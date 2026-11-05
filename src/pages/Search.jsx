@@ -30,16 +30,19 @@ const Search = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const sentinelRef = useRef(null);
 
-  useEffect(() => {
-    if (!searchTerm) return;
+  const queryTerm = searchTerm ? decodeURIComponent(searchTerm).trim() : 'trending hindi songs';
 
-    const cacheKey = `tt_search_${searchTerm}_${activeFilter}`;
+  useEffect(() => {
+    const cacheKey = `tt_search_${queryTerm}_${activeFilter}`;
     try {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
-        setResults(JSON.parse(cached));
-        setLoading(false);
-        return;
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setResults(parsed);
+          setLoading(false);
+          return;
+        }
       }
     } catch {}
 
@@ -53,8 +56,8 @@ const Search = () => {
         let nextTok = null;
 
         const endpoint = activeFilter
-          ? `${API_BASE}/api/search?q=${encodeURIComponent(searchTerm)}&filter=${activeFilter}&language=en&hl=en`
-          : `${API_BASE}/api/search?q=${encodeURIComponent(searchTerm)}&language=en&hl=en`;
+          ? `${API_BASE}/api/search?q=${encodeURIComponent(queryTerm)}&filter=${activeFilter}&language=en&hl=en`
+          : `${API_BASE}/api/search?q=${encodeURIComponent(queryTerm)}&language=en&hl=en`;
 
         const res = await fetch(endpoint).then((r) => r.json()).catch(() => ({}));
         combined = res?.results || (Array.isArray(res) ? res : []);
@@ -63,7 +66,7 @@ const Search = () => {
         // If 'all' was selected and song count was low, append dedicated songs query quickly in parallel
         if (!activeFilter && combined.filter((i) => i.videoId || i.resultType === 'song').length < 8) {
           try {
-            const songsRes = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(searchTerm)}&filter=songs&language=en&hl=en`).then((r) => r.json());
+            const songsRes = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(queryTerm)}&filter=songs&language=en&hl=en`).then((r) => r.json());
             if (songsRes?.results?.length) {
               combined = [...combined, ...songsRes.results];
               nextTok = nextTok || songsRes.continuationToken || null;
@@ -102,7 +105,7 @@ const Search = () => {
     return () => {
       isMounted = false;
     };
-  }, [searchTerm, activeFilter]);
+  }, [queryTerm, activeFilter]);
 
   // Infinite Scroll Handler: fetches next 20 songs, hides automatically when finished
   const handleLoadMore = async () => {
@@ -189,7 +192,11 @@ const Search = () => {
       <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold theme-text-main">
-            Results for <span className="text-rose-500">"{decodedTerm}"</span>
+            {searchTerm ? (
+              <>Results for <span className="text-rose-500">"{decodedTerm}"</span></>
+            ) : (
+              <>Trending & <span className="text-rose-500">Top Music</span></>
+            )}
           </h1>
           <p className="text-xs theme-text-muted mt-1">
             Found {prioritizedSongs.length} songs & artists

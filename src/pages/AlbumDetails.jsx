@@ -21,29 +21,61 @@ const AlbumDetails = () => {
     let isMounted = true;
     setLoading(true);
 
-    fetch(`${API_BASE}/api/albums/${encodeURIComponent(id)}`)
-      .then((res) => res.json())
-      .then((data) => {
+    const loadAlbumData = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/albums/${encodeURIComponent(id)}`);
+        const data = await res.json();
         if (!isMounted) return;
-        const alb = data.album || data;
+
+        const alb = data.album || data || {};
         setAlbumData(alb);
-        const albumArtist = alb.artist || (alb.artists && alb.artists[0]?.name) || data.artist?.name || '';
-        const trks = (data.tracks || []).map((t) => ({
-          ...t,
-          artist: t.artist || (t.artists && t.artists[0]?.name) || albumArtist,
-          thumbnail: t.thumbnail || alb.thumbnail || alb.thumbnails?.[0]?.url,
-        })).map((t) => normalizeSong(t, albumArtist)).filter(Boolean);
-        setTracks(trks);
-      })
-      .catch(() => {})
-      .finally(() => {
+
+        const albumArtist =
+          alb.artist?.name ||
+          alb.artist ||
+          (alb.artists && alb.artists[0]?.name) ||
+          data.artist?.name ||
+          '';
+
+        let trks = (data.tracks || [])
+          .map((t) => ({
+            ...t,
+            artist: t.artist || (t.artists && t.artists[0]?.name) || albumArtist,
+            thumbnail: t.thumbnail || alb.thumbnail || alb.thumbnails?.[0]?.url,
+          }))
+          .map((t) => normalizeSong(t, albumArtist))
+          .filter(Boolean);
+
+        // Fallback: If no tracks were returned, search tracks by album name
+        if (trks.length === 0 && (alb.title || albumNameParam)) {
+          const queryTitle = alb.title || albumNameParam;
+          try {
+            const fallbackRes = await fetch(
+              `${API_BASE}/api/search?q=${encodeURIComponent(`${queryTitle} songs`)}&filter=songs&language=en&hl=en`
+            ).then((r) => r.json());
+
+            if (fallbackRes?.results?.length) {
+              trks = fallbackRes.results.map((t) => normalizeSong(t, albumArtist)).filter(Boolean);
+            }
+          } catch (e) {}
+        }
+
+        if (isMounted) {
+          setTracks(trks);
+        }
+      } catch (err) {
+        console.warn('Failed to load album:', err);
+      } finally {
         if (isMounted) setLoading(false);
-      });
+      }
+    };
+
+    loadAlbumData();
 
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, albumNameParam]);
 
   const handlePlayAll = () => {
     if (tracks.length > 0) {

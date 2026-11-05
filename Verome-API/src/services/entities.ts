@@ -23,22 +23,39 @@ export async function getSongComplete(videoId: string, ytmusic: YTMusic) {
 
 export async function getAlbumComplete(browseId: string, ytmusic: YTMusic) {
   const album = await ytmusic.getAlbum(browseId);
-  if (!album?.title) return { success: false, error: "Album not found" };
-
-  let artistBrowseId = null;
-  if (album.artist) {
-    const artistSearch = await ytmusic.search(album.artist, "artists");
-    artistBrowseId = artistSearch.results?.[0]?.browseId || null;
+  if (!album?.title && (!album?.tracks || album.tracks.length === 0)) {
+    const pl = await ytmusic.getPlaylist(browseId);
+    if (pl?.tracks?.length) {
+      return {
+        success: true,
+        album: { browseId, title: pl.title || "Album", year: "", thumbnail: pl.thumbnail, trackCount: pl.tracks.length },
+        artist: { name: (pl as any).author || (pl as any).artist || "Artist", browseId: null },
+        tracks: pl.tracks.map((t: any, i: number) => ({
+          videoId: t.videoId,
+          title: t.title,
+          duration: t.duration,
+          artist: t.artist || (pl as any).author || (pl as any).artist,
+          trackNumber: i + 1,
+        })),
+      };
+    }
+    return { success: false, error: "Album not found" };
   }
 
   return {
     success: true,
-    album: { browseId: album.browseId, title: album.title, year: album.year, thumbnail: album.thumbnail, trackCount: album.trackCount },
-    artist: { name: album.artist, browseId: artistBrowseId },
-    tracks: album.tracks.map((t: any, i: number) => ({
+    album: {
+      browseId: album.browseId,
+      title: album.title || "Album",
+      year: album.year || "",
+      thumbnail: album.thumbnail,
+      trackCount: album.trackCount || album.tracks?.length || 0,
+    },
+    artist: { name: album.artist || "", browseId: null },
+    tracks: (album.tracks || []).map((t: any, i: number) => ({
       videoId: t.videoId,
       title: t.title,
-      duration: t.duration,
+      duration: t.duration || "",
       artist: t.artist || (t.artists && t.artists[0]?.name) || album.artist,
       trackNumber: i + 1,
     })),

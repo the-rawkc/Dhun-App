@@ -61,7 +61,12 @@ export class YTMusic {
   // ─── Browse: Album ────────────────────────────────────────
 
   async getAlbum(browseId: string) {
-    const data = await this.makeRequest("browse", { browseId });
+    let cleanBrowseId = browseId;
+    if (cleanBrowseId.startsWith("OLAK") && !cleanBrowseId.startsWith("VL")) {
+      cleanBrowseId = `VL${cleanBrowseId}`;
+    }
+
+    const data = await this.makeRequest("browse", { browseId: cleanBrowseId });
 
     const singleColumn = data?.contents?.singleColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents;
     const twoColumnPrimary = data?.contents?.twoColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents;
@@ -71,14 +76,15 @@ export class YTMusic {
 
     const oldHeader = data?.header?.musicDetailHeaderRenderer ||
       data?.header?.musicImmersiveHeaderRenderer ||
-      data?.header?.musicVisualHeaderRenderer;
+      data?.header?.musicVisualHeaderRenderer ||
+      data?.header?.musicResponsiveHeaderRenderer;
 
     if (oldHeader) {
-      title = oldHeader.title?.runs?.[0]?.text;
+      title = oldHeader.title?.runs?.[0]?.text || title;
       const subtitleRuns = oldHeader.subtitle?.runs || oldHeader.straplineTextOne?.runs || [];
-      artist = subtitleRuns.find((r: any) => r.navigationEndpoint)?.text || subtitleRuns[0]?.text;
+      artist = subtitleRuns.find((r: any) => r.navigationEndpoint)?.text || subtitleRuns[0]?.text || artist;
       thumbnail = oldHeader.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.slice(-1)[0]?.url ||
-        oldHeader.thumbnail?.croppedSquareThumbnailRenderer?.thumbnail?.thumbnails?.slice(-1)[0]?.url;
+        oldHeader.thumbnail?.croppedSquareThumbnailRenderer?.thumbnail?.thumbnails?.slice(-1)[0]?.url || thumbnail;
     }
 
     const primaryContents = twoColumnPrimary || singleColumn || [];
@@ -101,12 +107,45 @@ export class YTMusic {
       }
     }
 
-    const trackContents = twoColumnSecondary || singleColumn || [];
+    const allSections = [
+      ...(twoColumnSecondary || []),
+      ...(twoColumnPrimary || []),
+      ...(singleColumn || []),
+      ...(data?.contents?.sectionListRenderer?.contents || []),
+    ];
+
     const tracks: any[] = [];
-    for (const section of trackContents) {
-      for (const item of (section.musicShelfRenderer?.contents || [])) {
-        const parsed = parseMusicItem(item.musicResponsiveListItemRenderer);
-        if (parsed) tracks.push(parsed);
+    const seenTrackIds = new Set();
+
+    for (const section of allSections) {
+      const shelfItems = section.musicShelfRenderer?.contents ||
+        section.musicPlaylistShelfRenderer?.contents ||
+        section.itemSectionRenderer?.contents || [];
+
+      for (const item of shelfItems) {
+        if (item.musicResponsiveListItemRenderer) {
+          const parsed = parseMusicItem(item.musicResponsiveListItemRenderer);
+          if (parsed && parsed.videoId && !seenTrackIds.has(parsed.videoId)) {
+            seenTrackIds.add(parsed.videoId);
+            tracks.push(parsed);
+          }
+        }
+      }
+    }
+
+    // Fallback to getPlaylist if album tracks were not populated
+    if (tracks.length === 0 && (browseId.startsWith("OLAK") || browseId.startsWith("VL") || browseId.startsWith("RD"))) {
+      const pl = await this.getPlaylist(browseId);
+      if (pl?.tracks?.length) {
+        return {
+          browseId,
+          title: pl.title || title,
+          artist: (pl as any).author || (pl as any).artist || artist,
+          thumbnail: pl.thumbnail || thumbnail,
+          year: year || "",
+          trackCount: pl.tracks.length,
+          tracks: pl.tracks,
+        };
       }
     }
 
