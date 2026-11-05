@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <!-- Premium Crimson Brand Gradient -->
+    <!-- Dhun Premium Crimson Gradient -->
     <linearGradient id="dhunBg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#f43f5e"/>
       <stop offset="100%" stop-color="#be123c"/>
@@ -10,13 +10,16 @@
   <!-- Sober, Crisp Circular Badge -->
   <circle cx="256" cy="256" r="248" fill="url(#dhunBg)"/>
 
-  <!-- 3 Simple, Sober, Sharp Harmonic Soundwaves (Spotify Inspired) -->
-  <g fill="none" stroke="#0a0a0e" stroke-linecap="round">
-    <!-- Top Wave -->
-    <path d="M135 208 C 200 148, 305 142, 377 182" stroke-width="44"/>
-    <!-- Middle Wave -->
-    <path d="M158 272 C 212 222, 295 218, 354 250" stroke-width="40"/>
-    <!-- Bottom Wave -->
-    <path d="M182 336 C 225 296, 285 294, 330 318" stroke-width="36"/>
+  <!-- Soundwave Rhombus Graphic -->
+  <g fill="#ffffff">
+    <circle cx="114.6" cy="256" r="10.8" />
+    <rect x="140.4" y="219.4" width="21.5" height="73.1" rx="10.75" />
+    <rect x="176.9" y="187.2" width="21.5" height="137.6" rx="10.75" />
+    <rect x="211.9" y="120.6" width="22.6" height="270.9" rx="11.3" />
+    <rect x="247.9" y="154.9" width="21.5" height="202.1" rx="10.75" />
+    <rect x="282.4" y="185.1" width="21.5" height="141.9" rx="10.75" />
+    <rect x="318.4" y="209.8" width="20.4" height="92.5" rx="10.2" />
+    <rect x="352.8" y="230.2" width="20.4" height="51.6" rx="10.2" />
+    <circle cx="397.4" cy="256" r="10.2" />
   </g>
 </svg>
