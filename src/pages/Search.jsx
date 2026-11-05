@@ -59,7 +59,18 @@ const Search = () => {
           ? `${API_BASE}/api/search?q=${encodeURIComponent(queryTerm)}&filter=${activeFilter}&language=en&hl=en`
           : `${API_BASE}/api/search?q=${encodeURIComponent(queryTerm)}&language=en&hl=en`;
 
-        const res = await fetch(endpoint).then((r) => r.json()).catch(() => ({}));
+        const response = await fetch(endpoint).catch(() => null);
+        if (!response || !response.ok) {
+          setError(
+            response?.status === 503
+              ? 'Backend API quota or usage limit reached on Deno Deploy (503 Service Unavailable). Please check your Deno Deploy project.'
+              : 'Search request failed. Unable to reach backend server.'
+          );
+          setLoading(false);
+          return;
+        }
+
+        const res = await response.json().catch(() => ({}));
         combined = res?.results || (Array.isArray(res) ? res : []);
         nextTok = res?.continuationToken || null;
 
@@ -230,8 +241,14 @@ const Search = () => {
       )}
 
       {error && !loading && (
-        <div className="p-8 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-center text-rose-500 text-sm">
-          Search request failed. Please check connection.
+        <div className="p-8 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-center text-rose-500 text-sm max-w-lg mx-auto my-6 space-y-2">
+          <p className="font-semibold">{typeof error === 'string' ? error : 'Search request failed. Please check connection.'}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-1.5 text-xs bg-rose-600 hover:bg-rose-500 text-white rounded-full font-bold shadow transition-colors"
+          >
+            Retry
+          </button>
         </div>
       )}
 
