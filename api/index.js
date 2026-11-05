@@ -1941,12 +1941,9 @@ async function handleAuthProfile(searchParams) {
 }
 
 // api/index.ts
-var config = {
-  runtime: "edge"
-};
 var ytmusic = new YTMusic();
 var youtubeSearch = new YouTubeSearch();
-async function handler(req) {
+async function handleWebRequest(req) {
   const url = new URL(req.url);
   const { pathname, searchParams } = url;
   if (req.method === "OPTIONS") {
@@ -1955,7 +1952,7 @@ async function handler(req) {
   try {
     let response = null;
     if (pathname === "/health" || pathname === "/api/health") {
-      return json({ status: "ok", version: "2.0.0", platform: "vercel-edge" });
+      return json({ status: "ok", version: "2.0.0", platform: "vercel" });
     }
     if (pathname === "/api/auth/login")
       return await handleAuthLogin(req);
@@ -1991,7 +1988,28 @@ async function handler(req) {
     return json({ error: "Internal Server Error", message: err?.message || String(err) }, 500);
   }
 }
+async function handler(req, res) {
+  if (res && typeof res.status === "function") {
+    try {
+      const proto = req.headers["x-forwarded-proto"] || "https";
+      const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
+      const fullUrl = `${proto}://${host}${req.url}`;
+      const webReq = new Request(fullUrl, {
+        method: req.method,
+        headers: req.headers
+      });
+      const webRes = await handleWebRequest(webReq);
+      res.status(webRes.status);
+      webRes.headers.forEach((val, key) => res.setHeader(key, val));
+      const body = await webRes.text();
+      return res.end(body);
+    } catch (e) {
+      res.status(500).json({ error: e?.message || "Internal error" });
+    }
+  } else {
+    return await handleWebRequest(req);
+  }
+}
 export {
-  config,
   handler as default
 };

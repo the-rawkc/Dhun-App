@@ -10,14 +10,10 @@ import { handleInfoRoutes } from "../Verome-API/src/routes/info.ts";
 import { handleFeedRoutes } from "../Verome-API/src/routes/feed.ts";
 import { handleAuthLogin, handleAuthSync, handleAuthProfile } from "../Verome-API/src/routes/auth.ts";
 
-export const config = {
-  runtime: 'edge',
-};
-
 const ytmusic = new YTMusic();
 const youtubeSearch = new YouTubeSearch();
 
-export default async function handler(req: Request): Promise<Response> {
+async function handleWebRequest(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const { pathname, searchParams } = url;
 
@@ -30,7 +26,7 @@ export default async function handler(req: Request): Promise<Response> {
     let response: Response | null = null;
 
     if (pathname === "/health" || pathname === "/api/health") {
-      return json({ status: "ok", version: "2.0.0", platform: "vercel-edge" });
+      return json({ status: "ok", version: "2.0.0", platform: "vercel" });
     }
 
     // ─── Cloud User Database & Authentication ────────────────
@@ -67,5 +63,31 @@ export default async function handler(req: Request): Promise<Response> {
     return json({ error: "Endpoint not found", path: pathname }, 404);
   } catch (err: any) {
     return json({ error: "Internal Server Error", message: err?.message || String(err) }, 500);
+  }
+}
+
+export default async function handler(req: any, res?: any): Promise<any> {
+  // Check if Node.js serverless invocation (req: IncomingMessage, res: ServerResponse)
+  if (res && typeof res.status === "function") {
+    try {
+      const proto = req.headers["x-forwarded-proto"] || "https";
+      const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
+      const fullUrl = `${proto}://${host}${req.url}`;
+      const webReq = new Request(fullUrl, {
+        method: req.method,
+        headers: req.headers,
+      });
+      const webRes = await handleWebRequest(webReq);
+
+      res.status(webRes.status);
+      webRes.headers.forEach((val, key) => res.setHeader(key, val));
+      const body = await webRes.text();
+      return res.end(body);
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || "Internal error" });
+    }
+  } else {
+    // Edge runtime invocation (req: Request)
+    return await handleWebRequest(req);
   }
 }
