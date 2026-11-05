@@ -7,7 +7,7 @@ import { parseSearchResults, parseSuggestions, parseMusicItem, parseTwoRowItem }
 
 export class YTMusic {
   private baseURL = "https://music.youtube.com/youtubei/v1";
-  private apiKey = Deno.env.get("YTM_API_KEY") || atob("QUl6YVN5QzlYTDNaaldqWENsSVgxRm1VeEpxLS1Fb2hjRDRfb1Nz");
+  private apiKey = (typeof Deno !== "undefined" ? Deno.env.get("YTM_API_KEY") : typeof process !== "undefined" ? process.env?.["YTM_API_KEY"] : undefined) || atob("QUl6YVN5QzlYTDNaaldqWENsSVgxRm1VeEpxLS1Fb2hjRDRfb1Nz");
   private context = {
     client: {
       hl: "en",

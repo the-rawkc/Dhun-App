@@ -5,10 +5,15 @@
  */
 
 import { json, error } from "../helpers/response.ts";
-import { fromFileUrl } from "jsr:@std/path";
 
-const DATA_DIR = fromFileUrl(new URL("../../data", import.meta.url));
-const DB_FILE = fromFileUrl(new URL("../../data/users.json", import.meta.url));
+function fileUrlToPath(url: URL): string {
+  let path = url.pathname;
+  if (/^\/[a-zA-Z]:/.test(path)) path = path.slice(1);
+  return decodeURIComponent(path);
+}
+
+const DATA_DIR = fileUrlToPath(new URL("../../data", import.meta.url));
+const DB_FILE = fileUrlToPath(new URL("../../data/users.json", import.meta.url));
 
 interface UserRecord {
   phone: string;

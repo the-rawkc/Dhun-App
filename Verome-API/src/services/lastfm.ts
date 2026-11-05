@@ -3,7 +3,15 @@
  * Artist info, track info, and similar tracks
  */
 
-const API_KEY = Deno.env.get("LASTFM_API_KEY") || atob("MDg2N2JjYjZmMzZjODc5Mzk4OTY5ZGI2ODJhN2I2OWI=");
+const getEnv = (key: string) => {
+  try {
+    if (typeof Deno !== "undefined") return Deno.env.get(key);
+    if (typeof process !== "undefined") return process.env?.[key];
+  } catch {}
+  return undefined;
+};
+
+const API_KEY = getEnv("LASTFM_API_KEY") || atob("MDg2N2JjYjZmMzZjODc5Mzk4OTY5ZGI2ODJhN2I2OWI=");
 
 export const LastFM = {
   API_KEY,
