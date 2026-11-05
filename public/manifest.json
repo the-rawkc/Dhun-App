@@ -1,0 +1,24 @@
+{
+  "name": "Dhun — Indian & Global Music Streaming",
+  "short_name": "Dhun",
+  "description": "Unlimited Free Indian & Worldwide Music Streaming with Offline Downloads and Synced Lyrics",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070709",
+  "theme_color": "#e11d48",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

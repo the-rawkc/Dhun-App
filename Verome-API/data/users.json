@@ -1,0 +1,29 @@
+{
+  "9876543210": {
+    "phone": "9876543210",
+    "pin": "1234",
+    "name": "Rahul Sharma",
+    "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=9876543210",
+    "joinedAt": "Nov 2026",
+    "favorites": [
+      {
+        "artist": "Arijit Singh",
+        "title": "Tum Hi Ho",
+        "videoId": "test1234"
+      }
+    ],
+    "playlists": [
+      {
+        "id": "pl-1793877167013-1",
+        "title": "My Desi Hits",
+        "description": "Top Bollywood & Soulful Tracks",
+        "cover": "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80",
+        "tracks": [],
+        "createdAt": 1793877167014
+      }
+    ],
+    "favoriteArtists": [],
+    "themeMode": "dark",
+    "updatedAt": 1793877167312
+  }
+}
