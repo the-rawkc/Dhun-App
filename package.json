@@ -2,9 +2,8 @@
   "name": "dhun-music-app",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
   "scripts": {
-    "start": "node server.js",
+    "start": "node server.mjs",
     "dev": "concurrently -n \"API,WEB\" -c \"cyan,green\" \"npm run server\" \"npm run client\"",
     "client": "vite",
     "server": "deno run --allow-net --allow-env --allow-read --allow-write Verome-API/main.ts",
