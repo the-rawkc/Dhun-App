@@ -8,8 +8,6 @@ import {
   FaSearch,
   FaTimes,
   FaUser,
-  FaMoon,
-  FaSun,
 } from 'react-icons/fa';
 
 const TopBar = () => {
@@ -84,20 +82,37 @@ const TopBar = () => {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between gap-3 px-4 md:px-8 py-3.5 theme-bg-main/90 backdrop-blur-md border-b theme-border">
+    <header className="sticky top-0 z-30 flex items-center gap-3 px-4 md:px-8 py-3.5 theme-bg-main/90 backdrop-blur-md border-b theme-border">
+      {/* Profile Icon shifted to the LEFT (Icon only, no text) */}
+      <button
+        onClick={() => navigate('/profile')}
+        className="shrink-0 p-0.5 rounded-full ring-2 ring-rose-500/30 hover:ring-rose-500 transition-all cursor-pointer active:scale-95 shadow-md shadow-rose-600/10"
+        title={user?.name ? `${user.name} - Profile` : 'Your Profile'}
+        aria-label="Profile"
+      >
+        {user?.avatar ? (
+          <img
+            src={user.avatar}
+            alt="avatar"
+            className="w-9 h-9 rounded-full object-cover border-2 border-rose-500 shadow-sm"
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-rose-600 to-red-500 flex items-center justify-center text-white text-xs shadow-sm">
+            <FaUser />
+          </div>
+        )}
+      </button>
+
       {/* Search Bar Container */}
       <div ref={containerRef} className="relative flex-1 max-w-xl">
         <form onSubmit={handleSearchSubmit} className="relative flex items-center">
-          <div className="absolute left-3.5 theme-text-muted pointer-events-none">
-            <FaSearch className="text-xs" />
-          </div>
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setIsFocused(true)}
             placeholder="Search Hindi, Punjabi, Bollywood songs or artists..."
-            className="w-full pl-9 pr-8 py-2 rounded-full bg-slate-500/10 border theme-border theme-text-main placeholder-slate-400 text-xs md:text-sm focus:outline-none focus:border-rose-500 transition-all"
+            className="w-full pl-4 pr-11 py-2.5 rounded-full bg-slate-500/10 border theme-border theme-text-main placeholder-slate-400 text-xs md:text-sm focus:outline-none focus:border-rose-500 transition-all"
           />
           {query && (
             <button
@@ -106,11 +121,20 @@ const TopBar = () => {
                 setQuery('');
                 setSuggestions([]);
               }}
-              className="absolute right-3 p-1 theme-text-muted hover:theme-text-main"
+              className="absolute right-9 p-1 theme-text-muted hover:theme-text-main"
             >
               <FaTimes className="text-xs" />
             </button>
           )}
+          {/* Search Icon on the RIGHT */}
+          <button
+            type="submit"
+            className="absolute right-3.5 p-1 theme-text-muted hover:text-rose-500 transition-colors"
+            title="Search"
+            aria-label="Search"
+          >
+            <FaSearch className="text-sm" />
+          </button>
         </form>
 
         {/* Fast Autocomplete Dropdown */}
@@ -131,40 +155,6 @@ const TopBar = () => {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Right Actions: Theme Toggle & Profile Button */}
-      <div className="flex items-center gap-2.5">
-        {/* Quick Theme Toggle */}
-        <button
-          onClick={handleToggleTheme}
-          className="p-2 rounded-full hover:bg-slate-500/10 theme-text-muted hover:theme-text-main transition-all"
-          title={`Switch to ${themeMode === 'dark' ? 'Light (White & Red)' : 'Dark (Black & Red)'} Mode`}
-        >
-          {themeMode === 'dark' ? <FaSun className="text-amber-400 text-sm" /> : <FaMoon className="text-rose-600 text-sm" />}
-        </button>
-
-        {/* User Profile Button */}
-        <button
-          onClick={() => navigate('/profile')}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-500/10 hover:bg-slate-500/20 border theme-border transition-all cursor-pointer active:scale-95"
-          title="Open Profile Page"
-        >
-          {user?.avatar ? (
-            <img
-              src={user.avatar}
-              alt="avatar"
-              className="w-5 h-5 rounded-full object-cover border border-rose-500"
-            />
-          ) : (
-            <div className="w-5 h-5 rounded-full bg-rose-600 flex items-center justify-center text-white text-[10px]">
-              <FaUser />
-            </div>
-          )}
-          <span className="text-xs font-semibold theme-text-main truncate max-w-[100px]">
-            {user?.name ? user.name.split(' ')[0] : 'Profile'}
-          </span>
-        </button>
       </div>
     </header>
   );

@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 // Verome-API/src/services/ytmusic-parser.ts
 function parseSearchResults(data) {
   const results = [];
@@ -1784,146 +1787,155 @@ function parseVideo(video, channelId, channelName) {
 }
 
 // Verome-API/src/routes/auth.ts
-function fileUrlToPath(url) {
-  let path = url.pathname;
-  if (/^\/[a-zA-Z]:/.test(path))
-    path = path.slice(1);
-  return decodeURIComponent(path);
+function getDbPaths() {
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  const dataDir = isServerless ? '/tmp' : path.resolve(process.cwd(), 'data');
+  const dbFile = path.resolve(dataDir, 'users.json');
+  return { dataDir, dbFile };
 }
-var DATA_DIR = fileUrlToPath(new URL("../../data", import.meta.url));
-var DB_FILE = fileUrlToPath(new URL("../../data/users.json", import.meta.url));
+
 var usersCache = {};
 var isLoaded = false;
+
 async function ensureDB() {
-  if (isLoaded)
-    return;
+  if (isLoaded) return;
+  const { dataDir, dbFile } = getDbPaths();
   try {
-    await Deno.mkdir(DATA_DIR, { recursive: true });
-  } catch {
-  }
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+  } catch (e) {}
   try {
-    const content = await Deno.readTextFile(DB_FILE);
-    usersCache = JSON.parse(content);
-  } catch {
+    if (fs.existsSync(dbFile)) {
+      const content = fs.readFileSync(dbFile, 'utf-8');
+      usersCache = JSON.parse(content);
+    } else {
+      usersCache = {};
+    }
+  } catch (e) {
     usersCache = {};
   }
   isLoaded = true;
 }
+
 async function persistDB() {
+  const { dataDir, dbFile } = getDbPaths();
   try {
-    await Deno.mkdir(DATA_DIR, { recursive: true });
-    await Deno.writeTextFile(DB_FILE, JSON.stringify(usersCache, null, 2));
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(dbFile, JSON.stringify(usersCache, null, 2), 'utf-8');
   } catch (err) {
-    console.error("Failed to persist users database:", err);
+    console.error('Failed to persist users database:', err);
   }
 }
+
 async function handleAuthLogin(req) {
-  if (req.method !== "POST")
-    return error("Method not allowed", 405);
+  if (req.method !== 'POST') return error('Method not allowed', 405);
   let body = {};
   try {
     body = await req.json();
   } catch {
-    return error("Invalid JSON body");
+    return error('Invalid JSON body');
   }
-  const { phone, pin, name } = body;
-  if (!phone || typeof phone !== "string")
-    return error("Mobile number is required");
-  if (!pin || typeof pin !== "string" || pin.length !== 4)
-    return error("4-digit PIN is required");
-  const cleanPhone = phone.replace(/\D/g, "").slice(-10);
-  if (cleanPhone.length !== 10)
-    return error("Please provide a valid 10-digit Indian mobile number");
+  const { phone, pin, name, avatar } = body;
+  if (!phone || typeof phone !== 'string') return error('Mobile number is required');
+  if (!pin || typeof pin !== 'string' || pin.length !== 4) return error('4-digit PIN is required');
+  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+  if (cleanPhone.length !== 10) return error('Please provide a valid 10-digit Indian mobile number');
+
   await ensureDB();
   let user = usersCache[cleanPhone];
+
   if (user) {
     if (user.pin !== pin) {
-      return error("Incorrect 4-digit PIN. Please try again.", 401);
+      return error('Incorrect 4-digit PIN. Please try again.', 401);
     }
+    if (name && name.trim()) user.name = name.trim();
+    if (avatar && avatar.trim()) user.avatar = avatar.trim();
+    user.updatedAt = Date.now();
+    await persistDB();
   } else {
+    const chosenAvatar = avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanPhone}`;
     user = {
       phone: cleanPhone,
       pin,
-      name: name && name.trim() || `User +91-${cleanPhone.slice(-4)}`,
-      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanPhone}`,
-      joinedAt: new Date().toLocaleDateString("en-IN", { month: "short", year: "numeric" }),
+      name: (name && name.trim()) || `User +91-${cleanPhone.slice(-4)}`,
+      avatar: chosenAvatar,
+      joinedAt: new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
       favorites: [],
       playlists: [
         {
           id: `pl-${Date.now()}-1`,
-          title: "My Desi Hits",
-          description: "Top Bollywood & Soulful Tracks",
-          cover: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80",
+          title: 'My Favorite Songs',
+          description: 'Personal playlist',
+          cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80',
           tracks: [],
-          createdAt: Date.now()
-        }
+          createdAt: Date.now(),
+        },
       ],
       favoriteArtists: [],
-      themeMode: "dark",
-      updatedAt: Date.now()
+      themeMode: 'dark',
+      updatedAt: Date.now(),
     };
     usersCache[cleanPhone] = user;
     await persistDB();
   }
+
   return json({
     success: true,
     user: {
       phone: user.phone,
       name: user.name,
       avatar: user.avatar,
-      joinedAt: user.joinedAt
+      joinedAt: user.joinedAt,
     },
     favorites: user.favorites || [],
     playlists: user.playlists || [],
     favoriteArtists: user.favoriteArtists || [],
-    themeMode: user.themeMode || "dark"
+    themeMode: user.themeMode || 'dark',
   });
 }
+
 async function handleAuthSync(req) {
-  if (req.method !== "POST")
-    return error("Method not allowed", 405);
+  if (req.method !== 'POST') return error('Method not allowed', 405);
   let body = {};
   try {
     body = await req.json();
   } catch {
-    return error("Invalid JSON body");
+    return error('Invalid JSON body');
   }
   const { phone, pin, favorites, playlists, favoriteArtists, themeMode } = body;
-  if (!phone || !pin)
-    return error("Phone and PIN required for sync", 400);
-  const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+  if (!phone || !pin) return error('Phone and PIN required for sync', 400);
+  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
   await ensureDB();
   const user = usersCache[cleanPhone];
   if (!user || user.pin !== pin) {
-    return error("Unauthorized sync: invalid credentials", 401);
+    return error('Unauthorized sync: invalid credentials', 401);
   }
-  if (Array.isArray(favorites))
-    user.favorites = favorites;
-  if (Array.isArray(playlists))
-    user.playlists = playlists;
-  if (Array.isArray(favoriteArtists))
-    user.favoriteArtists = favoriteArtists;
-  if (themeMode)
-    user.themeMode = themeMode;
+  if (Array.isArray(favorites)) user.favorites = favorites;
+  if (Array.isArray(playlists)) user.playlists = playlists;
+  if (Array.isArray(favoriteArtists)) user.favoriteArtists = favoriteArtists;
+  if (themeMode) user.themeMode = themeMode;
   user.updatedAt = Date.now();
   usersCache[cleanPhone] = user;
   await persistDB();
   return json({
     success: true,
-    message: "Cloud database synced successfully",
-    updatedAt: user.updatedAt
+    message: 'Cloud database synced successfully',
+    updatedAt: user.updatedAt,
   });
 }
+
 async function handleAuthProfile(searchParams) {
-  const phone = searchParams.get("phone");
-  const pin = searchParams.get("pin");
-  if (!phone || !pin)
-    return error("Phone and PIN required", 400);
-  const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+  const phone = searchParams.get('phone');
+  const pin = searchParams.get('pin');
+  if (!phone || !pin) return error('Phone and PIN required', 400);
+  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
   await ensureDB();
   const user = usersCache[cleanPhone];
   if (!user || user.pin !== pin) {
-    return error("Invalid phone or PIN", 401);
+    return error('Invalid phone or PIN', 401);
   }
   return json({
     success: true,
@@ -1931,12 +1943,70 @@ async function handleAuthProfile(searchParams) {
       phone: user.phone,
       name: user.name,
       avatar: user.avatar,
-      joinedAt: user.joinedAt
+      joinedAt: user.joinedAt,
     },
     favorites: user.favorites || [],
     playlists: user.playlists || [],
     favoriteArtists: user.favoriteArtists || [],
-    themeMode: user.themeMode || "dark"
+    themeMode: user.themeMode || 'dark',
+  });
+}
+
+async function handleAuthUpdateProfile(req) {
+  if (req.method !== 'POST' && req.method !== 'PATCH') return error('Method not allowed', 405);
+  let body = {};
+  try {
+    body = await req.json();
+  } catch {
+    return error('Invalid JSON body');
+  }
+  const { phone, pin, name, avatar } = body;
+  if (!phone || !pin) return error('Phone and PIN required', 400);
+  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+  await ensureDB();
+  const user = usersCache[cleanPhone];
+  if (!user || user.pin !== pin) {
+    return error('Invalid phone or PIN', 401);
+  }
+  if (name && name.trim()) user.name = name.trim();
+  if (avatar && avatar.trim()) user.avatar = avatar.trim();
+  user.updatedAt = Date.now();
+  usersCache[cleanPhone] = user;
+  await persistDB();
+  return json({
+    success: true,
+    user: {
+      phone: user.phone,
+      name: user.name,
+      avatar: user.avatar,
+      joinedAt: user.joinedAt,
+    },
+  });
+}
+
+async function handleAdminUsers(req, searchParams) {
+  const adminPin = searchParams.get('adminPin') || req.headers.get('x-admin-pin');
+  if (adminPin !== '8888' && adminPin !== '1234') {
+    return error('Unauthorized admin access. Please provide valid admin PIN.', 401);
+  }
+  await ensureDB();
+  const usersList = Object.values(usersCache).map((u) => ({
+    phone: u.phone,
+    name: u.name,
+    avatar: u.avatar,
+    joinedAt: u.joinedAt,
+    updatedAt: u.updatedAt || Date.now(),
+    favoritesCount: Array.isArray(u.favorites) ? u.favorites.length : 0,
+    playlistsCount: Array.isArray(u.playlists) ? u.playlists.length : 0,
+    favorites: u.favorites || [],
+    playlists: u.playlists || [],
+    themeMode: u.themeMode || 'dark',
+  }));
+  return json({
+    success: true,
+    totalUsers: usersList.length,
+    users: usersList,
+    serverTime: new Date().toISOString(),
   });
 }
 
@@ -1960,6 +2030,10 @@ async function handleWebRequest(req) {
       return await handleAuthSync(req);
     if (pathname === "/api/auth/profile")
       return await handleAuthProfile(searchParams);
+    if (pathname === "/api/auth/profile/update" || pathname === "/api/auth/update")
+      return await handleAuthUpdateProfile(req);
+    if (pathname === "/api/admin/users")
+      return await handleAdminUsers(req, searchParams);
     if (pathname === "/api/search")
       response = await handleSearch(req, searchParams, ytmusic, youtubeSearch);
     else if (pathname === "/api/search/suggestions")
@@ -1994,9 +2068,14 @@ async function handler(req, res) {
       const proto = req.headers["x-forwarded-proto"] || "https";
       const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
       const fullUrl = `${proto}://${host}${req.url}`;
+      let bodyData = undefined;
+      if (req.method !== 'GET' && req.method !== 'HEAD' && req.body) {
+        bodyData = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      }
       const webReq = new Request(fullUrl, {
         method: req.method,
-        headers: req.headers
+        headers: req.headers,
+        body: bodyData,
       });
       const webRes = await handleWebRequest(webReq);
       res.status(webRes.status);

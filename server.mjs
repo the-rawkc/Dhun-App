@@ -31,8 +31,17 @@ const server = http.createServer(async (req, res) => {
   if (pathname.startsWith('/api') || pathname === '/health') {
     try {
       const fullUrl = `http://${req.headers.host || `localhost:${PORT}`}${req.url}`;
+      let bodyData = undefined;
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        const chunks = [];
+        for await (const chunk of req) chunks.push(chunk);
+        bodyData = Buffer.concat(chunks);
+      }
       const webReq = new Request(fullUrl, {
         method: req.method || 'GET',
+        headers: req.headers,
+        body: bodyData,
+        duplex: bodyData ? 'half' : undefined,
       });
 
       const webRes = await handler(webReq);

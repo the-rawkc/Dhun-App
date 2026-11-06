@@ -1,11 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import MobileNav from './components/MobileNav';
 import MusicPlayer from './components/MusicPlayer/MusicPlayer';
 import AddToPlaylistModal from './components/AddToPlaylistModal';
 import EqualizerModal from './components/EqualizerModal';
+import AuthLandingModal from './components/Auth/AuthLandingModal';
+import { getActiveSession, fetchCloudProfile } from './services/authService';
+import { loadCloudUserData } from './redux/features/playerSlice';
 import {
   Home,
   Search,
@@ -20,9 +24,27 @@ import {
   Podcast,
   Settings,
   Profile,
+  AdminPortal,
 } from './pages';
 
 const MainPage = () => {
+  const dispatch = useDispatch();
+  const [session, setSession] = useState(getActiveSession());
+  const [showAuthLanding, setShowAuthLanding] = useState(!getActiveSession());
+
+  useEffect(() => {
+    // If user is already logged in, seamlessly sync their latest songs and playlists from the cloud
+    if (session) {
+      fetchCloudProfile()
+        .then((data) => {
+          if (data && (data.favorites || data.playlists)) {
+            dispatch(loadCloudUserData(data));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [session, dispatch]);
+
   return (
     <div className="relative flex h-screen w-screen overflow-hidden theme-bg-main theme-text-main font-sans">
       {/* Desktop Left Sidebar */}
@@ -51,13 +73,14 @@ const MainPage = () => {
               <Route path="/podcast" element={<Podcast />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/admin" element={<AdminPortal />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
         </main>
       </div>
 
-      {/* Floating Bottom Music Player (Desktop Bar + Mobile Mini-Player + Mobile Full-Screen Sheet) */}
+      {/* Floating Bottom Music Player */}
       <MusicPlayer />
 
       {/* Mobile Bottom Navigation Bar */}
@@ -68,6 +91,15 @@ const MainPage = () => {
 
       {/* Global Spotify Pro Equalizer & Audio DSP Modal */}
       <EqualizerModal />
+
+      {/* First-Time Landing & Auth Modal */}
+      <AuthLandingModal
+        isOpen={showAuthLanding}
+        onClose={(user) => {
+          setSession(user || getActiveSession());
+          setShowAuthLanding(false);
+        }}
+      />
     </div>
   );
 };

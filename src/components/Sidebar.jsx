@@ -13,6 +13,7 @@ import {
   FaSlidersH,
   FaDownload,
   FaUser,
+  FaShieldAlt,
 } from 'react-icons/fa';
 
 const navItems = [
@@ -26,6 +27,7 @@ const libraryItems = [
   { name: 'Playlists & Library', to: '/library', icon: FaMusic },
   { name: 'Recently Played', to: '/recent', icon: FaHistory },
   { name: 'Your Profile', to: '/profile', icon: FaUser },
+  { name: 'Admin Portal', to: '/admin', icon: FaShieldAlt },
   { name: 'App Settings', to: '/settings', icon: FaSlidersH },
 ];
 

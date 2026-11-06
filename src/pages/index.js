@@ -11,6 +11,7 @@ import Recent from './Recent';
 import Podcast from './Podcast';
 import Settings from './Settings';
 import Profile from './Profile';
+import AdminPortal from './AdminPortal';
 
 export {
   Home,
@@ -26,4 +27,5 @@ export {
   Podcast,
   Settings,
   Profile,
+  AdminPortal,
 };

@@ -6,9 +6,11 @@ import {
   getActiveSession,
   loginWithPhoneAndPin,
   logoutUser,
+  updateProfileAvatar,
   exportUserDataJSON,
   importUserDataJSON,
 } from '../services/authService';
+import { PRESET_AVATARS } from '../utils/avatars';
 import {
   FaUser,
   FaPhoneAlt,
@@ -21,10 +23,11 @@ import {
   FaMobileAlt,
   FaFileExport,
   FaFileImport,
-  FaChevronRight,
   FaCheck,
   FaShieldAlt,
   FaCloudUploadAlt,
+  FaCamera,
+  FaTimes,
 } from 'react-icons/fa';
 
 const Profile = () => {
@@ -39,6 +42,11 @@ const Profile = () => {
   const [authError, setAuthError] = useState('');
   const [authSuccess, setAuthSuccess] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Avatar picker modal state
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [customAvatarUrl, setCustomAvatarUrl] = useState('');
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
 
   useEffect(() => {
     setCurrentUser(getActiveSession());
@@ -71,6 +79,30 @@ const Profile = () => {
     setAuthSuccess('You have logged out.');
   };
 
+  const handleSelectAvatar = async (avatarUrl) => {
+    if (!currentUser) {
+      alert('Please log in with your phone and PIN first to save your avatar.');
+      return;
+    }
+    setIsSavingAvatar(true);
+    try {
+      const updated = await updateProfileAvatar(avatarUrl);
+      setCurrentUser(updated);
+      setIsAvatarModalOpen(false);
+      setAuthSuccess('Avatar updated successfully!');
+    } catch (e) {
+      alert(e.message || 'Failed to update avatar');
+    } finally {
+      setIsSavingAvatar(false);
+    }
+  };
+
+  const handleCustomAvatarSubmit = (e) => {
+    e.preventDefault();
+    if (!customAvatarUrl.trim()) return;
+    handleSelectAvatar(customAvatarUrl.trim());
+  };
+
   const handleFileImport = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -90,7 +122,7 @@ const Profile = () => {
 
   return (
     <div className="flex flex-col gap-8 pb-28 select-none animate-fade-in max-w-4xl mx-auto">
-      {/* Page Title */}
+      {/* Page Title & App Settings */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold theme-text-main">
@@ -110,13 +142,20 @@ const Profile = () => {
         </button>
       </div>
 
+      {authSuccess && (
+        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-xs font-semibold flex items-center gap-2 animate-fade-in">
+          <FaCheck className="text-sm shrink-0" />
+          <span>{authSuccess}</span>
+        </div>
+      )}
+
       {/* Main Profile Header Card */}
       <div className="p-6 md:p-8 rounded-3xl theme-bg-card border theme-border shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 relative z-10">
-          {/* Avatar */}
-          <div className="relative">
+          {/* Avatar with Change Button */}
+          <div className="relative group">
             {currentUser?.avatar ? (
               <img
                 src={currentUser.avatar}
@@ -128,16 +167,43 @@ const Profile = () => {
                 <FaUser />
               </div>
             )}
-            <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-emerald-500 border-2 theme-border flex items-center justify-center text-white text-[10px]" title="Active">
+
+            {/* Click to Change Avatar Overlay */}
+            <button
+              onClick={() => setIsAvatarModalOpen(true)}
+              className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-[11px] font-bold transition-opacity cursor-pointer"
+              title="Change Profile Avatar"
+            >
+              <FaCamera className="text-base mb-1" />
+              <span>Change</span>
+            </button>
+
+            <div
+              className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-emerald-500 border-2 theme-border flex items-center justify-center text-white text-[10px]"
+              title="Active Status"
+            >
               <FaCheck />
             </div>
           </div>
 
           {/* User Meta */}
           <div className="flex-1 text-center sm:text-left">
-            <h2 className="text-xl md:text-2xl font-black theme-text-main">
-              {currentUser?.name || 'Guest Music Lover'}
-            </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+              <h2 className="text-xl md:text-2xl font-black theme-text-main">
+                {currentUser?.name || 'Guest Music Lover'}
+              </h2>
+
+              {/* Direct Choose Avatar Button */}
+              {currentUser && (
+                <button
+                  onClick={() => setIsAvatarModalOpen(true)}
+                  className="px-3 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 border border-rose-500/30 transition-all self-center sm:self-auto flex items-center gap-1.5"
+                >
+                  <FaCamera className="text-[10px]" />
+                  <span>Choose Avatar</span>
+                </button>
+              )}
+            </div>
 
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-500">
@@ -153,7 +219,7 @@ const Profile = () => {
 
             <p className="text-xs theme-text-muted mt-3 max-w-xl">
               {currentUser
-                ? 'Your songs and playlists are tied to your phone number and 4-digit PIN. Log in with the same details on any phone to retrieve your music.'
+                ? 'Your songs and playlists are tied to your phone number and 4-digit PIN. Log in with the same details on any device to retrieve your music.'
                 : 'Log in with your phone number and 4-digit PIN below so your songs and playlists never get lost when switching devices.'}
             </p>
           </div>
@@ -230,16 +296,10 @@ const Profile = () => {
             </div>
           )}
 
-          {authSuccess && (
-            <div className="mb-4 p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-xs font-semibold">
-              {authSuccess}
-            </div>
-          )}
-
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-bold theme-text-muted mb-1.5 uppercase tracking-wider">
-                Your Name (Optional)
+                Your Name (For new accounts)
               </label>
               <div className="relative">
                 <FaUser className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
@@ -258,15 +318,17 @@ const Profile = () => {
                 10-Digit Mobile Number
               </label>
               <div className="relative">
-                <FaPhoneAlt className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs">
+                  +91
+                </span>
                 <input
                   type="tel"
                   required
                   maxLength={10}
-                  placeholder="e.g. 9876543210"
+                  placeholder="9876543210"
                   value={phoneInput}
                   onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ''))}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-500/10 border theme-border text-sm font-mono theme-text-main focus:outline-none focus:border-rose-500 transition-colors"
+                  className="w-full pl-12 pr-4 py-2.5 rounded-2xl bg-slate-500/10 border theme-border text-sm font-mono theme-text-main focus:outline-none focus:border-rose-500 transition-colors"
                 />
               </div>
             </div>
@@ -302,7 +364,7 @@ const Profile = () => {
               ) : (
                 <>
                   <FaCloudUploadAlt className="text-base" />
-                  <span>Save & Load Account</span>
+                  <span>Log In & Sync My Music</span>
                 </>
               )}
             </button>
@@ -310,7 +372,7 @@ const Profile = () => {
         </div>
       ) : (
         <div className="p-6 md:p-8 rounded-3xl theme-bg-card border theme-border shadow-lg">
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 flex items-center justify-center text-emerald-500">
               <FaCheck className="text-base" />
             </div>
@@ -338,6 +400,29 @@ const Profile = () => {
           </div>
         </div>
       )}
+
+      {/* Admin Portal Card */}
+      <div className="p-6 md:p-8 rounded-3xl theme-bg-card border theme-border shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-rose-600/15 text-rose-500 flex items-center justify-center text-xl shrink-0 border border-rose-500/20">
+            <FaShieldAlt />
+          </div>
+          <div>
+            <h3 className="text-base font-bold theme-text-main">Admin Portal</h3>
+            <p className="text-xs theme-text-muted">
+              Monitor registered users, active playlists, and cloud database records
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => navigate('/admin')}
+          className="px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-md shadow-rose-600/30 flex items-center gap-2 self-start sm:self-auto"
+        >
+          <FaShieldAlt className="text-xs" />
+          <span>Open Admin Portal</span>
+        </button>
+      </div>
 
       {/* Library Backup & Transfer Section */}
       <div className="p-6 md:p-8 rounded-3xl theme-bg-card border theme-border shadow-lg">
@@ -369,6 +454,81 @@ const Profile = () => {
           </label>
         </div>
       </div>
+
+      {/* Choose Avatar Modal */}
+      {isAvatarModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-lg rounded-3xl theme-bg-card border theme-border shadow-2xl p-6 text-left max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-4 border-b theme-border">
+              <div>
+                <h3 className="text-base font-bold theme-text-main">Choose Your Avatar</h3>
+                <p className="text-xs theme-text-muted">Select an avatar style for your Dhun profile</p>
+              </div>
+              <button
+                onClick={() => setIsAvatarModalOpen(false)}
+                className="p-2 rounded-full theme-text-muted hover:theme-text-main bg-slate-500/10"
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto custom-scrollbar flex-1 py-4 space-y-5">
+              {/* Presets Grid */}
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                {PRESET_AVATARS.map((av) => (
+                  <button
+                    key={av.id}
+                    onClick={() => handleSelectAvatar(av.url)}
+                    disabled={isSavingAvatar}
+                    className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl border transition-all ${
+                      currentUser?.avatar === av.url
+                        ? 'border-rose-500 bg-rose-500/10 scale-105'
+                        : 'theme-border hover:bg-slate-500/10'
+                    }`}
+                  >
+                    <img src={av.url} alt={av.name} className="w-14 h-14 rounded-full object-cover shadow-md" />
+                    <span className="text-[10px] font-bold theme-text-main truncate max-w-[80px]">
+                      {av.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom Image URL Form */}
+              <form onSubmit={handleCustomAvatarSubmit} className="pt-2 border-t theme-border">
+                <label className="block text-xs font-bold theme-text-muted mb-1.5 uppercase tracking-wider">
+                  Or Paste Custom Image URL
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={customAvatarUrl}
+                    onChange={(e) => setCustomAvatarUrl(e.target.value)}
+                    placeholder="https://example.com/avatar.jpg"
+                    className="flex-1 px-3.5 py-2 rounded-xl bg-slate-500/10 border theme-border text-xs theme-text-main focus:outline-none focus:border-rose-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSavingAvatar || !customAvatarUrl.trim()}
+                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="pt-3 border-t theme-border flex justify-end">
+              <button
+                onClick={() => setIsAvatarModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-500/10 text-xs font-bold theme-text-main"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

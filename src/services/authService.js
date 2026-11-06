@@ -41,7 +41,7 @@ export const setCloudConfig = (config) => {
  * Universal Cloud Login using Mobile + 4-digit PIN
  * Connects directly to backend database so data is shared across all mobiles!
  */
-export const loginWithPhoneAndPin = async (phone, pin, name = '') => {
+export const loginWithPhoneAndPin = async (phone, pin, name = '', avatar = '') => {
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
   if (cleanPhone.length !== 10) throw new Error('Please enter a valid 10-digit Indian mobile number');
   if (!pin || pin.length !== 4) throw new Error('PIN must be 4 digits');
@@ -49,7 +49,7 @@ export const loginWithPhoneAndPin = async (phone, pin, name = '') => {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone: cleanPhone, pin, name }),
+    body: JSON.stringify({ phone: cleanPhone, pin, name, avatar }),
   });
 
   const data = await res.json();
@@ -63,6 +63,50 @@ export const loginWithPhoneAndPin = async (phone, pin, name = '') => {
   };
 
   setActiveSession(sessionObj);
+  return data;
+};
+
+/**
+ * Update User Avatar and Name in Cloud Database
+ */
+export const updateProfileAvatar = async (avatar, name = '') => {
+  const session = getActiveSession();
+  if (!session || !session.phone || !session.pin) throw new Error('User not logged in');
+
+  const res = await fetch(`${API_BASE}/api/auth/profile/update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      phone: session.phone,
+      pin: session.pin,
+      avatar,
+      name: name || session.name,
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'Failed to update profile');
+  }
+
+  const updatedSession = {
+    ...session,
+    avatar: data.user.avatar,
+    name: data.user.name,
+  };
+  setActiveSession(updatedSession);
+  return updatedSession;
+};
+
+/**
+ * Fetch all registered users for Admin Portal
+ */
+export const fetchAdminUsers = async (adminPin = '8888') => {
+  const res = await fetch(`${API_BASE}/api/admin/users?adminPin=${encodeURIComponent(adminPin)}`);
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'Failed to fetch admin users');
+  }
   return data;
 };
 
@@ -114,6 +158,11 @@ export const fetchCloudProfile = async () => {
 
 export const logoutUser = () => {
   setActiveSession(null);
+  try {
+    localStorage.removeItem('tunetide_favorites');
+    localStorage.removeItem('tunetide_playlists');
+    localStorage.removeItem('tunetide_fav_artists');
+  } catch (e) {}
 };
 
 export const exportUserDataJSON = () => {
