@@ -20,7 +20,6 @@ import {
   FaRedo,
   FaHeart,
   FaRegHeart,
-  FaChevronDown,
   FaChevronUp,
   FaArrowLeft,
   FaListUl,
@@ -29,7 +28,6 @@ import {
   FaFolderPlus,
   FaMicrophoneAlt,
   FaSlidersH,
-  FaTimes,
 } from 'react-icons/fa';
 import SyncedLyrics from '../SyncedLyrics';
 import { saveTrackOffline, getOfflineTrack } from '../../services/offlineStorage';
@@ -56,31 +54,6 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
 
   const [activeTab, setActiveTab] = useState('art'); // 'art' | 'lyrics'
   const [downloadStatus, setDownloadStatus] = useState('idle');
-
-  // Touch gesture refs for sliding up lyrics and sliding down to return
-  const touchStartY = useRef(0);
-  const touchStartX = useRef(0);
-
-  const handleTouchStart = (e) => {
-    touchStartY.current = e.touches[0].clientY;
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = (e) => {
-    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
-    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
-
-    // Detect dominant vertical swipe
-    if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 35) {
-      if (deltaY < -35 && activeTab !== 'lyrics') {
-        // Swiped UP -> Slide up live lyrics!
-        setActiveTab('lyrics');
-      } else if (deltaY > 40 && activeTab === 'lyrics') {
-        // Swiped DOWN while lyrics is open -> Slide down to poster view!
-        setActiveTab('art');
-      }
-    }
-  };
 
   // Handle mobile phone physical/gesture Back button via history popstate
   useEffect(() => {
@@ -138,8 +111,6 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
 
   return (
     <div
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
       className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-white animate-slide-up select-none overflow-hidden"
     >
       {/* Full-Screen Song Poster Background (Edge-to-Edge) */}
@@ -250,42 +221,10 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
 
       {/* Slide-Up Live Lyrics Drawer (Slides up smoothly over the poster) */}
       <div
-        className={`absolute inset-x-0 bottom-0 top-14 z-40 flex flex-col rounded-t-3xl backdrop-blur-2xl bg-black/90 border-t border-white/20 shadow-2xl transition-transform duration-500 ease-out ${
+        className={`absolute inset-x-0 bottom-0 top-14 z-40 flex flex-col rounded-t-3xl bg-[#0e0e12] border-t border-white/15 shadow-2xl transform-gpu will-change-transform transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden ${
           activeTab === 'lyrics' ? 'translate-y-0' : 'translate-y-full pointer-events-none'
         }`}
       >
-        {/* Pull Down / Minimize Header with Dedicated Close Cross */}
-        <div
-          onClick={() => setActiveTab('art')}
-          onTouchEnd={() => setActiveTab('art')}
-          className="w-full flex items-center justify-between px-5 pt-3 pb-2.5 cursor-pointer bg-white/5 active:bg-white/10 border-b border-white/10 shrink-0 select-none"
-        >
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-1.5 rounded-full bg-white/40" />
-            <span className="text-xs text-white/80 font-bold flex items-center gap-1.5">
-              <FaChevronDown className="text-xs text-rose-400" /> Swipe or tap down to close
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setActiveTab('art');
-            }}
-            onTouchEnd={(e) => {
-              e.stopPropagation();
-              setActiveTab('art');
-            }}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-90 text-white font-bold text-xs border border-white/20 shadow-lg"
-            title="Close Lyrics"
-            aria-label="Close Lyrics"
-          >
-            <FaTimes className="text-xs text-rose-400" />
-            <span>Close</span>
-          </button>
-        </div>
-
         <div className="flex-1 overflow-hidden">
           <SyncedLyrics onClose={() => setActiveTab('art')} />
         </div>

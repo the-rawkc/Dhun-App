@@ -12,7 +12,9 @@ class PlayerEngine {
     this.currentVideoId = null;
     this.isOfflinePlayback = false;
     this.offlineAudioEl = null;
-    this.silentAudioEl = null;
+    this.audioContext = null;
+    this.oscillatorNode = null;
+    this.gainNode = null;
     this.wakeLock = null;
     this.shouldBePlaying = false;
     this.isUserPaused = false;
@@ -26,25 +28,53 @@ class PlayerEngine {
       prev: () => {},
     };
 
-    this.initSilentAudio();
     this.initYouTube();
     this.initOfflineAudio();
     this.initMediaSession();
     this.initVisibilityListener();
   }
 
-  initSilentAudio() {
+  startAudioAnchor() {
     if (typeof window === 'undefined') return;
     try {
-      // 1-second silent WAV base64 loop to maintain mobile background audio session & lock screen controls
-      const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-      this.silentAudioEl = new Audio(SILENT_WAV);
-      this.silentAudioEl.loop = true;
-      this.silentAudioEl.volume = 0.01;
-      this.silentAudioEl.preload = 'auto';
+      if (!this.audioContext) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          this.audioContext = new AudioCtx();
+        }
+      }
+      if (this.audioContext) {
+        if (this.audioContext.state === 'suspended') {
+          this.audioContext.resume().catch(() => {});
+        }
+        if (!this.oscillatorNode) {
+          this.oscillatorNode = this.audioContext.createOscillator();
+          this.gainNode = this.audioContext.createGain();
+          // Sub-audible 20Hz infrasound, volume 0.001 (inaudible to ears, but registers as active audio stream in OS mixer)
+          this.oscillatorNode.frequency.value = 20;
+          this.gainNode.gain.value = 0.001;
+          this.oscillatorNode.connect(this.gainNode);
+          this.gainNode.connect(this.audioContext.destination);
+          this.oscillatorNode.start();
+        }
+      }
     } catch (e) {
-      console.warn('Silent audio initialization failed:', e);
+      console.warn('Audio anchor error:', e);
     }
+  }
+
+  stopAudioAnchor() {
+    try {
+      if (this.oscillatorNode) {
+        this.oscillatorNode.stop();
+        this.oscillatorNode.disconnect();
+        this.oscillatorNode = null;
+      }
+      if (this.gainNode) {
+        this.gainNode.disconnect();
+        this.gainNode = null;
+      }
+    } catch (e) {}
   }
 
   initVisibilityListener() {
@@ -52,16 +82,13 @@ class PlayerEngine {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         if (this.shouldBePlaying && !this.isUserPaused) {
-          // Keep silent audio alive so OS does not freeze the media session thread
-          if (this.silentAudioEl) {
-            this.silentAudioEl.play().catch(() => {});
-          }
+          this.startAudioAnchor();
+          this.updateMediaSessionState('playing');
           if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
             try {
               this.ytPlayer.playVideo();
             } catch (e) {}
           }
-          this.updateMediaSessionState('playing');
         }
       } else {
         // Returned to tab: ensure sync
@@ -71,6 +98,7 @@ class PlayerEngine {
               this.ytPlayer.playVideo();
             } catch (e) {}
           }
+          this.updateMediaSessionState('playing');
         }
       }
     });
@@ -140,8 +168,9 @@ class PlayerEngine {
       if (!container) {
         container = document.createElement('div');
         container.id = 'yt-audio-container';
-        // Non-zero dimensions and positive z-index prevent mobile OS energy-saver from freezing iframe
-        container.style.cssText = 'position:fixed;bottom:10px;right:10px;width:120px;height:120px;opacity:0.015;pointer-events:none;z-index:1;overflow:hidden;border:none;';
+        // Size 320x240 and opacity 0.99 placed behind body (z-index -50)
+        // Ensures mobile OS compositor classifies the media stream as active, non-occluded, foreground audio
+        container.style.cssText = 'position:fixed;top:0;left:0;width:320px;height:240px;opacity:0.99;pointer-events:none;z-index:-50;overflow:hidden;border:none;';
         document.body.appendChild(container);
       }
 
@@ -184,9 +213,7 @@ class PlayerEngine {
                 this.startTimeTracking();
                 this.listeners.stateChange(true);
                 this.requestWakeLock();
-                if (this.silentAudioEl) {
-                  this.silentAudioEl.play().catch(() => {});
-                }
+                this.startAudioAnchor();
                 try {
                   // Force highest bitrate audio stream (Spotify Pro quality)
                   if (typeof this.ytPlayer.setPlaybackQuality === 'function') {
@@ -197,36 +224,28 @@ class PlayerEngine {
                 if (dur && dur > 0) this.listeners.durationChange(dur);
                 this.updateMediaSessionState('playing');
               } else if (event.data === 2) { // Paused
-                // Check if pause was triggered by OS / visibility loss when locking phone
+                // If paused by OS / visibility loss on lock screen:
                 if (this.shouldBePlaying && !this.isUserPaused) {
-                  if (typeof document !== 'undefined' && document.hidden) {
-                    if (this.silentAudioEl) {
-                      this.silentAudioEl.play().catch(() => {});
+                  this.startAudioAnchor();
+                  this.updateMediaSessionState('playing');
+                  setTimeout(() => {
+                    if (this.shouldBePlaying && !this.isUserPaused && this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
+                      try {
+                        this.ytPlayer.playVideo();
+                      } catch (e) {}
                     }
-                    setTimeout(() => {
-                      if (this.shouldBePlaying && !this.isUserPaused && this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
-                        try {
-                          this.ytPlayer.playVideo();
-                        } catch (e) {}
-                      }
-                    }, 150);
-                    this.updateMediaSessionState('playing');
-                    return;
-                  }
+                  }, 200);
+                  return;
                 }
                 this.stopTimeTracking();
+                this.stopAudioAnchor();
                 this.listeners.stateChange(false);
                 this.releaseWakeLock();
-                if (this.silentAudioEl) {
-                  this.silentAudioEl.pause();
-                }
                 this.updateMediaSessionState('paused');
               } else if (event.data === 0) { // Ended
                 this.shouldBePlaying = false;
                 this.stopTimeTracking();
-                if (this.silentAudioEl) {
-                  this.silentAudioEl.pause();
-                }
+                this.stopAudioAnchor();
                 this.listeners.ended();
                 this.updateMediaSessionState('none');
               } else if (event.data === 5 || event.data === 3 || event.data === -1) {
@@ -345,16 +364,7 @@ class PlayerEngine {
     if (typeof window === 'undefined') return;
     try {
       audioDSP.ensureContext();
-      if (this.silentAudioEl) {
-        const p = this.silentAudioEl.play();
-        if (p && typeof p.then === 'function') {
-          p.then(() => {
-            if (!this.shouldBePlaying) {
-              this.silentAudioEl.pause();
-            }
-          }).catch(() => {});
-        }
-      }
+      this.startAudioAnchor();
       if (this.offlineAudioEl) {
         const p = this.offlineAudioEl.play();
         if (p && typeof p.then === 'function') {
@@ -381,9 +391,7 @@ class PlayerEngine {
     if (autoPlay) {
       this.shouldBePlaying = true;
       this.isUserPaused = false;
-      if (this.silentAudioEl) {
-        this.silentAudioEl.play().catch(() => {});
-      }
+      this.startAudioAnchor();
     }
 
     // Check if track is available offline first
@@ -436,9 +444,7 @@ class PlayerEngine {
   play() {
     this.isUserPaused = false;
     this.shouldBePlaying = true;
-    if (this.silentAudioEl) {
-      this.silentAudioEl.play().catch(() => {});
-    }
+    this.startAudioAnchor();
     this.updateMediaSessionState('playing');
     this.requestWakeLock();
     if (this.isOfflinePlayback && this.offlineAudioEl) {
@@ -451,9 +457,7 @@ class PlayerEngine {
   pause() {
     this.isUserPaused = true;
     this.shouldBePlaying = false;
-    if (this.silentAudioEl) {
-      this.silentAudioEl.pause();
-    }
+    this.stopAudioAnchor();
     this.updateMediaSessionState('paused');
     this.releaseWakeLock();
     if (this.isOfflinePlayback && this.offlineAudioEl) {
