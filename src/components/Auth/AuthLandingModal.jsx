@@ -137,7 +137,7 @@ const AuthLandingModal = ({ isOpen, onClose }) => {
           {authMode === 'register' && (
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
-                Your Name
+                Your Full Name <span className="text-rose-500">*</span>
               </label>
               <div className="relative flex items-center">
                 <FaUser className="absolute left-3.5 text-xs text-neutral-400" />
@@ -146,7 +146,7 @@ const AuthLandingModal = ({ isOpen, onClose }) => {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Rahul Sharma"
+                  placeholder="Enter your name (e.g. Rahul Sharma)"
                   className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs sm:text-sm placeholder-neutral-500 focus:outline-none focus:border-rose-500 transition-colors"
                 />
               </div>

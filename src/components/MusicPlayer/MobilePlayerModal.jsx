@@ -111,19 +111,22 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-white animate-slide-up select-none overflow-hidden">
-      {/* Full-Page Song Poster Ambient Background */}
+      {/* Full-Screen Song Poster Background (Edge-to-Edge) */}
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
         <img
           src={activeSong.thumbnail}
-          alt=""
-          className="w-full h-full object-cover filter blur-3xl scale-125 opacity-40 transition-all duration-700"
+          alt={activeSong.title}
+          className={`w-full h-full object-cover object-center transition-transform duration-1000 ${
+            isPlaying ? 'scale-105' : 'scale-100'
+          }`}
           onError={(e) => {
             if (activeSong.videoId) {
               e.currentTarget.src = `https://i.ytimg.com/vi/${activeSong.videoId}/hqdefault.jpg`;
             }
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/45 to-black/95" />
+        {/* Cinematic gradient overlay ensuring top header and bottom controls are crystal clear */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/25 to-black/90" />
       </div>
 
       {/* Top Header */}
@@ -131,7 +134,7 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         {/* Prominent Back Button */}
         <button
           onClick={handleClose}
-          className="flex items-center gap-1.5 px-3 py-1.5 -ml-1 rounded-full text-white/90 bg-white/10 backdrop-blur-md hover:bg-white/20 active:scale-95 transition-all border border-white/10"
+          className="flex items-center gap-1.5 px-3 py-1.5 -ml-1 rounded-full text-white/90 bg-black/40 backdrop-blur-md hover:bg-black/60 active:scale-95 transition-all border border-white/15 shadow-lg"
           title="Back"
           aria-label="Back"
         >
@@ -140,10 +143,10 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         </button>
 
         <div className="flex flex-col items-center">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-rose-400">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-rose-400 drop-shadow-md">
             Now Playing
           </span>
-          <span className="text-xs font-medium text-white/70 truncate max-w-[170px]">
+          <span className="text-xs font-medium text-white/90 truncate max-w-[170px] drop-shadow-sm">
             {activeSong.artist}
           </span>
         </div>
@@ -151,7 +154,7 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => dispatch(setIsEqualizerModalOpen(true))}
-            className="p-2 rounded-full text-white/80 hover:text-white bg-white/10 backdrop-blur-md border border-white/10 active:scale-95 transition-all"
+            className="p-2 rounded-full text-white/90 hover:text-white bg-black/40 backdrop-blur-md border border-white/15 active:scale-95 transition-all shadow-lg"
             title="Spotify Pro Equalizer"
           >
             <FaSlidersH className="text-sm text-rose-400" />
@@ -162,7 +165,7 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
               handleClose();
               if (onOpenQueue) onOpenQueue();
             }}
-            className="p-2 -mr-1 rounded-full text-white/80 hover:text-white bg-white/10 backdrop-blur-md border border-white/10 active:scale-95 transition-all"
+            className="p-2 -mr-1 rounded-full text-white/90 hover:text-white bg-black/40 backdrop-blur-md border border-white/15 active:scale-95 transition-all shadow-lg"
             title="Queue"
           >
             <FaListUl className="text-base" />
@@ -170,24 +173,24 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         </div>
       </div>
 
-      {/* Switcher Pill: Art vs Lyrics */}
+      {/* Switcher Pill: Poster View vs Live Lyrics */}
       <div className="flex justify-center my-1.5 shrink-0">
-        <div className="flex items-center p-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 shadow-inner">
+        <div className="flex items-center p-1 rounded-full bg-black/50 backdrop-blur-md border border-white/15 shadow-xl">
           <button
             onClick={() => setActiveTab('art')}
             className={`px-4 py-1 rounded-full text-xs font-semibold transition-all ${
               activeTab === 'art'
-                ? 'bg-rose-600 text-white shadow-md'
+                ? 'bg-rose-600 text-white shadow-lg'
                 : 'text-white/70 hover:text-white'
             }`}
           >
-            Artwork
+            Poster View
           </button>
           <button
             onClick={() => setActiveTab('lyrics')}
             className={`flex items-center gap-1.5 px-4 py-1 rounded-full text-xs font-semibold transition-all ${
               activeTab === 'lyrics'
-                ? 'bg-rose-600 text-white shadow-md'
+                ? 'bg-rose-600 text-white shadow-lg'
                 : 'text-white/70 hover:text-white'
             }`}
           >
@@ -197,42 +200,33 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         </div>
       </div>
 
-      {/* Main Visual Center: Either Big Artwork or Synced Lyrics */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-2 min-h-0">
-        {activeTab === 'art' ? (
-          <div className="relative w-[70vw] max-w-[270px] sm:max-w-[300px] aspect-square rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-white/15">
-            <img
-              src={activeSong.thumbnail}
-              alt={activeSong.title}
-              className={`w-full h-full object-cover transition-transform duration-700 ${
-                isPlaying ? 'scale-105' : 'scale-100'
-              }`}
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                e.currentTarget.src = activeSong.videoId
-                  ? `https://i.ytimg.com/vi/${activeSong.videoId}/hqdefault.jpg`
-                  : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
-              }}
-            />
-          </div>
-        ) : (
-          <div className="w-full h-full rounded-2xl overflow-hidden backdrop-blur-md bg-black/40 p-2 border border-white/10">
+      {/* Main Center Area: Full Screen Poster Experience (NO Picture in a Box) or Live Lyrics */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-2 min-h-0">
+        {activeTab === 'lyrics' ? (
+          <div className="w-full h-full rounded-3xl overflow-hidden backdrop-blur-xl bg-black/50 p-4 border border-white/15 shadow-2xl animate-fade-in">
             <SyncedLyrics />
           </div>
+        ) : (
+          /* Open View: The song poster is the full screen background */
+          <div className="flex-1 w-full" />
         )}
       </div>
 
       {/* Track Info & Action Buttons (Shifted upwards) */}
       <div className="px-6 pt-1 pb-1 flex items-center justify-between shrink-0">
         <div className="flex flex-col min-w-0 pr-4">
-          <h2 className="text-xl font-bold text-white truncate drop-shadow-sm">{activeSong.title}</h2>
-          <p className="text-sm text-white/70 truncate mt-0.5">{activeSong.artist}</p>
+          <h2 className="text-xl sm:text-2xl font-black text-white truncate drop-shadow-lg">
+            {activeSong.title}
+          </h2>
+          <p className="text-sm font-semibold text-white/80 truncate mt-0.5 drop-shadow-sm">
+            {activeSong.artist}
+          </p>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {/* Add to playlist */}
           <button
             onClick={() => dispatch(openAddToPlaylistModal(activeSong))}
-            className="p-2 rounded-full text-white/80 hover:text-rose-400 active:scale-95 transition-all"
+            className="p-2.5 rounded-full text-white/90 hover:text-rose-400 bg-black/30 backdrop-blur-md border border-white/10 active:scale-95 transition-all shadow-md"
             title="Add to Playlist"
           >
             <FaFolderPlus className="text-lg" />
@@ -241,8 +235,8 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
           {/* Offline Download */}
           <button
             onClick={handleDownload}
-            className={`p-2 rounded-full active:scale-95 transition-all ${
-              downloadStatus === 'downloaded' ? 'text-emerald-400' : 'text-white/80 hover:text-rose-400'
+            className={`p-2.5 rounded-full active:scale-95 transition-all bg-black/30 backdrop-blur-md border border-white/10 shadow-md ${
+              downloadStatus === 'downloaded' ? 'text-emerald-400' : 'text-white/90 hover:text-rose-400'
             }`}
             title="Download Offline"
           >
@@ -252,8 +246,8 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
           {/* Like */}
           <button
             onClick={() => dispatch(toggleFavorite(activeSong))}
-            className={`p-2 rounded-full transition-transform active:scale-125 ${
-              isFav ? 'text-rose-500' : 'text-white/80 hover:text-white'
+            className={`p-2.5 rounded-full transition-transform active:scale-125 bg-black/30 backdrop-blur-md border border-white/10 shadow-md ${
+              isFav ? 'text-rose-500' : 'text-white/90 hover:text-white'
             }`}
           >
             {isFav ? <FaHeart className="text-xl" /> : <FaRegHeart className="text-xl" />}

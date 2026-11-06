@@ -28,6 +28,7 @@ import {
   FaCloudUploadAlt,
   FaCamera,
   FaTimes,
+  FaPen,
 } from 'react-icons/fa';
 
 const Profile = () => {
@@ -43,6 +44,11 @@ const Profile = () => {
   const [authSuccess, setAuthSuccess] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
+  // Edit Name state
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameEditInput, setNameEditInput] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+
   // Avatar picker modal state
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [customAvatarUrl, setCustomAvatarUrl] = useState('');
@@ -51,6 +57,27 @@ const Profile = () => {
   useEffect(() => {
     setCurrentUser(getActiveSession());
   }, []);
+
+  const handleStartEditName = () => {
+    setNameEditInput(currentUser?.name || '');
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async (e) => {
+    e.preventDefault();
+    if (!nameEditInput.trim()) return;
+    setIsSavingName(true);
+    try {
+      const updated = await updateProfileAvatar(currentUser.avatar, nameEditInput.trim());
+      setCurrentUser(updated);
+      setIsEditingName(false);
+      setAuthSuccess('Your name has been updated successfully!');
+    } catch (err) {
+      alert(err.message || 'Failed to update name');
+    } finally {
+      setIsSavingName(false);
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -189,9 +216,47 @@ const Profile = () => {
           {/* User Meta */}
           <div className="flex-1 text-center sm:text-left">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
-              <h2 className="text-xl md:text-2xl font-black theme-text-main">
-                {currentUser?.name || 'Guest Music Lover'}
-              </h2>
+              {isEditingName ? (
+                <form onSubmit={handleSaveName} className="flex items-center gap-2 justify-center sm:justify-start">
+                  <input
+                    type="text"
+                    required
+                    value={nameEditInput}
+                    onChange={(e) => setNameEditInput(e.target.value)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-500/10 border border-rose-500 text-sm font-bold theme-text-main focus:outline-none"
+                    placeholder="Enter your name"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSavingName}
+                    className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md active:scale-95 transition-all"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingName(false)}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-500/10 text-xs font-semibold theme-text-muted hover:theme-text-main"
+                  >
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <div className="flex items-center gap-2 justify-center sm:justify-start">
+                  <h2 className="text-xl md:text-2xl font-black theme-text-main">
+                    {currentUser?.name || 'Guest Music Lover'}
+                  </h2>
+                  {currentUser && (
+                    <button
+                      onClick={handleStartEditName}
+                      className="p-1.5 rounded-full text-slate-400 hover:text-rose-500 hover:bg-slate-500/10 transition-colors"
+                      title="Edit Name"
+                    >
+                      <FaPen className="text-xs" />
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Direct Choose Avatar Button */}
               {currentUser && (
@@ -401,29 +466,6 @@ const Profile = () => {
         </div>
       )}
 
-      {/* Admin Portal Card */}
-      <div className="p-6 md:p-8 rounded-3xl theme-bg-card border theme-border shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-rose-600/15 text-rose-500 flex items-center justify-center text-xl shrink-0 border border-rose-500/20">
-            <FaShieldAlt />
-          </div>
-          <div>
-            <h3 className="text-base font-bold theme-text-main">Admin Portal</h3>
-            <p className="text-xs theme-text-muted">
-              Monitor registered users, active playlists, and cloud database records
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={() => navigate('/admin')}
-          className="px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-md shadow-rose-600/30 flex items-center gap-2 self-start sm:self-auto"
-        >
-          <FaShieldAlt className="text-xs" />
-          <span>Open Admin Portal</span>
-        </button>
-      </div>
-
       {/* Library Backup & Transfer Section */}
       <div className="p-6 md:p-8 rounded-3xl theme-bg-card border theme-border shadow-lg">
         <h3 className="text-base md:text-lg font-bold theme-text-main mb-2">
@@ -461,8 +503,8 @@ const Profile = () => {
           <div className="relative w-full max-w-lg rounded-3xl theme-bg-card border theme-border shadow-2xl p-6 text-left max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between pb-4 border-b theme-border">
               <div>
-                <h3 className="text-base font-bold theme-text-main">Choose Your Avatar</h3>
-                <p className="text-xs theme-text-muted">Select an avatar style for your Dhun profile</p>
+                <h3 className="text-base font-bold theme-text-main">Choose Cartoon Avatar</h3>
+                <p className="text-xs theme-text-muted">Select an illustrated graphical avatar for your profile</p>
               </div>
               <button
                 onClick={() => setIsAvatarModalOpen(false)}
