@@ -88,21 +88,57 @@ const playerSlice = createSlice({
   name: 'player',
   initialState,
   reducers: {
-    // Hydrate everything from Cloud Database on Login
+    // Hydrate & Smart-Merge everything from Cloud Database on Login for 100% Data Uniformity
     loadCloudUserData: (state, action) => {
-      const { favorites, playlists, favoriteArtists, themeMode } = action.payload;
+      const { favorites, playlists, favoriteArtists, themeMode } = action.payload || {};
+
+      // 1. Smart-Merge Liked Songs (Favorites): combine local + cloud, deduplicate by videoId
+      const favMap = new Map();
+      (state.favorites || []).forEach((f) => {
+        if (f && f.videoId) favMap.set(f.videoId, f);
+      });
       if (Array.isArray(favorites)) {
-        state.favorites = favorites;
-        saveItem('tunetide_favorites', favorites);
+        favorites.forEach((f) => {
+          if (f && f.videoId) favMap.set(f.videoId, f);
+        });
       }
+      state.favorites = Array.from(favMap.values());
+      saveItem('tunetide_favorites', state.favorites);
+
+      // 2. Smart-Merge Playlists: combine local + cloud playlists, deduplicate by ID or Title
+      const plMap = new Map();
+      (state.playlists || []).forEach((p) => {
+        if (p && (p.id || p.title)) plMap.set(p.id || p.title, p);
+      });
       if (Array.isArray(playlists)) {
-        state.playlists = playlists;
-        saveItem('tunetide_playlists', playlists);
+        playlists.forEach((p) => {
+          if (p && (p.id || p.title)) {
+            const key = p.id || p.title;
+            const existing = plMap.get(key);
+            if (existing && Array.isArray(existing.tracks)) {
+              // Merge playlist tracks
+              const trackMap = new Map();
+              existing.tracks.forEach((t) => t && t.videoId && trackMap.set(t.videoId, t));
+              (p.tracks || []).forEach((t) => t && t.videoId && trackMap.set(t.videoId, t));
+              plMap.set(key, { ...existing, ...p, tracks: Array.from(trackMap.values()) });
+            } else {
+              plMap.set(key, p);
+            }
+          }
+        });
       }
-      if (Array.isArray(favoriteArtists)) {
-        state.favoriteArtists = favoriteArtists;
-        saveItem('tunetide_fav_artists', favoriteArtists);
-      }
+      state.playlists = Array.from(plMap.values());
+      saveItem('tunetide_playlists', state.playlists);
+
+      // 3. Smart-Merge Favorite Artists
+      const artistSet = new Set([
+        ...(state.favoriteArtists || []),
+        ...((Array.isArray(favoriteArtists) && favoriteArtists) || []),
+      ]);
+      state.favoriteArtists = Array.from(artistSet);
+      saveItem('tunetide_fav_artists', state.favoriteArtists);
+
+      // 4. Theme
       if (themeMode) {
         state.themeMode = themeMode;
         saveItem('tunetide_theme', themeMode);
@@ -111,6 +147,9 @@ const playerSlice = createSlice({
           else document.documentElement.classList.remove('dark');
         }
       }
+
+      // Automatically sync unified merged library back to cloud database!
+      triggerCloudSync(state);
     },
 
     setThemeMode: (state, action) => {

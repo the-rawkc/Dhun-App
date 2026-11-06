@@ -1854,6 +1854,9 @@ function parseVideo(video, channelId, channelName) {
 }
 
 // Verome-API/src/routes/auth.ts
+const CLOUD_DB_ID = 'ff808181a09d98f701a1b064284550e3';
+const CLOUD_DB_ENDPOINT = `https://api.restful-api.dev/objects/${CLOUD_DB_ID}`;
+
 function getDbPaths() {
   const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
   const dataDir = isServerless ? '/tmp' : path.resolve(process.cwd(), 'data');
@@ -1863,9 +1866,30 @@ function getDbPaths() {
 
 var usersCache = {};
 var isLoaded = false;
+var lastCloudFetch = 0;
 
 async function ensureDB() {
-  if (isLoaded) return;
+  const now = Date.now();
+  // If memory cache was updated within last 10 seconds, it is fresh
+  if (isLoaded && now - lastCloudFetch < 10000) return;
+
+  // 1. Fetch from durable cloud database first (persists across all Vercel/Render serverless restarts!)
+  try {
+    const res = await fetch(CLOUD_DB_ENDPOINT);
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data?.users && typeof json.data.users === 'object') {
+        usersCache = { ...json.data.users, ...usersCache };
+        isLoaded = true;
+        lastCloudFetch = now;
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('Cloud DB fetch failed, falling back to local storage:', err);
+  }
+
+  // 2. Fallback to local disk if cloud has network issue
   const { dataDir, dbFile } = getDbPaths();
   try {
     if (!fs.existsSync(dataDir)) {
@@ -1875,25 +1899,35 @@ async function ensureDB() {
   try {
     if (fs.existsSync(dbFile)) {
       const content = fs.readFileSync(dbFile, 'utf-8');
-      usersCache = JSON.parse(content);
-    } else {
-      usersCache = {};
+      const parsed = JSON.parse(content);
+      usersCache = { ...parsed, ...usersCache };
     }
-  } catch (e) {
-    usersCache = {};
-  }
+  } catch (e) {}
   isLoaded = true;
 }
 
 async function persistDB() {
+  // 1. Write to local disk cache
   const { dataDir, dbFile } = getDbPaths();
   try {
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
     fs.writeFileSync(dbFile, JSON.stringify(usersCache, null, 2), 'utf-8');
+  } catch (err) {}
+
+  // 2. Persist to cloud database
+  try {
+    await fetch(CLOUD_DB_ENDPOINT, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'dhun_users_db',
+        data: { users: usersCache },
+      }),
+    });
   } catch (err) {
-    console.error('Failed to persist users database:', err);
+    console.error('Failed to persist users to cloud DB:', err);
   }
 }
 
