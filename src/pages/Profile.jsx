@@ -65,15 +65,18 @@ const Profile = () => {
 
   const handleSaveName = async (e) => {
     e.preventDefault();
-    if (!nameEditInput.trim()) return;
+    const trimmed = nameEditInput.trim();
+    if (!trimmed) return;
     setIsSavingName(true);
     try {
-      const updated = await updateProfileAvatar(currentUser.avatar, nameEditInput.trim());
+      const currentAvatar = currentUser?.avatar || DEFAULT_AVATARS[0];
+      const updated = await updateProfileAvatar(currentAvatar, trimmed);
       setCurrentUser(updated);
       setIsEditingName(false);
       setAuthSuccess('Your name has been updated successfully!');
+      setTimeout(() => setAuthSuccess(''), 3500);
     } catch (err) {
-      alert(err.message || 'Failed to update name');
+      console.warn('Name update warning:', err);
     } finally {
       setIsSavingName(false);
     }
@@ -107,18 +110,16 @@ const Profile = () => {
   };
 
   const handleSelectAvatar = async (avatarUrl) => {
-    if (!currentUser) {
-      alert('Please log in with your phone and PIN first to save your avatar.');
-      return;
-    }
     setIsSavingAvatar(true);
     try {
-      const updated = await updateProfileAvatar(avatarUrl);
+      const currentName = currentUser?.name || 'Music Lover';
+      const updated = await updateProfileAvatar(avatarUrl, currentName);
       setCurrentUser(updated);
       setIsAvatarModalOpen(false);
       setAuthSuccess('Avatar updated successfully!');
+      setTimeout(() => setAuthSuccess(''), 3500);
     } catch (e) {
-      alert(e.message || 'Failed to update avatar');
+      console.warn('Avatar update warning:', e);
     } finally {
       setIsSavingAvatar(false);
     }

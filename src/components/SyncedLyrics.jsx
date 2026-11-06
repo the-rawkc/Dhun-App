@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { parseLRC } from '../utils/normalizeSong';
+import { formatLyricsByLanguage } from '../utils/lyricsLanguage';
 import { playerEngine } from '../services/playerEngine';
 import { API_BASE } from '../services/apiConfig';
 import { FaTimes, FaMicrophoneAlt } from 'react-icons/fa';
@@ -30,9 +31,13 @@ const SyncedLyrics = ({ onClose }) => {
         if (!isMounted) return;
         if (data?.success) {
           const parsed = data.syncedLyrics ? parseLRC(data.syncedLyrics) : [];
+          const formattedSynced = parsed.map((item) => ({
+            ...item,
+            text: formatLyricsByLanguage(item.text),
+          }));
           setLyricsData({
-            synced: parsed.length > 0 ? parsed : null,
-            plain: data.plainLyrics || null,
+            synced: formattedSynced.length > 0 ? formattedSynced : null,
+            plain: data.plainLyrics ? formatLyricsByLanguage(data.plainLyrics) : null,
           });
         } else {
           setError(true);
@@ -87,9 +92,18 @@ const SyncedLyrics = ({ onClose }) => {
         </div>
         {onClose && (
           <button
-            onClick={onClose}
-            className="p-2.5 rounded-full hover:bg-slate-500/10 theme-text-muted hover:theme-text-main transition-all"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="p-2.5 rounded-full bg-slate-500/20 hover:bg-slate-500/30 active:scale-90 theme-text-main transition-all cursor-pointer z-20"
             title="Close Lyrics"
+            aria-label="Close Lyrics"
           >
             <FaTimes />
           </button>

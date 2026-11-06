@@ -29,6 +29,7 @@ import {
   FaFolderPlus,
   FaMicrophoneAlt,
   FaSlidersH,
+  FaTimes,
 } from 'react-icons/fa';
 import SyncedLyrics from '../SyncedLyrics';
 import { saveTrackOffline, getOfflineTrack } from '../../services/offlineStorage';
@@ -249,19 +250,40 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
 
       {/* Slide-Up Live Lyrics Drawer (Slides up smoothly over the poster) */}
       <div
-        className={`absolute inset-x-0 bottom-0 top-14 z-30 flex flex-col rounded-t-3xl backdrop-blur-2xl bg-black/85 border-t border-white/20 shadow-2xl transition-transform duration-500 ease-out ${
+        className={`absolute inset-x-0 bottom-0 top-14 z-40 flex flex-col rounded-t-3xl backdrop-blur-2xl bg-black/90 border-t border-white/20 shadow-2xl transition-transform duration-500 ease-out ${
           activeTab === 'lyrics' ? 'translate-y-0' : 'translate-y-full pointer-events-none'
         }`}
       >
-        {/* Pull Down / Minimize Handle */}
+        {/* Pull Down / Minimize Header with Dedicated Close Cross */}
         <div
           onClick={() => setActiveTab('art')}
-          className="w-full flex flex-col items-center pt-2.5 pb-1 cursor-pointer active:opacity-70 shrink-0"
+          onTouchEnd={() => setActiveTab('art')}
+          className="w-full flex items-center justify-between px-5 pt-3 pb-2.5 cursor-pointer bg-white/5 active:bg-white/10 border-b border-white/10 shrink-0 select-none"
         >
-          <div className="w-12 h-1.5 rounded-full bg-white/40 mb-1" />
-          <span className="text-[10px] text-white/60 font-semibold flex items-center gap-1">
-            <FaChevronDown className="text-[9px]" /> Swipe or tap down to return to poster
-          </span>
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-1.5 rounded-full bg-white/40" />
+            <span className="text-xs text-white/80 font-bold flex items-center gap-1.5">
+              <FaChevronDown className="text-xs text-rose-400" /> Swipe or tap down to close
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveTab('art');
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              setActiveTab('art');
+            }}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-90 text-white font-bold text-xs border border-white/20 shadow-lg"
+            title="Close Lyrics"
+            aria-label="Close Lyrics"
+          >
+            <FaTimes className="text-xs text-rose-400" />
+            <span>Close</span>
+          </button>
         </div>
 
         <div className="flex-1 overflow-hidden">

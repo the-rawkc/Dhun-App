@@ -89,7 +89,7 @@ const Library = () => {
             }`}
           >
             <FaMusic className="text-xs" />
-            <span>Playlists ({playlists.length})</span>
+            <span>Playlists ({playlists.length + 1})</span>
           </button>
 
           <button
@@ -130,42 +130,102 @@ const Library = () => {
         </div>
       </div>
 
-      {/* ─── TAB 1: PLAYLISTS ────────────────────────────────────────── */}
+      {/* ─── TAB 1: PLAYLISTS (Compact List-Item Boxes with Liked Songs) ── */}
       {activeTab === 'playlists' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {/* Liked Songs Playlist Box (1st Playlist) */}
+          <div
+            onClick={() => setActiveTab('liked')}
+            className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border border-rose-500/20 shadow-sm"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl shrink-0 bg-gradient-to-br from-rose-600 via-pink-600 to-rose-900 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                <FaHeart className="text-white text-xl drop-shadow" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-bold text-sm sm:text-base theme-text-main group-hover:text-rose-500 truncate transition-colors flex items-center gap-1.5">
+                  <span>Liked Songs</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-rose-500/20 text-rose-400">
+                    Auto
+                  </span>
+                </h3>
+                <p className="text-xs theme-text-muted mt-0.5 truncate">
+                  {favorites.length} {favorites.length === 1 ? 'song' : 'songs'} • Your Favorites
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0 pl-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePlayFavorites();
+                }}
+                disabled={favorites.length === 0}
+                className="p-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-md hover:scale-110 active:scale-95 transition-all disabled:opacity-30"
+                title="Play Liked Songs"
+                aria-label="Play Liked Songs"
+              >
+                <FaPlay className="text-[10px]" />
+              </button>
+            </div>
+          </div>
+
+          {/* User Custom Playlists as Compact List-Item Boxes */}
           {playlists.map((pl) => (
             <div
               key={pl.id}
               onClick={() => navigate(`/playlist/${pl.id}`)}
-              className="p-4 rounded-3xl glass-card cursor-pointer group flex flex-col justify-between"
+              className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border theme-border shadow-sm"
             >
-              <div>
-                <div className="aspect-square rounded-2xl overflow-hidden bg-dark-800 shadow-lg mb-3.5 relative">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-dark-800 shrink-0 shadow-md">
                   <img
                     src={pl.cover}
                     alt={pl.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  {/* Shuffle Quick Button Overlay */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (pl.tracks.length > 0) {
-                        dispatch(playPlaylistWithShuffle({ tracks: pl.tracks }));
-                      }
-                    }}
-                    className="absolute bottom-2.5 right-2.5 p-3 rounded-full bg-rose-600 text-white shadow-xl opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 transition-all"
-                    title="Shuffle Play"
-                  >
-                    <FaRandom className="text-xs" />
-                  </button>
                 </div>
-                <h3 className="font-bold text-base theme-text-main group-hover:text-rose-500 truncate transition-colors">
-                  {pl.title}
-                </h3>
-                <p className="text-xs theme-text-muted mt-1 truncate">
-                  {pl.tracks.length} songs
-                </p>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm sm:text-base theme-text-main group-hover:text-rose-500 truncate transition-colors">
+                    {pl.title}
+                  </h3>
+                  <p className="text-xs theme-text-muted mt-0.5 truncate">
+                    {pl.tracks.length} {pl.tracks.length === 1 ? 'song' : 'songs'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (pl.tracks.length > 0) {
+                      dispatch(playPlaylistWithShuffle({ tracks: pl.tracks }));
+                    }
+                  }}
+                  disabled={pl.tracks.length === 0}
+                  className="p-2.5 rounded-full bg-slate-500/15 hover:bg-slate-500/25 text-white/90 hover:text-white shadow-sm hover:scale-105 active:scale-95 transition-all disabled:opacity-20"
+                  title="Shuffle Play"
+                  aria-label="Shuffle Play"
+                >
+                  <FaRandom className="text-[10px]" />
+                </button>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (pl.tracks.length > 0) {
+                      dispatch(playSong({ song: pl.tracks[0], songs: pl.tracks, index: 0 }));
+                    }
+                  }}
+                  disabled={pl.tracks.length === 0}
+                  className="p-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-md hover:scale-110 active:scale-95 transition-all disabled:opacity-30"
+                  title="Play Playlist"
+                  aria-label="Play Playlist"
+                >
+                  <FaPlay className="text-[10px]" />
+                </button>
               </div>
             </div>
           ))}

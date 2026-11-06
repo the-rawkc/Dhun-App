@@ -1624,6 +1624,66 @@ async function handleMusicFind(searchParams, ytmusic2) {
   return match ? json({ success: true, data: match }) : json({ success: false, error: "Song not found" }, 404);
 }
 
+// Indic Script to English Transliteration (Keeping Devanagari Hindi as Hindi)
+const INDIC_CHAR_MAP = {
+  // Gurmukhi (Punjabi)
+  'ਅ': 'a', 'ਆ': 'aa', 'ਇ': 'i', 'ਈ': 'ee', 'ਉ': 'u', 'ਊ': 'oo', 'ਏ': 'e', 'ਐ': 'ai', 'ਓ': 'o', 'ਔ': 'au',
+  'ਕ': 'k', 'ਖ': 'kh', 'ਗ': 'g', 'ਘ': 'gh', 'ਙ': 'ng', 'ਚ': 'ch', 'ਛ': 'chh', 'ਜ': 'j', 'ਝ': 'jh', 'ਞ': 'ny',
+  'ਟ': 't', 'ਠ': 'th', 'ਡ': 'd', 'ਢ': 'dh', 'ਣ': 'n', 'ਤ': 't', 'ਥ': 'th', 'ਦ': 'd', 'ਧ': 'dh', 'ਨ': 'n',
+  'ਪ': 'p', 'ਫ': 'ph', 'ਬ': 'b', 'ਭ': 'bh', 'ਮ': 'm', 'ਯ': 'y', 'ਰ': 'r', 'ਲ': 'l', 'ਵ': 'v', 'ੜ': 'r',
+  'ਸ਼': 'sh', 'ਸ': 's', 'ਹ': 'h', 'ਾ': 'aa', 'ਿ': 'i', 'ੀ': 'ee', 'ੁ': 'u', 'ੂ': 'oo', 'ੇ': 'e', 'ੈ': 'ai',
+  'ੋ': 'o', 'ੌ': 'au', 'ੰ': 'n', 'ਂ': 'n', 'ੱ': '', '੍': '',
+  // Tamil
+  'அ': 'a', 'ஆ': 'aa', 'இ': 'i', 'ஈ': 'ee', 'உ': 'u', 'ஊ': 'oo', 'எ': 'e', 'ஏ': 'ae', 'ஐ': 'ai', 'ஒ': 'o', 'ஓ': 'oa', 'ஔ': 'au',
+  'க': 'k', 'ங': 'ng', 'ச': 'ch', 'ஞ': 'ny', 'ட': 't', 'ண': 'n', 'த': 'th', 'ந': 'n', 'ப': 'p', 'ம': 'm',
+  'ய': 'y', 'ர': 'r', 'ல': 'l', 'வ': 'v', 'ழ': 'zh', 'ள': 'l', 'ற': 'r', 'ன': 'n', 'ஜ': 'j', 'ஷ': 'sh', 'ஸ': 's', 'ஹ': 'h',
+  'ா': 'aa', 'ி': 'i', 'ீ': 'ee', 'ு': 'u', 'ூ': 'oo', 'ெ': 'e', 'ே': 'ae', 'ை': 'ai', 'ொ': 'o', 'ோ': 'oa', 'ௌ': 'au', '்': '',
+  // Telugu
+  'అ': 'a', 'ఆ': 'aa', 'ఇ': 'i', 'ఈ': 'ee', 'ఉ': 'u', 'ఊ': 'oo', 'ఎ': 'e', 'ఏ': 'ae', 'ఐ': 'ai', 'ఒ': 'o', 'ఓ': 'oa', 'ఔ': 'au',
+  'క': 'k', 'ఖ': 'kh', 'గ': 'g', 'ఘ': 'gh', 'చ': 'ch', 'ఛ': 'chh', 'జ': 'j', 'ఝ': 'jh', 'ట': 't', 'ఠ': 'th', 'డ': 'd', 'ఢ': 'dh', 'ణ': 'n',
+  'త': 'th', 'థ': 'th', 'ద': 'd', 'ధ': 'dh', 'న': 'n', 'ప': 'p', 'ఫ': 'ph', 'బ': 'b', 'భ': 'bh', 'మ': 'm', 'య': 'y', 'ర': 'r', 'ల': 'l', 'వ': 'v',
+  'శ': 'sh', 'ష': 'sh', 'స': 's', 'హ': 'h', 'ళ': 'l', 'ా': 'aa', 'ి': 'i', 'ీ': 'ee', 'ు': 'u', 'ూ': 'oo', 'ె': 'e', 'ే': 'ae', 'ై': 'ai', 'ొ': 'o', 'ో': 'oa', 'ౌ': 'au', '్': '', 'ం': 'm',
+  // Malayalam
+  'അ': 'a', 'ആ': 'aa', 'ഇ': 'i', 'ഈ': 'ee', 'ഉ': 'u', 'ഊ': 'oo', 'എ': 'e', 'ഏ': 'ae', 'ഐ': 'ai', 'ഒ': 'o', 'ഓ': 'oa', 'ഔ': 'au',
+  'ക': 'k', 'ഖ': 'kh', 'ഗ': 'g', 'ഘ': 'gh', 'ങ': 'ng', 'ച': 'ch', 'ഛ': 'chh', 'ജ': 'j', 'ഝ': 'jh', 'ഞ': 'ny',
+  'ട': 't', 'ഠ': 'th', 'ഡ': 'd', 'ഢ': 'dh', 'ണ': 'n', 'ത': 'th', 'ഥ': 'th', 'ദ': 'd', 'ധ': 'dh', 'ന': 'n',
+  'പ': 'p', 'ഫ': 'ph', 'ബ': 'b', 'ഭ': 'bh', 'മ': 'm', 'യ': 'y', 'ര': 'r', 'ല': 'l', 'വ': 'v', 'ശ': 'sh', 'ഷ': 'sh', 'സ': 's', 'ഹ': 'h', 'ള': 'l',
+  'ാ': 'aa', 'ി': 'i', 'ീ': 'ee', 'ു': 'u', 'ൂ': 'oo', 'െ': 'e', 'േ': 'ae', 'ൈ': 'ai', 'ൊ': 'o', 'ോ': 'oa', 'ൌ': 'au', '്': '', 'ം': 'm',
+  // Kannada
+  'ಅ': 'a', 'ಆ': 'aa', 'ಇ': 'i', 'ಈ': 'ee', 'ಉ': 'u', 'ಊ': 'oo', 'ಎ': 'e', 'ಏ': 'ae', 'ಐ': 'ai', 'ಒ': 'o', 'ಓ': 'oa', 'ಔ': 'au',
+  'ಕ': 'k', 'ಖ': 'kh', 'ಗ': 'g', 'ಘ': 'gh', 'ಙ': 'ng', 'ಚ': 'ch', 'ಛ': 'chh', 'ಜ': 'j', 'ಝ': 'jh', 'ಞ': 'ny',
+  'ಟ': 't', 'ಠ': 'th', 'ಡ': 'd', 'ಢ': 'dh', 'ಣ': 'n', 'ತ': 'th', 'ಥ': 'th', 'ದ': 'd', 'ಧ': 'dh', 'ನ': 'n',
+  'ಪ': 'p', 'ಫ': 'ph', 'ಬ': 'b', 'ಭ': 'bh', 'ಮ': 'm', 'ಯ': 'y', 'ರ': 'r', 'ಲ': 'l', 'ವ': 'v', 'ಶ': 'sh', 'ಷ': 'sh', 'ಸ': 's', 'ಹ': 'h', 'ಳ': 'l',
+  'ಾ': 'aa', 'ಿ': 'i', 'ೀ': 'ee', 'ು': 'u', 'ೂ': 'oo', 'ೆ': 'e', 'ೇ': 'ae', 'ೈ': 'ai', 'ೊ': 'o', 'ೋ': 'oa', 'ೌ': 'au', '್': '', 'ಂ': 'm',
+  // Bengali
+  'অ': 'o', 'আ': 'aa', 'ই': 'i', 'ঈ': 'ee', 'উ': 'u', 'ঊ': 'oo', 'এ': 'e', 'ঐ': 'oi', 'ও': 'o', 'ঔ': 'ou',
+  'ক': 'k', 'খ': 'kh', 'গ': 'g', 'ഘ': 'gh', 'ঙ': 'ng', 'চ': 'ch', 'ছ': 'chh', 'জ': 'j', 'ঝ': 'jh', 'ঞ': 'ny',
+  'ট': 't', 'ঠ': 'th', 'ড': 'd', 'ঢ': 'dh', 'ণ': 'n', 'ত': 't', 'থ': 'th', 'দ': 'd', 'ಧ': 'dh', 'ন': 'n',
+  'প': 'p', 'ফ': 'ph', 'ব': 'b', 'ভ': 'bh', 'ম': 'm', 'য': 'y', 'র': 'r', 'ল': 'l', 'শ': 'sh', 'ষ': 'sh', 'স': 's', 'হ': 'h',
+  'া': 'aa', 'ি': 'i', 'ী': 'ee', 'ু': 'u', 'ൂ': 'oo', 'ে': 'e', 'ৈ': 'oi', 'ো': 'o', 'ৌ': 'ou', '্': '', 'ং': 'ng',
+  // Gujarati
+  'અ': 'a', 'આ': 'aa', 'ઇ': 'i', 'ઈ': 'ee', 'ઉ': 'u', 'ઊ': 'oo', 'એ': 'e', 'ઐ': 'ai', 'ઓ': 'o', 'ઔ': 'au',
+  'ક': 'k', 'ખ': 'kh', 'ગ': 'g', 'ઘ': 'gh', 'ચ': 'ch', 'છ': 'chh', 'જ': 'j', 'ઝ': 'jh', 'ટ': 't', 'ઠ': 'th', 'ડ': 'd', 'ઢ': 'dh', 'ણ': 'n',
+  'ત': 't', 'થ': 'th', 'દ': 'd', 'ધ': 'dh', 'ન': 'n', 'પ': 'p', 'ફ': 'ph', 'બ': 'b', 'ભ': 'bh', 'મ': 'm', 'ય': 'y', 'ર': 'r', 'લ': 'l', 'વ': 'v',
+  'શ': 'sh', 'ષ': 'sh', 'સ': 's', 'હ': 'h', 'ળ': 'l', 'ા': 'aa', 'િ': 'i', 'ી': 'ee', 'ુ': 'u', 'ૂ': 'oo', 'ે': 'e', 'ૈ': 'ai', 'ો': 'o', 'ૌ': 'au', '્': '', 'ં': 'n'
+};
+
+function formatLyricsByLang(text) {
+  if (!text || typeof text !== 'string') return text;
+  // If Devanagari Hindi only, leave as Hindi!
+  const hasHindi = /[\u0900-\u097F]/.test(text);
+  const hasNonHindiIndic = /[\u0980-\u0D7F]/.test(text);
+  if (hasHindi && !hasNonHindiIndic) return text;
+  if (!hasNonHindiIndic) return text;
+
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    out += INDIC_CHAR_MAP[ch] !== undefined ? INDIC_CHAR_MAP[ch] : ch;
+  }
+  return out;
+}
+
 // Verome-API/src/services/lyrics.ts
 async function getLyrics(title, artist, duration) {
   try {
@@ -1637,7 +1697,14 @@ async function getLyrics(title, artist, duration) {
       response = await fetch(searchUrl);
       const results = await response.json();
       if (Array.isArray(results) && results.length > 0) {
-        data = results[0];
+        // For non-Hindi songs, prefer Romanized/English results if available
+        const englishResult = results.find(
+          (r) =>
+            (r.syncedLyrics || r.plainLyrics) &&
+            /[a-zA-Z]/.test(r.syncedLyrics || r.plainLyrics) &&
+            !/[\u0980-\u0D7F]/.test(r.syncedLyrics || r.plainLyrics)
+        );
+        data = englishResult || results[0];
       }
     }
     if (!data || data.statusCode) {
@@ -1649,8 +1716,8 @@ async function getLyrics(title, artist, duration) {
       artistName: data.artistName,
       albumName: data.albumName,
       duration: data.duration,
-      plainLyrics: data.plainLyrics,
-      syncedLyrics: data.syncedLyrics
+      plainLyrics: formatLyricsByLang(data.plainLyrics),
+      syncedLyrics: formatLyricsByLang(data.syncedLyrics)
     };
   } catch (err) {
     return { success: false, error: String(err) };
@@ -1964,8 +2031,22 @@ async function handleAuthUpdateProfile(req) {
   if (!phone || !pin) return error('Phone and PIN required', 400);
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
   await ensureDB();
-  const user = usersCache[cleanPhone];
-  if (!user || user.pin !== pin) {
+  let user = usersCache[cleanPhone];
+  if (!user) {
+    // Auto-create/upsert user if not existing in cache
+    user = {
+      phone: cleanPhone,
+      pin,
+      name: name?.trim() || 'Music Lover',
+      avatar: avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      joinedAt: Date.now(),
+      updatedAt: Date.now(),
+      playlists: [],
+      favorites: [],
+      favoriteArtists: [],
+      themeMode: 'dark',
+    };
+  } else if (user.pin !== pin) {
     return error('Invalid phone or PIN', 401);
   }
   if (name && name.trim()) user.name = name.trim();

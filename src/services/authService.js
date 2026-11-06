@@ -67,34 +67,54 @@ export const loginWithPhoneAndPin = async (phone, pin, name = '', avatar = '') =
 };
 
 /**
- * Update User Avatar and Name in Cloud Database
+ * Update User Avatar and Name in Local Storage and Cloud Database
  */
 export const updateProfileAvatar = async (avatar, name = '') => {
-  const session = getActiveSession();
-  if (!session || !session.phone || !session.pin) throw new Error('User not logged in');
-
-  const res = await fetch(`${API_BASE}/api/auth/profile/update`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      phone: session.phone,
-      pin: session.pin,
-      avatar,
-      name: name || session.name,
-    }),
-  });
-
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    throw new Error(data.error || 'Failed to update profile');
-  }
+  const session = getActiveSession() || {
+    phone: '',
+    pin: '',
+    name: 'Music Lover',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+    joinedAt: Date.now(),
+  };
 
   const updatedSession = {
     ...session,
-    avatar: data.user.avatar,
-    name: data.user.name,
+    avatar: avatar || session.avatar,
+    name: name ? name.trim() : session.name,
   };
+
+  // 1. Immediately save to localStorage so UI updates instantly
   setActiveSession(updatedSession);
+
+  // 2. If user has phone & pin, sync with cloud backend in background
+  if (session.phone && session.pin) {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/profile/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: session.phone,
+          pin: session.pin,
+          avatar: updatedSession.avatar,
+          name: updatedSession.name,
+        }),
+      });
+      const data = await res.json();
+      if (data?.success && data?.user) {
+        const synced = {
+          ...updatedSession,
+          avatar: data.user.avatar,
+          name: data.user.name,
+        };
+        setActiveSession(synced);
+        return synced;
+      }
+    } catch (e) {
+      console.warn('Background cloud profile update warning:', e);
+    }
+  }
+
   return updatedSession;
 };
 

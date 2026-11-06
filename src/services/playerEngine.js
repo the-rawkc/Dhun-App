@@ -140,8 +140,8 @@ class PlayerEngine {
       if (!container) {
         container = document.createElement('div');
         container.id = 'yt-audio-container';
-        // Non-zero dimensions (>200px) ensure mobile OS does not flag the video as an invisible micro-element
-        container.style.cssText = 'position:fixed;bottom:0;right:0;width:240px;height:240px;opacity:0.002;pointer-events:none;z-index:-999;overflow:hidden;transform:scale(0.5);';
+        // Non-zero dimensions and positive z-index prevent mobile OS energy-saver from freezing iframe
+        container.style.cssText = 'position:fixed;bottom:10px;right:10px;width:120px;height:120px;opacity:0.015;pointer-events:none;z-index:1;overflow:hidden;border:none;';
         document.body.appendChild(container);
       }
 
@@ -156,7 +156,7 @@ class PlayerEngine {
         this.ytPlayer = new window.YT.Player('yt-player-target', {
           height: '100%',
           width: '100%',
-          host: 'https://www.youtube-nocookie.com',
+          host: 'https://www.youtube.com',
           playerVars: {
             autoplay: 1,
             controls: 0,
@@ -229,11 +229,20 @@ class PlayerEngine {
                 }
                 this.listeners.ended();
                 this.updateMediaSessionState('none');
-              } else if (event.data === 5) { // Video Cued (Ready to play on mobile)
-                if (this.pendingAutoPlay || this.currentTrack) {
+              } else if (event.data === 5 || event.data === 3 || event.data === -1) {
+                // Video Cued (5), Buffering (3), or Unstarted (-1) -> auto-play watchdog
+                if (this.shouldBePlaying && !this.isUserPaused) {
                   try {
                     this.ytPlayer.playVideo();
                   } catch (e) {}
+                  setTimeout(() => {
+                    if (this.shouldBePlaying && !this.isUserPaused && this.ytPlayer && typeof this.ytPlayer.getPlayerState === 'function') {
+                      const st = this.ytPlayer.getPlayerState();
+                      if (st !== 1) {
+                        try { this.ytPlayer.playVideo(); } catch (e) {}
+                      }
+                    }
+                  }, 1200);
                 }
               }
             },
@@ -243,7 +252,7 @@ class PlayerEngine {
               if (event.data === 150 || event.data === 101 || event.data === 100 || event.data === 2) {
                 setTimeout(() => {
                   this.listeners.next();
-                }, 800);
+                }, 400);
               }
             },
           },
