@@ -12,7 +12,10 @@ class PlayerEngine {
     this.currentVideoId = null;
     this.isOfflinePlayback = false;
     this.offlineAudioEl = null;
+    this.silentAudioEl = null;
     this.wakeLock = null;
+    this.shouldBePlaying = false;
+    this.isUserPaused = false;
 
     this.listeners = {
       timeUpdate: () => {},
@@ -23,9 +26,54 @@ class PlayerEngine {
       prev: () => {},
     };
 
+    this.initSilentAudio();
     this.initYouTube();
     this.initOfflineAudio();
     this.initMediaSession();
+    this.initVisibilityListener();
+  }
+
+  initSilentAudio() {
+    if (typeof window === 'undefined') return;
+    try {
+      // 1-second silent WAV base64 loop to maintain mobile background audio session & lock screen controls
+      const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      this.silentAudioEl = new Audio(SILENT_WAV);
+      this.silentAudioEl.loop = true;
+      this.silentAudioEl.volume = 0.01;
+      this.silentAudioEl.preload = 'auto';
+    } catch (e) {
+      console.warn('Silent audio initialization failed:', e);
+    }
+  }
+
+  initVisibilityListener() {
+    if (typeof document === 'undefined') return;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (this.shouldBePlaying && !this.isUserPaused) {
+          // Keep silent audio alive so OS does not freeze the media session thread
+          if (this.silentAudioEl) {
+            this.silentAudioEl.play().catch(() => {});
+          }
+          if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
+            try {
+              this.ytPlayer.playVideo();
+            } catch (e) {}
+          }
+          this.updateMediaSessionState('playing');
+        }
+      } else {
+        // Returned to tab: ensure sync
+        if (this.shouldBePlaying && !this.isUserPaused) {
+          if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
+            try {
+              this.ytPlayer.playVideo();
+            } catch (e) {}
+          }
+        }
+      }
+    });
   }
 
   initOfflineAudio() {
@@ -92,8 +140,8 @@ class PlayerEngine {
       if (!container) {
         container = document.createElement('div');
         container.id = 'yt-audio-container';
-        // 1px visible container prevents mobile browsers from suspending hidden video playback
-        container.style.cssText = 'position:fixed;bottom:0;left:0;width:1px;height:1px;opacity:0.01;pointer-events:none;z-index:9999;overflow:hidden;';
+        // Non-zero dimensions (>200px) ensure mobile OS does not flag the video as an invisible micro-element
+        container.style.cssText = 'position:fixed;bottom:0;right:0;width:240px;height:240px;opacity:0.002;pointer-events:none;z-index:-999;overflow:hidden;transform:scale(0.5);';
         document.body.appendChild(container);
       }
 
@@ -131,9 +179,14 @@ class PlayerEngine {
             onStateChange: (event) => {
               if (this.isOfflinePlayback) return;
               if (event.data === 1) { // Playing
+                this.shouldBePlaying = true;
+                this.isUserPaused = false;
                 this.startTimeTracking();
                 this.listeners.stateChange(true);
                 this.requestWakeLock();
+                if (this.silentAudioEl) {
+                  this.silentAudioEl.play().catch(() => {});
+                }
                 try {
                   // Force highest bitrate audio stream (Spotify Pro quality)
                   if (typeof this.ytPlayer.setPlaybackQuality === 'function') {
@@ -144,12 +197,36 @@ class PlayerEngine {
                 if (dur && dur > 0) this.listeners.durationChange(dur);
                 this.updateMediaSessionState('playing');
               } else if (event.data === 2) { // Paused
+                // Check if pause was triggered by OS / visibility loss when locking phone
+                if (this.shouldBePlaying && !this.isUserPaused) {
+                  if (typeof document !== 'undefined' && document.hidden) {
+                    if (this.silentAudioEl) {
+                      this.silentAudioEl.play().catch(() => {});
+                    }
+                    setTimeout(() => {
+                      if (this.shouldBePlaying && !this.isUserPaused && this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
+                        try {
+                          this.ytPlayer.playVideo();
+                        } catch (e) {}
+                      }
+                    }, 150);
+                    this.updateMediaSessionState('playing');
+                    return;
+                  }
+                }
                 this.stopTimeTracking();
                 this.listeners.stateChange(false);
                 this.releaseWakeLock();
+                if (this.silentAudioEl) {
+                  this.silentAudioEl.pause();
+                }
                 this.updateMediaSessionState('paused');
               } else if (event.data === 0) { // Ended
+                this.shouldBePlaying = false;
                 this.stopTimeTracking();
+                if (this.silentAudioEl) {
+                  this.silentAudioEl.pause();
+                }
                 this.listeners.ended();
                 this.updateMediaSessionState('none');
               } else if (event.data === 5) { // Video Cued (Ready to play on mobile)
@@ -199,8 +276,16 @@ class PlayerEngine {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
 
     try {
-      navigator.mediaSession.setActionHandler('play', () => this.play());
-      navigator.mediaSession.setActionHandler('pause', () => this.pause());
+      navigator.mediaSession.setActionHandler('play', () => {
+        this.isUserPaused = false;
+        this.shouldBePlaying = true;
+        this.play();
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        this.isUserPaused = true;
+        this.shouldBePlaying = false;
+        this.pause();
+      });
       navigator.mediaSession.setActionHandler('previoustrack', () => this.listeners.prev());
       navigator.mediaSession.setActionHandler('nexttrack', () => this.listeners.next());
       navigator.mediaSession.setActionHandler('seekto', (details) => {
@@ -251,6 +336,16 @@ class PlayerEngine {
     if (typeof window === 'undefined') return;
     try {
       audioDSP.ensureContext();
+      if (this.silentAudioEl) {
+        const p = this.silentAudioEl.play();
+        if (p && typeof p.then === 'function') {
+          p.then(() => {
+            if (!this.shouldBePlaying) {
+              this.silentAudioEl.pause();
+            }
+          }).catch(() => {});
+        }
+      }
       if (this.offlineAudioEl) {
         const p = this.offlineAudioEl.play();
         if (p && typeof p.then === 'function') {
@@ -273,6 +368,14 @@ class PlayerEngine {
     this.currentVideoId = cleanVideoId;
     this.currentTrack = trackMeta;
     this.updateMediaMetadata(trackMeta);
+
+    if (autoPlay) {
+      this.shouldBePlaying = true;
+      this.isUserPaused = false;
+      if (this.silentAudioEl) {
+        this.silentAudioEl.play().catch(() => {});
+      }
+    }
 
     // Check if track is available offline first
     try {
@@ -322,6 +425,13 @@ class PlayerEngine {
   }
 
   play() {
+    this.isUserPaused = false;
+    this.shouldBePlaying = true;
+    if (this.silentAudioEl) {
+      this.silentAudioEl.play().catch(() => {});
+    }
+    this.updateMediaSessionState('playing');
+    this.requestWakeLock();
     if (this.isOfflinePlayback && this.offlineAudioEl) {
       this.offlineAudioEl.play().catch(() => {});
     } else if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
@@ -330,6 +440,13 @@ class PlayerEngine {
   }
 
   pause() {
+    this.isUserPaused = true;
+    this.shouldBePlaying = false;
+    if (this.silentAudioEl) {
+      this.silentAudioEl.pause();
+    }
+    this.updateMediaSessionState('paused');
+    this.releaseWakeLock();
     if (this.isOfflinePlayback && this.offlineAudioEl) {
       this.offlineAudioEl.pause();
     } else if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {

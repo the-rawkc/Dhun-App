@@ -110,36 +110,51 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col theme-bg-main theme-text-main animate-slide-up select-none overflow-hidden">
+    <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-white animate-slide-up select-none overflow-hidden">
+      {/* Full-Page Song Poster Ambient Background */}
+      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+        <img
+          src={activeSong.thumbnail}
+          alt=""
+          className="w-full h-full object-cover filter blur-3xl scale-125 opacity-40 transition-all duration-700"
+          onError={(e) => {
+            if (activeSong.videoId) {
+              e.currentTarget.src = `https://i.ytimg.com/vi/${activeSong.videoId}/hqdefault.jpg`;
+            }
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/45 to-black/95" />
+      </div>
+
       {/* Top Header */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-2 shrink-0">
+      <div className="flex items-center justify-between px-5 pt-4 pb-1 shrink-0">
         {/* Prominent Back Button */}
         <button
           onClick={handleClose}
-          className="flex items-center gap-1.5 px-3 py-1.5 -ml-2 rounded-full theme-text-muted hover:theme-text-main active:scale-95 transition-all bg-slate-500/10 hover:bg-slate-500/20"
+          className="flex items-center gap-1.5 px-3 py-1.5 -ml-1 rounded-full text-white/90 bg-white/10 backdrop-blur-md hover:bg-white/20 active:scale-95 transition-all border border-white/10"
           title="Back"
           aria-label="Back"
         >
-          <FaArrowLeft className="text-base text-rose-500" />
-          <span className="text-xs font-bold text-rose-500">Back</span>
+          <FaArrowLeft className="text-sm text-rose-400" />
+          <span className="text-xs font-bold text-rose-400">Back</span>
         </button>
 
         <div className="flex flex-col items-center">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-rose-500">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-rose-400">
             Now Playing
           </span>
-          <span className="text-xs font-semibold theme-text-muted truncate max-w-[170px]">
+          <span className="text-xs font-medium text-white/70 truncate max-w-[170px]">
             {activeSong.artist}
           </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => dispatch(setIsEqualizerModalOpen(true))}
-            className="p-2 rounded-full theme-text-muted hover:text-rose-500"
+            className="p-2 rounded-full text-white/80 hover:text-white bg-white/10 backdrop-blur-md border border-white/10 active:scale-95 transition-all"
             title="Spotify Pro Equalizer"
           >
-            <FaSlidersH className="text-base text-rose-500" />
+            <FaSlidersH className="text-sm text-rose-400" />
           </button>
 
           <button
@@ -147,22 +162,23 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
               handleClose();
               if (onOpenQueue) onOpenQueue();
             }}
-            className="p-2 -mr-2 rounded-full theme-text-muted hover:theme-text-main"
+            className="p-2 -mr-1 rounded-full text-white/80 hover:text-white bg-white/10 backdrop-blur-md border border-white/10 active:scale-95 transition-all"
+            title="Queue"
           >
-            <FaListUl className="text-lg" />
+            <FaListUl className="text-base" />
           </button>
         </div>
       </div>
 
       {/* Switcher Pill: Art vs Lyrics */}
-      <div className="flex justify-center my-2 shrink-0">
-        <div className="flex items-center p-1 rounded-full bg-slate-500/10 border theme-border">
+      <div className="flex justify-center my-1.5 shrink-0">
+        <div className="flex items-center p-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 shadow-inner">
           <button
             onClick={() => setActiveTab('art')}
             className={`px-4 py-1 rounded-full text-xs font-semibold transition-all ${
               activeTab === 'art'
                 ? 'bg-rose-600 text-white shadow-md'
-                : 'theme-text-muted hover:theme-text-main'
+                : 'text-white/70 hover:text-white'
             }`}
           >
             Artwork
@@ -172,7 +188,7 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
             className={`flex items-center gap-1.5 px-4 py-1 rounded-full text-xs font-semibold transition-all ${
               activeTab === 'lyrics'
                 ? 'bg-rose-600 text-white shadow-md'
-                : 'theme-text-muted hover:theme-text-main'
+                : 'text-white/70 hover:text-white'
             }`}
           >
             <FaMicrophoneAlt className="text-xs" />
@@ -182,9 +198,9 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
       </div>
 
       {/* Main Visual Center: Either Big Artwork or Synced Lyrics */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 min-h-0">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-2 min-h-0">
         {activeTab === 'art' ? (
-          <div className="relative w-full max-w-[320px] aspect-square rounded-3xl overflow-hidden shadow-2xl shadow-rose-600/20 border-2 border-rose-500/20">
+          <div className="relative w-[70vw] max-w-[270px] sm:max-w-[300px] aspect-square rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-white/15">
             <img
               src={activeSong.thumbnail}
               alt={activeSong.title}
@@ -200,23 +216,23 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
             />
           </div>
         ) : (
-          <div className="w-full h-full rounded-2xl overflow-hidden">
+          <div className="w-full h-full rounded-2xl overflow-hidden backdrop-blur-md bg-black/40 p-2 border border-white/10">
             <SyncedLyrics />
           </div>
         )}
       </div>
 
-      {/* Track Info & Action Buttons */}
-      <div className="px-6 py-2 flex items-center justify-between shrink-0">
+      {/* Track Info & Action Buttons (Shifted upwards) */}
+      <div className="px-6 pt-1 pb-1 flex items-center justify-between shrink-0">
         <div className="flex flex-col min-w-0 pr-4">
-          <h2 className="text-xl font-bold theme-text-main truncate">{activeSong.title}</h2>
-          <p className="text-sm theme-text-muted truncate mt-0.5">{activeSong.artist}</p>
+          <h2 className="text-xl font-bold text-white truncate drop-shadow-sm">{activeSong.title}</h2>
+          <p className="text-sm text-white/70 truncate mt-0.5">{activeSong.artist}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {/* Add to playlist */}
           <button
             onClick={() => dispatch(openAddToPlaylistModal(activeSong))}
-            className="p-2.5 rounded-full theme-text-muted hover:text-rose-500"
+            className="p-2 rounded-full text-white/80 hover:text-rose-400 active:scale-95 transition-all"
             title="Add to Playlist"
           >
             <FaFolderPlus className="text-lg" />
@@ -225,8 +241,8 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
           {/* Offline Download */}
           <button
             onClick={handleDownload}
-            className={`p-2.5 rounded-full transition-all ${
-              downloadStatus === 'downloaded' ? 'text-emerald-500' : 'theme-text-muted hover:text-rose-500'
+            className={`p-2 rounded-full active:scale-95 transition-all ${
+              downloadStatus === 'downloaded' ? 'text-emerald-400' : 'text-white/80 hover:text-rose-400'
             }`}
             title="Download Offline"
           >
@@ -236,8 +252,8 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
           {/* Like */}
           <button
             onClick={() => dispatch(toggleFavorite(activeSong))}
-            className={`p-2.5 rounded-full transition-transform active:scale-125 ${
-              isFav ? 'text-rose-600' : 'theme-text-muted hover:theme-text-main'
+            className={`p-2 rounded-full transition-transform active:scale-125 ${
+              isFav ? 'text-rose-500' : 'text-white/80 hover:text-white'
             }`}
           >
             {isFav ? <FaHeart className="text-xl" /> : <FaRegHeart className="text-xl" />}
@@ -245,8 +261,8 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         </div>
       </div>
 
-      {/* Seekbar */}
-      <div className="px-6 py-2 shrink-0">
+      {/* Seekbar (Shifted upwards) */}
+      <div className="px-6 py-1 shrink-0">
         <input
           type="range"
           min="0"
@@ -255,32 +271,32 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
           onChange={handleSeek}
           className="progress-slider w-full"
           style={{
-            background: `linear-gradient(to right, #e11d48 ${
+            background: `linear-gradient(to right, #f43f5e ${
               duration > 0 ? (currentTime / duration) * 100 : 0
-            }%, rgba(148, 163, 184, 0.2) ${
+            }%, rgba(255, 255, 255, 0.25) ${
               duration > 0 ? (currentTime / duration) * 100 : 0
             }%)`,
           }}
         />
-        <div className="flex justify-between items-center text-xs font-mono theme-text-muted mt-1.5">
+        <div className="flex justify-between items-center text-xs font-mono text-white/60 mt-1">
           <span>{formatTime(currentTime)}</span>
           <span>{formatTime(duration)}</span>
         </div>
       </div>
 
-      {/* Playback Controls */}
-      <div className="flex items-center justify-between px-6 py-4 pb-8 shrink-0">
+      {/* Playback Controls (Shifted upwards with generous bottom clearance) */}
+      <div className="flex items-center justify-between px-6 pt-2 pb-14 sm:pb-16 shrink-0">
         {/* Shuffle Button with active indicator */}
         <button
           onClick={() => dispatch(toggleShuffle())}
           className={`relative p-3 rounded-full transition-colors ${
-            shuffle ? 'text-rose-600 font-bold' : 'theme-text-muted hover:theme-text-main'
+            shuffle ? 'text-rose-500 font-bold' : 'text-white/70 hover:text-white'
           }`}
           title="Shuffle"
         >
           <FaRandom className="text-lg" />
           {shuffle && (
-            <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-rose-600" />
+            <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-rose-500" />
           )}
         </button>
 
@@ -290,7 +306,7 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
             dispatch(prevSong());
             playerEngine.seekTo(0);
           }}
-          className="p-3 theme-text-main hover:text-rose-600 transition-transform active:scale-90"
+          className="p-3 text-white hover:text-rose-400 transition-transform active:scale-90"
         >
           <FaStepBackward className="text-2xl" />
         </button>
@@ -298,7 +314,7 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         {/* Play/Pause Main Button */}
         <button
           onClick={handleTogglePlay}
-          className="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-xl shadow-rose-600/40 transition-transform active:scale-95"
+          className="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-2xl shadow-rose-600/50 transition-transform active:scale-95"
         >
           {isPlaying ? (
             <FaPause className="text-2xl" />
@@ -313,7 +329,7 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
             dispatch(nextSong());
             playerEngine.seekTo(0);
           }}
-          className="p-3 theme-text-main hover:text-rose-600 transition-transform active:scale-90"
+          className="p-3 text-white hover:text-rose-400 transition-transform active:scale-90"
         >
           <FaStepForward className="text-2xl" />
         </button>
@@ -322,12 +338,12 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         <button
           onClick={() => dispatch(toggleRepeat())}
           className={`relative p-3 rounded-full transition-colors ${
-            repeatMode !== 'off' ? 'text-rose-600' : 'theme-text-muted hover:theme-text-main'
+            repeatMode !== 'off' ? 'text-rose-500' : 'text-white/70 hover:text-white'
           }`}
         >
           <FaRedo className="text-lg" />
           {repeatMode === 'one' && (
-            <span className="absolute top-1.5 right-1.5 text-[9px] font-bold bg-rose-600 text-white w-3.5 h-3.5 rounded-full flex items-center justify-center">
+            <span className="absolute top-1.5 right-1.5 text-[9px] font-bold bg-rose-500 text-white w-3.5 h-3.5 rounded-full flex items-center justify-center">
               1
             </span>
           )}
