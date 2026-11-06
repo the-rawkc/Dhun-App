@@ -177,55 +177,43 @@ const SingerDetails = () => {
 
   return (
     <div className="flex flex-col gap-8 pb-28 select-none animate-fade-in">
-      {/* Hero Artist Banner */}
-      <div className="relative rounded-3xl overflow-hidden p-6 md:p-10 bg-gradient-to-br from-rose-950/40 via-red-950/20 to-dark-900 border border-rose-500/20 shadow-2xl flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-8">
-        <div className="w-36 h-36 md:w-48 md:h-48 rounded-full overflow-hidden bg-dark-950 shadow-2xl border-4 border-rose-500/40 shrink-0">
+      {/* Compact Artist Header (Photo & Name only) */}
+      <div className="relative rounded-2xl overflow-hidden p-4 sm:p-5 bg-gradient-to-br from-rose-950/30 via-red-950/20 to-dark-900 border border-rose-500/20 shadow-lg flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-dark-950 shadow-md border-2 border-rose-500/30 shrink-0">
           <img src={displayImage} alt={displayName} className="w-full h-full object-cover" />
         </div>
 
-        <div className="flex-1 text-center md:text-left">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs font-semibold mb-2">
-            <FaCheckCircle />
-            <span>Verified Indian Artist</span>
+        <div className="flex-1 text-center sm:text-left">
+          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[11px] font-semibold mb-1">
+            <FaCheckCircle className="text-[10px]" />
+            <span>Artist</span>
           </div>
 
-          <h1 className="text-3xl md:text-5xl font-extrabold theme-text-main tracking-tight">
+          <h1 className="text-xl sm:text-3xl font-extrabold theme-text-main tracking-tight">
             {displayName}
           </h1>
 
-          {artistData?.subscribers && (
-            <p className="text-xs md:text-sm theme-text-muted mt-2 font-medium">
-              {artistData.subscribers}
-            </p>
-          )}
-
-          {bio && (
-            <p className="text-xs md:text-sm theme-text-muted mt-3 max-w-2xl line-clamp-3 leading-relaxed">
-              {bio}
-            </p>
-          )}
-
-          <div className="mt-6 flex flex-wrap items-center justify-center md:justify-start gap-3">
+          <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2">
             <button
               onClick={handlePlayAll}
               disabled={prioritizedSongs.length === 0}
-              className="flex items-center gap-2.5 px-6 py-3 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-lg shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
             >
-              <FaPlay className="text-xs" />
-              <span>Play All Tracks</span>
+              <FaPlay className="text-[10px]" />
+              <span>Play All</span>
             </button>
 
             {/* Favorite / Follow Artist button */}
             <button
               onClick={handleFollowArtist}
-              className={`flex items-center gap-2 px-5 py-3 rounded-full border text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-xs font-bold transition-all ${
                 isFavoriteArtist
                   ? 'bg-rose-600 text-white border-rose-600'
                   : 'bg-slate-500/10 hover:bg-slate-500/20 theme-text-main border-slate-500/30'
               }`}
             >
-              {isFavoriteArtist ? <FaHeart /> : <FaRegHeart />}
-              <span>{isFavoriteArtist ? 'Following Artist' : 'Follow Artist'}</span>
+              {isFavoriteArtist ? <FaHeart className="text-xs" /> : <FaRegHeart className="text-xs" />}
+              <span>{isFavoriteArtist ? 'Following' : 'Follow'}</span>
             </button>
           </div>
         </div>

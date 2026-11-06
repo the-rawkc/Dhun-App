@@ -89,28 +89,24 @@ const AlbumDetails = () => {
 
   return (
     <div className="flex flex-col gap-8 pb-20 select-none animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 md:p-8 rounded-3xl bg-rose-500/10 border theme-border shadow-lg">
-        <div className="w-40 h-40 md:w-52 md:h-52 rounded-2xl overflow-hidden bg-dark-950 shadow-2xl shrink-0 border theme-border">
+      {/* Compact Album Header */}
+      <div className="flex flex-col sm:flex-row items-center sm:items-center gap-4 p-4 sm:p-5 rounded-2xl bg-rose-500/10 border theme-border shadow-md">
+        <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-dark-950 shadow-md shrink-0 border theme-border">
           <img src={cover} alt={title} className="w-full h-full object-cover" />
         </div>
-        <div className="flex-1 text-center md:text-left">
-          <span className="text-xs font-bold uppercase tracking-widest text-rose-500">
+        <div className="flex-1 text-center sm:text-left">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-rose-500">
             Album
           </span>
-          <h1 className="text-2xl md:text-4xl font-extrabold theme-text-main mt-1">{title}</h1>
-          <p className="text-sm theme-text-muted font-medium mt-1">{artist}</p>
-          <p className="text-xs theme-text-muted mt-2">
-            {albumData?.year ? `${albumData.year} • ` : ''}
-            {tracks.length} tracks
-          </p>
+          <h1 className="text-xl sm:text-2xl font-extrabold theme-text-main mt-0.5">{title}</h1>
+          <p className="text-xs theme-text-muted font-medium mt-0.5">{artist}</p>
 
           <button
             onClick={handlePlayAll}
             disabled={tracks.length === 0}
-            className="mt-6 inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-lg shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
+            className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
           >
-            <FaPlay className="text-xs" />
+            <FaPlay className="text-[10px]" />
             <span>Play Album</span>
           </button>
         </div>

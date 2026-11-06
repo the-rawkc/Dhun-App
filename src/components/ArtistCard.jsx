@@ -31,23 +31,23 @@ const ArtistCard = ({ artist }) => {
   return (
     <div
       onClick={handleClick}
-      className="group relative flex flex-col items-center text-center p-2.5 sm:p-3 rounded-2xl glass-card cursor-pointer select-none transition-all duration-300 hover:scale-[1.03]"
+      className="group relative flex flex-col items-center text-center p-2 rounded-2xl glass-card cursor-pointer select-none transition-all duration-300 hover:scale-[1.03]"
     >
       {/* Floating Favorite Heart */}
       <button
         onClick={handleToggleFav}
-        className={`absolute top-2 right-2 p-1.5 rounded-full backdrop-blur-md transition-all ${
+        className={`absolute top-1.5 right-1.5 p-1 rounded-full backdrop-blur-md transition-all ${
           isFav
             ? 'bg-rose-600 text-white'
             : 'bg-black/50 text-white/70 opacity-0 group-hover:opacity-100 hover:text-white'
         }`}
         title={isFav ? 'Unfollow Artist' : 'Follow Artist'}
       >
-        {isFav ? <FaHeart className="text-[10px]" /> : <FaRegHeart className="text-[10px]" />}
+        {isFav ? <FaHeart className="text-[9px]" /> : <FaRegHeart className="text-[9px]" />}
       </button>
 
-      {/* Avatar (Compact - 30% smaller) */}
-      <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-dark-800 shadow-md p-0.5 border border-slate-500/20 group-hover:border-rose-500 transition-all duration-300">
+      {/* Avatar (Compact & Sleek) */}
+      <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-dark-800 shadow-md p-0.5 border border-slate-500/20 group-hover:border-rose-500 transition-all duration-300">
         <img
           src={image}
           alt={name}
@@ -61,17 +61,13 @@ const ArtistCard = ({ artist }) => {
         />
       </div>
 
-      <div className="mt-2 flex items-center gap-1 justify-center max-w-full px-1">
+      {/* Name Only (no extra descriptions) */}
+      <div className="mt-1.5 flex items-center gap-1 justify-center max-w-full px-1">
         <h4 className="font-bold text-xs sm:text-sm theme-text-main group-hover:text-rose-500 truncate transition-colors">
           {name}
         </h4>
         <FaCheckCircle className="text-rose-500 text-[10px] shrink-0" title="Verified Artist" />
       </div>
-
-      <p className="text-[10px] theme-text-muted mt-0.5 capitalize truncate max-w-full">
-        {artist.subscribers ||
-          (artist.listeners ? `${Number(artist.listeners).toLocaleString()} listeners` : 'Indian Artist')}
-      </p>
     </div>
   );
 };

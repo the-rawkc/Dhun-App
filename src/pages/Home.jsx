@@ -162,27 +162,23 @@ const Home = () => {
 
   return (
     <div className="flex flex-col gap-7 pb-28 select-none animate-fade-in">
-      {/* ─── Hero Indian Banner ─────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl p-5 md:p-7 bg-gradient-to-r from-rose-900/40 via-red-950/60 to-dark-900 border border-rose-500/20 shadow-xl">
-        <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-400 text-xs font-semibold mb-2">
-            <HiSparkles />
+      {/* ─── Hero Indian Banner (Compact & Sleek) ───────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl p-4 sm:p-5 bg-gradient-to-r from-rose-900/35 via-red-950/50 to-dark-900 border border-rose-500/20 shadow-md">
+        <div className="relative z-10 max-w-xl">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[11px] font-semibold mb-1.5">
+            <HiSparkles className="text-xs" />
             <span>Desi Beats • Bollywood • Punjabi • South</span>
           </div>
 
-          <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight theme-text-main">
+          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight theme-text-main">
             India's Music Hub, <span className="text-rose-500">Free & Lossless</span>
           </h1>
 
-          <p className="mt-1.5 text-xs md:text-sm theme-text-muted leading-relaxed">
-            Unlimited streams, real-time synchronized karaoke lyrics, offline downloads, and background playback.
-          </p>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2.5">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               onClick={handlePlayTrending}
               disabled={trendingIndia.length === 0}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
             >
               <FaPlay className="text-[10px]" />
               <span>Play India Trending</span>
@@ -190,7 +186,7 @@ const Home = () => {
 
             <button
               onClick={() => navigate('/charts')}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-500/10 hover:bg-slate-500/20 theme-text-main font-semibold text-xs border theme-border transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-500/10 hover:bg-slate-500/20 theme-text-main font-semibold text-xs border theme-border transition-all"
             >
               <FaFire className="text-rose-500 text-xs" />
               <span>India Top 50</span>
