@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   nextSong,
@@ -21,6 +21,7 @@ import {
   FaHeart,
   FaRegHeart,
   FaChevronDown,
+  FaChevronUp,
   FaArrowLeft,
   FaListUl,
   FaDownload,
@@ -54,6 +55,31 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
 
   const [activeTab, setActiveTab] = useState('art'); // 'art' | 'lyrics'
   const [downloadStatus, setDownloadStatus] = useState('idle');
+
+  // Touch gesture refs for sliding up lyrics and sliding down to return
+  const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
+
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e) => {
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+
+    // Detect dominant vertical swipe
+    if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 35) {
+      if (deltaY < -35 && activeTab !== 'lyrics') {
+        // Swiped UP -> Slide up live lyrics!
+        setActiveTab('lyrics');
+      } else if (deltaY > 40 && activeTab === 'lyrics') {
+        // Swiped DOWN while lyrics is open -> Slide down to poster view!
+        setActiveTab('art');
+      }
+    }
+  };
 
   // Handle mobile phone physical/gesture Back button via history popstate
   useEffect(() => {
@@ -110,7 +136,11 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-white animate-slide-up select-none overflow-hidden">
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-white animate-slide-up select-none overflow-hidden"
+    >
       {/* Full-Screen Song Poster Background (Edge-to-Edge) */}
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
         <img
@@ -200,16 +230,43 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         </div>
       </div>
 
-      {/* Main Center Area: Full Screen Poster Experience (NO Picture in a Box) or Live Lyrics */}
+      {/* Main Center Area: Open Full Screen Poster Canvas */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-2 min-h-0">
-        {activeTab === 'lyrics' ? (
-          <div className="w-full h-full rounded-3xl overflow-hidden backdrop-blur-xl bg-black/50 p-4 border border-white/15 shadow-2xl animate-fade-in">
-            <SyncedLyrics />
-          </div>
-        ) : (
-          /* Open View: The song poster is the full screen background */
-          <div className="flex-1 w-full" />
-        )}
+        <div className="flex-1 w-full" />
+      </div>
+
+      {/* Slide Up for Lyrics Cue Button (Visible in Poster View) */}
+      {activeTab !== 'lyrics' && (
+        <button
+          type="button"
+          onClick={() => setActiveTab('lyrics')}
+          className="flex items-center justify-center gap-1.5 py-1.5 px-4 mx-auto mb-2 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-white/90 hover:text-white text-xs font-bold transition-all active:scale-95 shadow-lg group shrink-0"
+        >
+          <FaChevronUp className="text-[10px] text-rose-400 group-hover:-translate-y-0.5 transition-transform animate-bounce" />
+          <span>Slide up for Live Lyrics</span>
+        </button>
+      )}
+
+      {/* Slide-Up Live Lyrics Drawer (Slides up smoothly over the poster) */}
+      <div
+        className={`absolute inset-x-0 bottom-0 top-14 z-30 flex flex-col rounded-t-3xl backdrop-blur-2xl bg-black/85 border-t border-white/20 shadow-2xl transition-transform duration-500 ease-out ${
+          activeTab === 'lyrics' ? 'translate-y-0' : 'translate-y-full pointer-events-none'
+        }`}
+      >
+        {/* Pull Down / Minimize Handle */}
+        <div
+          onClick={() => setActiveTab('art')}
+          className="w-full flex flex-col items-center pt-2.5 pb-1 cursor-pointer active:opacity-70 shrink-0"
+        >
+          <div className="w-12 h-1.5 rounded-full bg-white/40 mb-1" />
+          <span className="text-[10px] text-white/60 font-semibold flex items-center gap-1">
+            <FaChevronDown className="text-[9px]" /> Swipe or tap down to return to poster
+          </span>
+        </div>
+
+        <div className="flex-1 overflow-hidden">
+          <SyncedLyrics onClose={() => setActiveTab('art')} />
+        </div>
       </div>
 
       {/* Track Info & Action Buttons (Shifted upwards) */}
