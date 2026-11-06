@@ -9,6 +9,7 @@ class PlayerEngine {
     this.pendingAutoPlay = false;
     this.timeUpdateTimer = null;
     this.currentTrack = null;
+    this.currentVideoId = null;
     this.isOfflinePlayback = false;
     this.offlineAudioEl = null;
     this.wakeLock = null;
@@ -73,6 +74,14 @@ class PlayerEngine {
   initYouTube() {
     if (typeof window === 'undefined') return;
 
+    // Ensure YouTube Iframe API script tag is injected in PWA/mobile
+    if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      tag.async = true;
+      document.head.appendChild(tag);
+    }
+
     const setupPlayer = () => {
       if (!window.YT || !window.YT.Player) {
         setTimeout(setupPlayer, 150);
@@ -83,7 +92,8 @@ class PlayerEngine {
       if (!container) {
         container = document.createElement('div');
         container.id = 'yt-audio-container';
-        container.style.cssText = 'position:fixed;bottom:0;right:0;width:200px;height:200px;opacity:0.001;pointer-events:none;z-index:-9999;';
+        // 1px visible container prevents mobile browsers from suspending hidden video playback
+        container.style.cssText = 'position:fixed;bottom:0;left:0;width:1px;height:1px;opacity:0.01;pointer-events:none;z-index:9999;overflow:hidden;';
         document.body.appendChild(container);
       }
 
@@ -96,8 +106,9 @@ class PlayerEngine {
 
       try {
         this.ytPlayer = new window.YT.Player('yt-player-target', {
-          height: '200',
-          width: '200',
+          height: '100%',
+          width: '100%',
+          host: 'https://www.youtube-nocookie.com',
           playerVars: {
             autoplay: 1,
             controls: 0,
@@ -106,6 +117,8 @@ class PlayerEngine {
             playsinline: 1,
             rel: 0,
             enablejsapi: 1,
+            origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+            widget_referrer: typeof window !== 'undefined' ? window.location.href : undefined,
           },
           events: {
             onReady: () => {
@@ -139,11 +152,22 @@ class PlayerEngine {
                 this.stopTimeTracking();
                 this.listeners.ended();
                 this.updateMediaSessionState('none');
+              } else if (event.data === 5) { // Video Cued (Ready to play on mobile)
+                if (this.pendingAutoPlay || this.currentTrack) {
+                  try {
+                    this.ytPlayer.playVideo();
+                  } catch (e) {}
+                }
               }
             },
             onError: (event) => {
               console.warn('YouTube Player Event Error:', event.data);
-              // Avoid triggering ended() on transient YouTube stream errors to prevent rapid skip loops
+              // Video restricted on mobile / embedding disabled (101, 150) or invalid (2, 100) -> auto advance
+              if (event.data === 150 || event.data === 101 || event.data === 100 || event.data === 2) {
+                setTimeout(() => {
+                  this.listeners.next();
+                }, 800);
+              }
             },
           },
         });
@@ -223,11 +247,30 @@ class PlayerEngine {
     }
   }
 
+  unlockAudio() {
+    if (typeof window === 'undefined') return;
+    try {
+      audioDSP.ensureContext();
+      if (this.offlineAudioEl) {
+        const p = this.offlineAudioEl.play();
+        if (p && typeof p.then === 'function') {
+          p.then(() => this.offlineAudioEl.pause()).catch(() => {});
+        }
+      }
+      if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
+        try {
+          this.ytPlayer.playVideo();
+        } catch (e) {}
+      }
+    } catch (e) {}
+  }
+
   async loadVideo(videoId, autoPlay = true, trackMeta = null) {
     if (!videoId) return;
     const cleanVideoId = typeof videoId === 'object' ? (videoId.videoId || videoId.id) : String(videoId).trim();
     if (!cleanVideoId) return;
 
+    this.currentVideoId = cleanVideoId;
     this.currentTrack = trackMeta;
     this.updateMediaMetadata(trackMeta);
 
@@ -367,4 +410,18 @@ class PlayerEngine {
 }
 
 export const playerEngine = new PlayerEngine();
+
+// First-touch global user interaction unlock for mobile phones and PWAs
+if (typeof window !== 'undefined') {
+  const unlockOnFirstTouch = () => {
+    playerEngine.unlockAudio();
+    window.removeEventListener('touchstart', unlockOnFirstTouch);
+    window.removeEventListener('touchend', unlockOnFirstTouch);
+    window.removeEventListener('click', unlockOnFirstTouch);
+  };
+  window.addEventListener('touchstart', unlockOnFirstTouch, { passive: true });
+  window.addEventListener('touchend', unlockOnFirstTouch, { passive: true });
+  window.addEventListener('click', unlockOnFirstTouch, { passive: true });
+}
+
 export default playerEngine;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   nextSong,
@@ -21,6 +21,7 @@ import {
   FaHeart,
   FaRegHeart,
   FaChevronDown,
+  FaArrowLeft,
   FaListUl,
   FaDownload,
   FaCheck,
@@ -54,6 +55,32 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
   const [activeTab, setActiveTab] = useState('art'); // 'art' | 'lyrics'
   const [downloadStatus, setDownloadStatus] = useState('idle');
 
+  // Handle mobile phone physical/gesture Back button via history popstate
+  useEffect(() => {
+    if (!isMobilePlayerOpen) return;
+
+    // Push history entry so phone Back button closes the player modal
+    window.history.pushState({ modal: 'mobile-player' }, '');
+
+    const handlePopState = () => {
+      dispatch(toggleMobilePlayer(false));
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isMobilePlayerOpen, dispatch]);
+
+  const handleClose = () => {
+    if (window.history.state?.modal === 'mobile-player') {
+      window.history.back();
+    } else {
+      dispatch(toggleMobilePlayer(false));
+    }
+  };
+
   if (!isMobilePlayerOpen || !activeSong) return null;
 
   const isFav = favorites.some((f) => f.videoId === activeSong?.videoId);
@@ -85,19 +112,23 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
   return (
     <div className="fixed inset-0 z-50 flex flex-col theme-bg-main theme-text-main animate-slide-up select-none overflow-hidden">
       {/* Top Header */}
-      <div className="flex items-center justify-between px-6 pt-5 pb-2 shrink-0">
+      <div className="flex items-center justify-between px-5 pt-4 pb-2 shrink-0">
+        {/* Prominent Back Button */}
         <button
-          onClick={() => dispatch(toggleMobilePlayer(false))}
-          className="p-2 -ml-2 rounded-full theme-text-muted hover:theme-text-main"
+          onClick={handleClose}
+          className="flex items-center gap-1.5 px-3 py-1.5 -ml-2 rounded-full theme-text-muted hover:theme-text-main active:scale-95 transition-all bg-slate-500/10 hover:bg-slate-500/20"
+          title="Back"
+          aria-label="Back"
         >
-          <FaChevronDown className="text-xl" />
+          <FaArrowLeft className="text-base text-rose-500" />
+          <span className="text-xs font-bold text-rose-500">Back</span>
         </button>
 
         <div className="flex flex-col items-center">
           <span className="text-[10px] font-bold uppercase tracking-widest text-rose-500">
             Now Playing
           </span>
-          <span className="text-xs font-semibold theme-text-muted truncate max-w-[200px]">
+          <span className="text-xs font-semibold theme-text-muted truncate max-w-[170px]">
             {activeSong.artist}
           </span>
         </div>
@@ -113,7 +144,7 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
 
           <button
             onClick={() => {
-              dispatch(toggleMobilePlayer(false));
+              handleClose();
               if (onOpenQueue) onOpenQueue();
             }}
             className="p-2 -mr-2 rounded-full theme-text-muted hover:theme-text-main"

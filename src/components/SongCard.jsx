@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
 import { saveTrackOffline, getOfflineTrack } from '../services/offlineStorage';
+import { playerEngine } from '../services/playerEngine';
 
 const SongCard = ({ song, songs = [], index = 0 }) => {
   const dispatch = useDispatch();
@@ -43,9 +44,11 @@ const SongCard = ({ song, songs = [], index = 0 }) => {
 
   const handlePlayClick = (e) => {
     e.stopPropagation();
+    playerEngine.unlockAudio();
     if (isCurrent) {
       dispatch(playPause());
     } else {
+      playerEngine.loadVideo(normalized.videoId, true, normalized);
       dispatch(playSong({ song: normalized, songs, index }));
     }
   };

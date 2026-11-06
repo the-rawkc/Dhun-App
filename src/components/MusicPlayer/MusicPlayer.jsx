@@ -80,7 +80,9 @@ const MusicPlayer = () => {
   // Load new song when activeSong changes
   useEffect(() => {
     if (activeSong?.videoId) {
-      playerEngine.loadVideo(activeSong.videoId, true, activeSong);
+      if (playerEngine.currentVideoId !== activeSong.videoId) {
+        playerEngine.loadVideo(activeSong.videoId, true, activeSong);
+      }
 
       // Check if downloaded offline
       getOfflineTrack(activeSong.videoId).then((item) => {

@@ -20,6 +20,7 @@ import {
 } from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
 import { saveTrackOffline, getOfflineTrack } from '../services/offlineStorage';
+import { playerEngine } from '../services/playerEngine';
 
 const SongRow = ({ song, index, songs = [], showCover = true, isHighlightedLiked = false }) => {
   const dispatch = useDispatch();
@@ -64,9 +65,11 @@ const SongRow = ({ song, index, songs = [], showCover = true, isHighlightedLiked
   }, [menuOpen]);
 
   const handleRowClick = () => {
+    playerEngine.unlockAudio();
     if (isCurrent) {
       dispatch(playPause());
     } else {
+      playerEngine.loadVideo(normalized.videoId, true, normalized);
       dispatch(playSong({ song: normalized, songs, index }));
     }
   };
