@@ -12,7 +12,6 @@ class PlayerEngine {
     this.currentVideoId = null;
     this.isOfflinePlayback = false;
     this.offlineAudioEl = null;
-    this.bgAudioEl = null;
     this.audioContext = null;
     this.oscillatorNode = null;
     this.gainNode = null;
@@ -29,59 +28,10 @@ class PlayerEngine {
       prev: () => {},
     };
 
-    this.initBackgroundAudio();
     this.initYouTube();
     this.initOfflineAudio();
     this.initMediaSession();
     this.initVisibilityListener();
-  }
-
-  /**
-   * Hardware Audio Track for Chrome PWA Standalone Mode
-   * In Android WebAPK, Chrome pauses subframes & AudioContext when locked UNLESS
-   * an HTML5 <audio> tag is playing in the top window.
-   */
-  initBackgroundAudio() {
-    if (typeof window === 'undefined') return;
-    try {
-      const sampleRate = 8000;
-      const numSamples = sampleRate * 2;
-      const dataSize = numSamples * 2;
-      const buffer = new ArrayBuffer(44 + dataSize);
-      const view = new DataView(buffer);
-
-      const writeStr = (offset, str) => {
-        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-      };
-
-      writeStr(0, 'RIFF');
-      view.setUint32(4, 36 + dataSize, true);
-      writeStr(8, 'WAVE');
-      writeStr(12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true); // PCM
-      view.setUint16(22, 1, true); // Mono
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * 2, true);
-      view.setUint16(32, 2, true);
-      view.setUint16(34, 16, true);
-      writeStr(36, 'data');
-      view.setUint32(40, dataSize, true);
-
-      // Low 20Hz hum at amplitude 2/32767: inaudible, but detected as valid audio by OS mixer
-      for (let i = 0; i < numSamples; i++) {
-        const val = Math.round(2 * Math.sin(2 * Math.PI * 20 * (i / sampleRate)));
-        view.setInt16(44 + i * 2, val, true);
-      }
-
-      const blob = new Blob([buffer], { type: 'audio/wav' });
-      this.bgAudioEl = new Audio(URL.createObjectURL(blob));
-      this.bgAudioEl.loop = true;
-      this.bgAudioEl.volume = 0.05;
-      this.bgAudioEl.preload = 'auto';
-    } catch (e) {
-      console.warn('Background audio init failed:', e);
-    }
   }
 
   startAudioAnchor() {
@@ -132,9 +82,6 @@ class PlayerEngine {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         if (this.shouldBePlaying && !this.isUserPaused) {
-          if (this.bgAudioEl) {
-            this.bgAudioEl.play().catch(() => {});
-          }
           this.startAudioAnchor();
           this.updateMediaSessionState('playing');
           if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
@@ -221,9 +168,7 @@ class PlayerEngine {
       if (!container) {
         container = document.createElement('div');
         container.id = 'yt-audio-container';
-        // Size 320x240 and opacity 0.99 placed behind body (z-index -50)
-        // Ensures mobile OS compositor classifies the media stream as active, non-occluded, foreground audio
-        container.style.cssText = 'position:fixed;top:0;left:0;width:320px;height:240px;opacity:0.99;pointer-events:none;z-index:-50;overflow:hidden;border:none;';
+        container.style.cssText = 'position:fixed;bottom:0;right:0;width:240px;height:240px;opacity:0.01;pointer-events:none;z-index:-10;overflow:hidden;border:none;';
         document.body.appendChild(container);
       }
 
@@ -235,6 +180,10 @@ class PlayerEngine {
       }
 
       try {
+        const originUrl = typeof window !== 'undefined' && window.location.origin && window.location.origin.startsWith('http')
+          ? window.location.origin
+          : undefined;
+
         this.ytPlayer = new window.YT.Player('yt-player-target', {
           height: '100%',
           width: '100%',
@@ -247,8 +196,7 @@ class PlayerEngine {
             playsinline: 1,
             rel: 0,
             enablejsapi: 1,
-            origin: typeof window !== 'undefined' ? window.location.origin : undefined,
-            widget_referrer: typeof window !== 'undefined' ? window.location.href : undefined,
+            ...(originUrl ? { origin: originUrl } : {}),
           },
           events: {
             onReady: () => {
@@ -266,9 +214,6 @@ class PlayerEngine {
                 this.startTimeTracking();
                 this.listeners.stateChange(true);
                 this.requestWakeLock();
-                if (this.bgAudioEl) {
-                  this.bgAudioEl.play().catch(() => {});
-                }
                 this.startAudioAnchor();
                 try {
                   // Force highest bitrate audio stream (Spotify Pro quality)
@@ -282,9 +227,6 @@ class PlayerEngine {
               } else if (event.data === 2) { // Paused
                 // If paused by OS on lock screen or backgrounding in Chrome PWA:
                 if (this.shouldBePlaying && !this.isUserPaused) {
-                  if (this.bgAudioEl) {
-                    this.bgAudioEl.play().catch(() => {});
-                  }
                   this.startAudioAnchor();
                   this.updateMediaSessionState('playing');
                   setTimeout(() => {
@@ -297,9 +239,6 @@ class PlayerEngine {
                   return;
                 }
                 this.stopTimeTracking();
-                if (this.bgAudioEl) {
-                  this.bgAudioEl.pause();
-                }
                 this.stopAudioAnchor();
                 this.listeners.stateChange(false);
                 this.releaseWakeLock();
@@ -307,9 +246,6 @@ class PlayerEngine {
               } else if (event.data === 0) { // Ended
                 this.shouldBePlaying = false;
                 this.stopTimeTracking();
-                if (this.bgAudioEl) {
-                  this.bgAudioEl.pause();
-                }
                 this.stopAudioAnchor();
                 this.listeners.ended();
                 this.updateMediaSessionState('none');
@@ -509,9 +445,6 @@ class PlayerEngine {
   play() {
     this.isUserPaused = false;
     this.shouldBePlaying = true;
-    if (this.bgAudioEl) {
-      this.bgAudioEl.play().catch(() => {});
-    }
     this.startAudioAnchor();
     this.updateMediaSessionState('playing');
     this.requestWakeLock();
@@ -525,9 +458,6 @@ class PlayerEngine {
   pause() {
     this.isUserPaused = true;
     this.shouldBePlaying = false;
-    if (this.bgAudioEl) {
-      this.bgAudioEl.pause();
-    }
     this.stopAudioAnchor();
     this.updateMediaSessionState('paused');
     this.releaseWakeLock();

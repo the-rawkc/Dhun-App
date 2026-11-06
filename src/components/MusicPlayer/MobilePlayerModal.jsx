@@ -20,7 +20,6 @@ import {
   FaRedo,
   FaHeart,
   FaRegHeart,
-  FaChevronUp,
   FaArrowLeft,
   FaListUl,
   FaDownload,
@@ -207,28 +206,26 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         <div className="flex-1 w-full" />
       </div>
 
-      {/* Slide Up for Lyrics Cue Button (Visible in Poster View) */}
+      {/* Button to View Lyrics (Visible in Poster View) */}
       {activeTab !== 'lyrics' && (
         <button
           type="button"
           onClick={() => setActiveTab('lyrics')}
-          className="flex items-center justify-center gap-1.5 py-1.5 px-4 mx-auto mb-2 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-white/90 hover:text-white text-xs font-bold transition-all active:scale-95 shadow-lg group shrink-0"
+          className="flex items-center justify-center gap-2 py-2 px-5 mx-auto mb-2.5 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition-all shrink-0 cursor-pointer"
         >
-          <FaChevronUp className="text-[10px] text-rose-400 group-hover:-translate-y-0.5 transition-transform animate-bounce" />
-          <span>Slide up for Live Lyrics</span>
+          <FaMicrophoneAlt className="text-xs" />
+          <span>View Live Lyrics</span>
         </button>
       )}
 
-      {/* Slide-Up Live Lyrics Drawer (Slides up smoothly over the poster) */}
-      <div
-        className={`absolute inset-x-0 bottom-0 top-14 z-40 flex flex-col rounded-t-3xl bg-[#0e0e12] border-t border-white/15 shadow-2xl transform-gpu will-change-transform transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden ${
-          activeTab === 'lyrics' ? 'translate-y-0' : 'translate-y-full pointer-events-none'
-        }`}
-      >
-        <div className="flex-1 overflow-hidden">
-          <SyncedLyrics onClose={() => setActiveTab('art')} />
+      {/* Live Lyrics View (Button Triggered Only) */}
+      {activeTab === 'lyrics' && (
+        <div className="absolute inset-x-0 bottom-0 top-14 z-40 flex flex-col rounded-t-3xl bg-[#0e0e12] border-t border-white/15 shadow-2xl overflow-hidden animate-fade-in">
+          <div className="flex-1 overflow-hidden">
+            <SyncedLyrics onClose={() => setActiveTab('art')} />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Track Info & Action Buttons (Shifted upwards) */}
       <div className="px-6 pt-1 pb-1 flex items-center justify-between shrink-0">

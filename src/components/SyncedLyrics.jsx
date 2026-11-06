@@ -13,18 +13,6 @@ const SyncedLyrics = ({ onClose }) => {
   const [error, setError] = useState(false);
   const activeLineRef = useRef(null);
   const containerRef = useRef(null);
-  const headerTouchY = useRef(0);
-
-  const handleHeaderTouchStart = (e) => {
-    headerTouchY.current = e.touches[0].clientY;
-  };
-
-  const handleHeaderTouchEnd = (e) => {
-    const delta = e.changedTouches[0].clientY - headerTouchY.current;
-    if (delta > 35 && onClose) {
-      onClose();
-    }
-  };
 
   useEffect(() => {
     if (!activeSong?.title) return;
@@ -89,52 +77,35 @@ const SyncedLyrics = ({ onClose }) => {
 
   return (
     <div className="relative flex flex-col h-full w-full bg-[#0e0e12] text-white p-4 sm:p-6 md:p-8 select-none overflow-hidden">
-      {/* Header with Drag Handle & Single Prominent Close Cross Button */}
-      <div
-        onTouchStart={handleHeaderTouchStart}
-        onTouchEnd={handleHeaderTouchEnd}
-        className="flex flex-col pb-3 border-b border-white/10 shrink-0"
-      >
-        {/* Swipe Down Indicator Bar */}
-        <div
-          onClick={onClose}
-          className="w-12 h-1.5 rounded-full bg-white/30 mx-auto mb-2.5 cursor-pointer active:bg-white/50 transition-colors"
-        />
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0 pr-2">
-            <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-500 shrink-0">
-              <FaMicrophoneAlt className="text-lg" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-bold text-base sm:text-lg text-white truncate">Live Karaoke Lyrics</h3>
-              <p className="text-xs text-white/60 truncate mt-0.5">
-                {activeSong?.title} • {activeSong?.artist}
-              </p>
-            </div>
+      {/* Header with Title and Single Close Button */}
+      <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-3 min-w-0 pr-2">
+          <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-500 shrink-0">
+            <FaMicrophoneAlt className="text-lg" />
           </div>
-
-          {onClose && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onClose();
-              }}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onClose();
-              }}
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 active:bg-rose-600 text-white shadow-lg transition-transform active:scale-90 cursor-pointer shrink-0"
-              title="Close Lyrics"
-              aria-label="Close Lyrics"
-            >
-              <FaTimes className="text-base" />
-            </button>
-          )}
+          <div className="min-w-0">
+            <h3 className="font-bold text-base sm:text-lg text-white truncate">Live Karaoke Lyrics</h3>
+            <p className="text-xs text-white/60 truncate mt-0.5">
+              {activeSong?.title} • {activeSong?.artist}
+            </p>
+          </div>
         </div>
+
+        {onClose && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 active:bg-rose-600 text-white font-semibold text-xs shadow transition-all cursor-pointer shrink-0"
+            title="Close Lyrics"
+          >
+            <FaTimes className="text-xs text-rose-400" />
+            <span>Close</span>
+          </button>
+        )}
       </div>
 
       {/* Lyrics Body */}
