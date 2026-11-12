@@ -97,20 +97,17 @@ const Library = () => {
 
         {/* Navigation Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
-          <button
-            onClick={() => setActiveTab('playlists')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-              activeTab === 'playlists'
-                ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-600/30'
-                : 'bg-slate-500/10 hover:bg-slate-500/20 theme-text-main'
-            }`}
-          >
-            <FaMusic className="text-xs" />
-            <span>Playlists ({playlists.length + 1})</span>
-          </button>
+          {activeTab !== 'playlists' && (
+            <button
+              onClick={() => setActiveTab('playlists')}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-slate-500/10 hover:bg-slate-500/20 theme-text-main transition-all"
+            >
+              <span>← All Playlists</span>
+            </button>
+          )}
 
           <button
-            onClick={() => setActiveTab('downloads')}
+            onClick={() => setActiveTab(activeTab === 'downloads' ? 'playlists' : 'downloads')}
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
               activeTab === 'downloads'
                 ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-600/30'
@@ -122,19 +119,7 @@ const Library = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('liked')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-              activeTab === 'liked'
-                ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-600/30'
-                : 'bg-slate-500/10 hover:bg-slate-500/20 theme-text-main'
-            }`}
-          >
-            <FaHeart className="text-xs text-rose-500" />
-            <span>Liked Songs ({favorites.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('artists')}
+            onClick={() => setActiveTab(activeTab === 'artists' ? 'playlists' : 'artists')}
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
               activeTab === 'artists'
                 ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-600/30'
@@ -293,23 +278,29 @@ const Library = () => {
       {/* ─── TAB 3: LIKED SONGS ─────────────────────────────────────── */}
       {activeTab === 'liked' && (
         <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setActiveTab('playlists')}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-500/10 hover:bg-slate-500/20 text-xs theme-text-main font-semibold transition-all"
+            >
+              <span>← Back to Playlists</span>
+            </button>
+            {favorites.length > 0 && (
+              <button
+                onClick={handlePlayFavorites}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/30"
+              >
+                <FaPlay className="text-[10px]" />
+                <span>Play Liked Songs</span>
+              </button>
+            )}
+          </div>
           {favorites.length > 0 ? (
-            <>
-              <div className="flex justify-end">
-                <button
-                  onClick={handlePlayFavorites}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/30"
-                >
-                  <FaPlay className="text-[10px]" />
-                  <span>Play Liked Songs</span>
-                </button>
-              </div>
-              <div className="space-y-1">
-                {favorites.map((song, i) => (
-                  <SongRow key={song.videoId || i} song={song} index={i} songs={favorites} />
-                ))}
-              </div>
-            </>
+            <div className="space-y-1">
+              {favorites.map((song, i) => (
+                <SongRow key={song.videoId || i} song={song} index={i} songs={favorites} />
+              ))}
+            </div>
           ) : (
             <div className="py-20 text-center theme-text-muted text-sm">
               No liked songs yet. Tap the heart icon on any song!
