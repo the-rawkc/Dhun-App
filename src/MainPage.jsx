@@ -33,16 +33,35 @@ const MainPage = () => {
   const [showAuthLanding, setShowAuthLanding] = useState(!getActiveSession());
 
   useEffect(() => {
-    // If user is already logged in, seamlessly sync their latest songs and playlists from the cloud
-    if (session) {
-      fetchCloudProfile()
-        .then((data) => {
-          if (data && (data.favorites || data.playlists)) {
-            dispatch(loadCloudUserData(data));
-          }
-        })
-        .catch(() => {});
-    }
+    const syncLatestFromCloud = () => {
+      const active = getActiveSession();
+      if (active?.phone && active?.pin) {
+        fetchCloudProfile()
+          .then((data) => {
+            if (data && data.success) {
+              dispatch(loadCloudUserData(data));
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
+    // 1. Sync on mount / session change
+    syncLatestFromCloud();
+
+    // 2. Auto-sync when user returns or focuses the app (ensures cross-device uniformity in real-time)
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        syncLatestFromCloud();
+      }
+    };
+    window.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', syncLatestFromCloud);
+
+    return () => {
+      window.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', syncLatestFromCloud);
+    };
   }, [session, dispatch]);
 
   return (

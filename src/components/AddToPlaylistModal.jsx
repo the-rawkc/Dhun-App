@@ -60,8 +60,9 @@ const AddToPlaylistModal = () => {
         {/* Existing Playlists list */}
         <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-2">
           {playlists.map((pl) => {
-            const isAlreadyAdded = pl.tracks.some(
-              (t) => t.videoId === songToAddToPlaylist.videoId
+            const trks = Array.isArray(pl.tracks) ? pl.tracks : [];
+            const isAlreadyAdded = trks.some(
+              (t) => t && t.videoId === songToAddToPlaylist.videoId
             );
             const isJustAdded = addedMap[pl.id];
 
@@ -88,7 +89,7 @@ const AddToPlaylistModal = () => {
                       {pl.title}
                     </span>
                     <span className="text-xs theme-text-muted">
-                      {pl.tracks.length} songs
+                      {trks.length} songs
                     </span>
                   </div>
                 </div>

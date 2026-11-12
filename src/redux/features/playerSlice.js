@@ -93,48 +93,50 @@ const playerSlice = createSlice({
     loadCloudUserData: (state, action) => {
       const { favorites, playlists, favoriteArtists, themeMode } = action.payload || {};
 
-      // 1. Smart-Merge Liked Songs (Favorites): combine local + cloud, deduplicate by videoId
+      // 1. Favorites: Cloud is authoritative. Deduplicate by videoId
       const favMap = new Map();
-      (state.favorites || []).forEach((f) => {
-        if (f && f.videoId) favMap.set(f.videoId, f);
-      });
       if (Array.isArray(favorites)) {
         favorites.forEach((f) => {
           if (f && f.videoId) favMap.set(f.videoId, f);
         });
       }
+      // Keep any unique local favorites not yet in cloud
+      (state.favorites || []).forEach((f) => {
+        if (f && f.videoId && !favMap.has(f.videoId)) {
+          favMap.set(f.videoId, f);
+        }
+      });
       state.favorites = Array.from(favMap.values());
       saveItem('tunetide_favorites', state.favorites);
 
-      // 2. Smart-Merge Playlists: combine local + cloud playlists, deduplicate by ID or Title
-      const plMap = new Map();
-      (state.playlists || []).forEach((p) => {
-        if (p && (p.id || p.title)) plMap.set(p.id || p.title, p);
-      });
-      if (Array.isArray(playlists)) {
-        playlists.forEach((p) => {
-          if (p && (p.id || p.title)) {
-            const key = p.id || p.title;
-            const existing = plMap.get(key);
-            if (existing && Array.isArray(existing.tracks)) {
-              // Merge playlist tracks
-              const trackMap = new Map();
-              existing.tracks.forEach((t) => t && t.videoId && trackMap.set(t.videoId, t));
-              (p.tracks || []).forEach((t) => t && t.videoId && trackMap.set(t.videoId, t));
-              plMap.set(key, { ...existing, ...p, tracks: Array.from(trackMap.values()) });
-            } else {
-              plMap.set(key, p);
-            }
-          }
-        });
+      // 2. Playlists: Cloud is authoritative. Guarantee tracks is always an array.
+      if (Array.isArray(playlists) && playlists.length > 0) {
+        const sanitizedCloudPlaylists = playlists.map((p) => ({
+          ...p,
+          tracks: Array.isArray(p.tracks) ? p.tracks : [],
+        }));
+        // Merge only non-default custom playlists created locally while offline
+        const cloudKeys = new Set(sanitizedCloudPlaylists.map((p) => p.id || p.title));
+        const localCustomPlaylists = (state.playlists || []).filter(
+          (p) =>
+            p &&
+            (p.id || p.title) &&
+            !cloudKeys.has(p.id || p.title) &&
+            !defaultPlaylists.some((dp) => dp.id === p.id)
+        );
+        state.playlists = [...sanitizedCloudPlaylists, ...localCustomPlaylists];
+      } else if (Array.isArray(playlists)) {
+        state.playlists = (state.playlists || []).map((p) => ({
+          ...p,
+          tracks: Array.isArray(p.tracks) ? p.tracks : [],
+        }));
       }
-      state.playlists = Array.from(plMap.values());
       saveItem('tunetide_playlists', state.playlists);
 
       // 3. Smart-Merge Favorite Artists
       const artistSet = new Set([
-        ...(state.favoriteArtists || []),
         ...((Array.isArray(favoriteArtists) && favoriteArtists) || []),
+        ...(state.favoriteArtists || []),
       ]);
       state.favoriteArtists = Array.from(artistSet);
       saveItem('tunetide_fav_artists', state.favoriteArtists);
@@ -149,8 +151,17 @@ const playerSlice = createSlice({
         }
       }
 
-      // Automatically sync unified merged library back to cloud database!
+      // Automatically sync unified merged library back to cloud database
       triggerCloudSync(state);
+    },
+
+    resetUserLibrary: (state) => {
+      state.favorites = [];
+      state.playlists = defaultPlaylists;
+      state.favoriteArtists = [];
+      saveItem('tunetide_favorites', []);
+      saveItem('tunetide_playlists', defaultPlaylists);
+      saveItem('tunetide_fav_artists', []);
     },
 
     setThemeMode: (state, action) => {
@@ -446,6 +457,7 @@ const playerSlice = createSlice({
 
 export const {
   loadCloudUserData,
+  resetUserLibrary,
   setThemeMode,
   playSong,
   playPlaylistWithShuffle,

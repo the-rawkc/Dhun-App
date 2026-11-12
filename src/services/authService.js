@@ -46,10 +46,31 @@ export const loginWithPhoneAndPin = async (phone, pin, name = '', avatar = '') =
   if (cleanPhone.length !== 10) throw new Error('Please enter a valid 10-digit Indian mobile number');
   if (!pin || pin.length !== 4) throw new Error('PIN must be 4 digits');
 
+  // Read current local library so pre-login liked songs & playlists migrate to cloud
+  let localFavorites = [];
+  let localPlaylists = [];
+  let localArtists = [];
+  let localTheme = 'dark';
+  try {
+    localFavorites = JSON.parse(localStorage.getItem('tunetide_favorites') || '[]');
+    localPlaylists = JSON.parse(localStorage.getItem('tunetide_playlists') || '[]');
+    localArtists = JSON.parse(localStorage.getItem('tunetide_fav_artists') || '[]');
+    localTheme = localStorage.getItem('tunetide_theme') || 'dark';
+  } catch (e) {}
+
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone: cleanPhone, pin, name, avatar }),
+    body: JSON.stringify({
+      phone: cleanPhone,
+      pin,
+      name,
+      avatar,
+      favorites: localFavorites,
+      playlists: localPlaylists,
+      favoriteArtists: localArtists,
+      themeMode: localTheme,
+    }),
   });
 
   const data = await res.json();

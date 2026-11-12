@@ -6,7 +6,9 @@ import {
   playTrackNow,
   playPlaylistWithShuffle,
   createPlaylist,
+  loadCloudUserData,
 } from '../redux/features/playerSlice';
+import { getActiveSession, fetchCloudProfile } from '../services/authService';
 import SongRow from '../components/SongRow';
 import ArtistCard from '../components/ArtistCard';
 import {
@@ -30,6 +32,20 @@ const Library = () => {
   const [loadingOffline, setLoadingOffline] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [playlistTitle, setPlaylistTitle] = useState('');
+
+  useEffect(() => {
+    // Refresh library from cloud database on opening Library page
+    const session = getActiveSession();
+    if (session?.phone && session?.pin) {
+      fetchCloudProfile()
+        .then((data) => {
+          if (data && data.success) {
+            dispatch(loadCloudUserData(data));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [dispatch]);
 
   useEffect(() => {
     setLoadingOffline(true);
@@ -192,7 +208,7 @@ const Library = () => {
                     {pl.title}
                   </h3>
                   <p className="text-xs theme-text-muted mt-0.5 truncate">
-                    {pl.tracks.length} {pl.tracks.length === 1 ? 'song' : 'songs'}
+                    {(pl.tracks || []).length} {(pl.tracks || []).length === 1 ? 'song' : 'songs'}
                   </p>
                 </div>
               </div>
@@ -201,11 +217,12 @@ const Library = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (pl.tracks.length > 0) {
-                      dispatch(playPlaylistWithShuffle({ tracks: pl.tracks }));
+                    const trks = Array.isArray(pl.tracks) ? pl.tracks : [];
+                    if (trks.length > 0) {
+                      dispatch(playPlaylistWithShuffle({ tracks: trks }));
                     }
                   }}
-                  disabled={pl.tracks.length === 0}
+                  disabled={!Array.isArray(pl.tracks) || pl.tracks.length === 0}
                   className="p-2.5 rounded-full bg-slate-500/15 hover:bg-slate-500/25 text-white/90 hover:text-white shadow-sm hover:scale-105 active:scale-95 transition-all disabled:opacity-20"
                   title="Shuffle Play"
                   aria-label="Shuffle Play"
@@ -216,11 +233,12 @@ const Library = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (pl.tracks.length > 0) {
-                      dispatch(playTrackNow({ song: pl.tracks[0], songs: pl.tracks, index: 0 }));
+                    const trks = Array.isArray(pl.tracks) ? pl.tracks : [];
+                    if (trks.length > 0) {
+                      dispatch(playTrackNow({ song: trks[0], songs: trks, index: 0 }));
                     }
                   }}
-                  disabled={pl.tracks.length === 0}
+                  disabled={!Array.isArray(pl.tracks) || pl.tracks.length === 0}
                   className="p-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-md hover:scale-110 active:scale-95 transition-all disabled:opacity-30"
                   title="Play Playlist"
                   aria-label="Play Playlist"

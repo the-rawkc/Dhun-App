@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { loadCloudUserData } from '../redux/features/playerSlice';
+import { loadCloudUserData, resetUserLibrary } from '../redux/features/playerSlice';
 import {
   getActiveSession,
   loginWithPhoneAndPin,
@@ -105,6 +105,7 @@ const Profile = () => {
 
   const handleLogout = () => {
     logoutUser();
+    dispatch(resetUserLibrary());
     setCurrentUser(null);
     setAuthSuccess('You have logged out.');
   };

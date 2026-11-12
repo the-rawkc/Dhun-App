@@ -1943,10 +1943,10 @@ var usersCache = {};
 var isLoaded = false;
 var lastCloudFetch = 0;
 
-async function ensureDB() {
+async function ensureDB(force = false) {
   const now = Date.now();
-  // If memory cache was updated within last 10 seconds, it is fresh
-  if (isLoaded && now - lastCloudFetch < 10000) return;
+  // If memory cache was updated within last 5 seconds and force is false, it is fresh
+  if (!force && isLoaded && now - lastCloudFetch < 5000) return;
 
   // 1. Fetch from durable cloud database first (persists across all Vercel/Render serverless restarts!)
   try {
@@ -1954,7 +1954,12 @@ async function ensureDB() {
     if (res.ok) {
       const json = await res.json();
       if (json?.data?.users && typeof json.data.users === 'object') {
-        usersCache = { ...json.data.users, ...usersCache };
+        for (const [phoneKey, cloudUser] of Object.entries(json.data.users)) {
+          const localUser = usersCache[phoneKey];
+          if (!localUser || (cloudUser.updatedAt || 0) >= (localUser.updatedAt || 0)) {
+            usersCache[phoneKey] = cloudUser;
+          }
+        }
         isLoaded = true;
         lastCloudFetch = now;
         return;
@@ -1975,7 +1980,7 @@ async function ensureDB() {
     if (fs.existsSync(dbFile)) {
       const content = fs.readFileSync(dbFile, 'utf-8');
       const parsed = JSON.parse(content);
-      usersCache = { ...parsed, ...usersCache };
+      usersCache = { ...usersCache, ...parsed };
     }
   } catch (e) {}
   isLoaded = true;
@@ -2014,13 +2019,13 @@ async function handleAuthLogin(req) {
   } catch {
     return error('Invalid JSON body');
   }
-  const { phone, pin, name, avatar } = body;
+  const { phone, pin, name, avatar, favorites, playlists, favoriteArtists, themeMode } = body;
   if (!phone || typeof phone !== 'string') return error('Mobile number is required');
   if (!pin || typeof pin !== 'string' || pin.length !== 4) return error('4-digit PIN is required');
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
   if (cleanPhone.length !== 10) return error('Please provide a valid 10-digit Indian mobile number');
 
-  await ensureDB();
+  await ensureDB(true);
   let user = usersCache[cleanPhone];
 
   if (user) {
@@ -2029,34 +2034,90 @@ async function handleAuthLogin(req) {
     }
     if (name && name.trim()) user.name = name.trim();
     if (avatar && avatar.trim()) user.avatar = avatar.trim();
+
+    // Smart-merge favorites if passed from client
+    if (Array.isArray(favorites) && favorites.length > 0) {
+      const favMap = new Map();
+      (user.favorites || []).forEach(f => { if (f && f.videoId) favMap.set(f.videoId, f); });
+      favorites.forEach(f => { if (f && f.videoId) favMap.set(f.videoId, f); });
+      user.favorites = Array.from(favMap.values());
+    }
+
+    // Smart-merge playlists if passed from client (guaranteeing tracks is array)
+    if (Array.isArray(playlists) && playlists.length > 0) {
+      const plMap = new Map();
+      (user.playlists || []).forEach(p => {
+        if (p && (p.id || p.title)) {
+          plMap.set(p.id || p.title, {
+            ...p,
+            tracks: Array.isArray(p.tracks) ? p.tracks : []
+          });
+        }
+      });
+      playlists.forEach(p => {
+        if (p && (p.id || p.title)) {
+          const key = p.id || p.title;
+          const sanitizedTracks = Array.isArray(p.tracks) ? p.tracks : [];
+          const existing = plMap.get(key);
+          if (existing) {
+            const trackMap = new Map();
+            (existing.tracks || []).forEach(t => { if (t && t.videoId) trackMap.set(t.videoId, t); });
+            sanitizedTracks.forEach(t => { if (t && t.videoId) trackMap.set(t.videoId, t); });
+            plMap.set(key, { ...existing, ...p, tracks: Array.from(trackMap.values()) });
+          } else {
+            plMap.set(key, { ...p, tracks: sanitizedTracks });
+          }
+        }
+      });
+      user.playlists = Array.from(plMap.values());
+    }
+
+    if (Array.isArray(favoriteArtists) && favoriteArtists.length > 0) {
+      const artSet = new Set([...(user.favoriteArtists || []), ...favoriteArtists]);
+      user.favoriteArtists = Array.from(artSet);
+    }
+
     user.updatedAt = Date.now();
+    usersCache[cleanPhone] = user;
     await persistDB();
   } else {
     const chosenAvatar = avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanPhone}`;
+    const initialFavs = Array.isArray(favorites) ? favorites.filter(f => f && f.videoId) : [];
+    const initialPlaylists = Array.isArray(playlists) && playlists.length > 0
+      ? playlists.map(p => ({
+          ...p,
+          tracks: Array.isArray(p.tracks) ? p.tracks : []
+        }))
+      : [
+          {
+            id: `pl-${Date.now()}-1`,
+            title: 'My Favorite Songs',
+            description: 'Personal playlist',
+            cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80',
+            tracks: [],
+            createdAt: Date.now(),
+          },
+        ];
     user = {
       phone: cleanPhone,
       pin,
       name: (name && name.trim()) || `User +91-${cleanPhone.slice(-4)}`,
       avatar: chosenAvatar,
       joinedAt: new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
-      favorites: [],
-      playlists: [
-        {
-          id: `pl-${Date.now()}-1`,
-          title: 'My Favorite Songs',
-          description: 'Personal playlist',
-          cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80',
-          tracks: [],
-          createdAt: Date.now(),
-        },
-      ],
-      favoriteArtists: [],
-      themeMode: 'dark',
+      favorites: initialFavs,
+      playlists: initialPlaylists,
+      favoriteArtists: Array.isArray(favoriteArtists) ? favoriteArtists : [],
+      themeMode: themeMode || 'dark',
       updatedAt: Date.now(),
     };
     usersCache[cleanPhone] = user;
     await persistDB();
   }
+
+  const cleanPlaylists = (user.playlists || []).map(p => ({
+    ...p,
+    tracks: Array.isArray(p.tracks) ? p.tracks : []
+  }));
 
   return json({
     success: true,
@@ -2067,7 +2128,7 @@ async function handleAuthLogin(req) {
       joinedAt: user.joinedAt,
     },
     favorites: user.favorites || [],
-    playlists: user.playlists || [],
+    playlists: cleanPlaylists,
     favoriteArtists: user.favoriteArtists || [],
     themeMode: user.themeMode || 'dark',
   });
@@ -2084,13 +2145,20 @@ async function handleAuthSync(req) {
   const { phone, pin, favorites, playlists, favoriteArtists, themeMode } = body;
   if (!phone || !pin) return error('Phone and PIN required for sync', 400);
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-  await ensureDB();
+  await ensureDB(true);
   const user = usersCache[cleanPhone];
   if (!user || user.pin !== pin) {
     return error('Unauthorized sync: invalid credentials', 401);
   }
-  if (Array.isArray(favorites)) user.favorites = favorites;
-  if (Array.isArray(playlists)) user.playlists = playlists;
+  if (Array.isArray(favorites)) {
+    user.favorites = favorites.filter(f => f && f.videoId);
+  }
+  if (Array.isArray(playlists)) {
+    user.playlists = playlists.map(p => ({
+      ...p,
+      tracks: Array.isArray(p.tracks) ? p.tracks : []
+    }));
+  }
   if (Array.isArray(favoriteArtists)) user.favoriteArtists = favoriteArtists;
   if (themeMode) user.themeMode = themeMode;
   user.updatedAt = Date.now();
@@ -2108,7 +2176,7 @@ async function handleAuthProfile(searchParams) {
   const pin = searchParams.get('pin');
   if (!phone || !pin) return error('Phone and PIN required', 400);
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-  await ensureDB();
+  await ensureDB(true);
   const user = usersCache[cleanPhone];
   if (!user || user.pin !== pin) {
     return error('Invalid phone or PIN', 401);
@@ -2122,7 +2190,10 @@ async function handleAuthProfile(searchParams) {
       joinedAt: user.joinedAt,
     },
     favorites: user.favorites || [],
-    playlists: user.playlists || [],
+    playlists: (user.playlists || []).map(p => ({
+      ...p,
+      tracks: Array.isArray(p.tracks) ? p.tracks : []
+    })),
     favoriteArtists: user.favoriteArtists || [],
     themeMode: user.themeMode || 'dark',
   });
@@ -2139,7 +2210,7 @@ async function handleAuthUpdateProfile(req) {
   const { phone, pin, name, avatar } = body;
   if (!phone || !pin) return error('Phone and PIN required', 400);
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-  await ensureDB();
+  await ensureDB(true);
   let user = usersCache[cleanPhone];
   if (!user) {
     // Auto-create/upsert user if not existing in cache
@@ -2179,7 +2250,7 @@ async function handleAdminUsers(req, searchParams) {
   if (adminPin !== '8888' && adminPin !== '1234') {
     return error('Unauthorized admin access. Please provide valid admin PIN.', 401);
   }
-  await ensureDB();
+  await ensureDB(true);
   const usersList = Object.values(usersCache).map((u) => ({
     phone: u.phone,
     name: u.name,

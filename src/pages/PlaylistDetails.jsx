@@ -34,15 +34,17 @@ const PlaylistDetails = () => {
     );
   }
 
+  const tracks = Array.isArray(playlist.tracks) ? playlist.tracks : [];
+
   const handlePlayAll = () => {
-    if (playlist.tracks.length > 0) {
-      dispatch(playTrackNow({ song: playlist.tracks[0], songs: playlist.tracks, index: 0 }));
+    if (tracks.length > 0) {
+      dispatch(playTrackNow({ song: tracks[0], songs: tracks, index: 0 }));
     }
   };
 
   const handleShufflePlay = () => {
-    if (playlist.tracks.length > 0) {
-      dispatch(playPlaylistWithShuffle({ tracks: playlist.tracks }));
+    if (tracks.length > 0) {
+      dispatch(playPlaylistWithShuffle({ tracks }));
     }
   };
 
@@ -76,14 +78,14 @@ const PlaylistDetails = () => {
             <p className="text-xs md:text-sm theme-text-muted mt-1">{playlist.description}</p>
           )}
           <p className="text-xs theme-text-muted mt-2 font-medium">
-            {playlist.tracks.length} {playlist.tracks.length === 1 ? 'song' : 'songs'}
+            {tracks.length} {tracks.length === 1 ? 'song' : 'songs'}
           </p>
 
           <div className="mt-6 flex flex-wrap items-center justify-center md:justify-start gap-3">
             {/* Play All */}
             <button
               onClick={handlePlayAll}
-              disabled={playlist.tracks.length === 0}
+              disabled={tracks.length === 0}
               className="flex items-center gap-2.5 px-6 py-3 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-lg shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
             >
               <FaPlay className="text-xs" />
@@ -93,7 +95,7 @@ const PlaylistDetails = () => {
             {/* Shuffle Play Button */}
             <button
               onClick={handleShufflePlay}
-              disabled={playlist.tracks.length === 0}
+              disabled={tracks.length === 0}
               className="flex items-center gap-2.5 px-6 py-3 rounded-full bg-slate-500/15 hover:bg-slate-500/25 border theme-border theme-text-main font-bold text-sm hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
             >
               <FaRandom className="text-xs text-rose-500" />
@@ -113,11 +115,11 @@ const PlaylistDetails = () => {
       </div>
 
       {/* Tracks List */}
-      {playlist.tracks.length > 0 ? (
+      {tracks.length > 0 ? (
         <div className="space-y-1">
-          {playlist.tracks.map((song, i) => (
+          {tracks.map((song, i) => (
             <div key={`${song.videoId}-${i}`} className="group relative">
-              <SongRow song={song} index={i} songs={playlist.tracks} />
+              <SongRow song={song} index={i} songs={tracks} />
               <button
                 onClick={(e) => {
                   e.stopPropagation();
