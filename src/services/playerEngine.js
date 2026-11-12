@@ -1,5 +1,4 @@
 import { getOfflineTrack } from './offlineStorage';
-import { audioDSP } from './audioDsp';
 import { API_BASE } from './apiConfig';
 
 class PlayerEngine {
@@ -20,6 +19,14 @@ class PlayerEngine {
     this.shouldBePlaying = false;
     this.isUserPaused = false;
     this.activeAbortController = null;
+    this.currentVolume = 0.8;
+    try {
+      const saved = localStorage.getItem('tunetide_volume');
+      if (saved !== null) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed === 'number' && !isNaN(parsed)) this.currentVolume = parsed;
+      }
+    } catch (e) {}
 
     this.listeners = {
       timeUpdate: () => {},
@@ -37,6 +44,11 @@ class PlayerEngine {
   }
 
   startBackgroundAudioAnchor() {
+    // Only use background anchor for YouTube fallback, NEVER when playing direct native audio!
+    if (this.isDirectAudio || this.isOfflinePlayback) {
+      this.stopBackgroundAudioAnchor();
+      return;
+    }
     if (typeof window === 'undefined') return;
     try {
       if (!this.bgAnchorEl) {
@@ -73,6 +85,7 @@ class PlayerEngine {
             }
           } else if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
             try {
+              if (typeof this.ytPlayer.unMute === 'function') this.ytPlayer.unMute();
               this.ytPlayer.playVideo();
             } catch (e) {}
           }
@@ -87,12 +100,9 @@ class PlayerEngine {
     if (typeof window === 'undefined') return;
     this.audioEl = new Audio();
     this.audioEl.preload = 'auto';
+    this.audioEl.volume = this.currentVolume;
+    this.audioEl.muted = false;
     this.offlineAudioEl = this.audioEl; // Backwards-compatibility alias
-
-    // Attach to Spotify Pro Web Audio DSP engine
-    try {
-      audioDSP.attachAudioElement(this.audioEl);
-    } catch (e) {}
 
     this.audioEl.addEventListener('timeupdate', () => {
       if (this.isDirectAudio || this.isOfflinePlayback) {
@@ -226,6 +236,8 @@ class PlayerEngine {
                 this.listeners.stateChange(true);
                 this.requestWakeLock();
                 try {
+                  if (typeof this.ytPlayer.unMute === 'function') this.ytPlayer.unMute();
+                  if (typeof this.ytPlayer.setVolume === 'function') this.ytPlayer.setVolume(Math.round((this.currentVolume ?? 0.8) * 100));
                   // Force highest bitrate audio stream (Spotify Pro quality)
                   if (typeof this.ytPlayer.setPlaybackQuality === 'function') {
                     this.ytPlayer.setPlaybackQuality('highres');
@@ -437,13 +449,9 @@ class PlayerEngine {
   unlockAudio() {
     if (typeof window === 'undefined') return;
     try {
-      audioDSP.ensureContext();
-      this.startBackgroundAudioAnchor();
       if (this.audioEl) {
-        const p = this.audioEl.play();
-        if (p && typeof p.then === 'function') {
-          p.then(() => this.audioEl.pause()).catch(() => {});
-        }
+        this.audioEl.volume = this.currentVolume ?? 0.8;
+        this.audioEl.muted = false;
       }
     } catch (e) {}
   }
@@ -466,7 +474,6 @@ class PlayerEngine {
     if (autoPlay) {
       this.shouldBePlaying = true;
       this.isUserPaused = false;
-      this.startBackgroundAudioAnchor();
       this.updateMediaSessionState('playing');
       this.requestWakeLock();
     }
@@ -477,11 +484,14 @@ class PlayerEngine {
       if (offlineRecord?.audioBlob && offlineRecord.audioBlob.size > 100) {
         this.isOfflinePlayback = true;
         this.isDirectAudio = true;
+        this.stopBackgroundAudioAnchor();
         if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
           try { this.ytPlayer.pauseVideo(); } catch (e) {}
         }
         const objUrl = URL.createObjectURL(offlineRecord.audioBlob);
         this.audioEl.src = objUrl;
+        this.audioEl.volume = this.currentVolume ?? 0.8;
+        this.audioEl.muted = false;
         if (autoPlay) {
           this.audioEl.play().catch(() => {});
         }
@@ -514,10 +524,13 @@ class PlayerEngine {
           const data = await res.json();
           if (data.success && data.streamUrl && this.currentVideoId === cleanVideoId) {
             this.isDirectAudio = true;
+            this.stopBackgroundAudioAnchor();
             if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
               try { this.ytPlayer.pauseVideo(); } catch (e) {}
             }
             this.audioEl.src = data.streamUrl;
+            this.audioEl.volume = this.currentVolume ?? 0.8;
+            this.audioEl.muted = false;
             if (autoPlay && this.shouldBePlaying && !this.isUserPaused) {
               const p = this.audioEl.play();
               if (p && typeof p.catch === 'function') {
@@ -551,6 +564,10 @@ class PlayerEngine {
       } catch (e) {}
     }
 
+    if (autoPlay) {
+      this.startBackgroundAudioAnchor();
+    }
+
     if (!this.isReady || !this.ytPlayer || typeof this.ytPlayer.loadVideoById !== 'function') {
       this.pendingVideoId = cleanVideoId;
       this.pendingAutoPlay = autoPlay;
@@ -558,7 +575,8 @@ class PlayerEngine {
     }
 
     try {
-      audioDSP.ensureContext();
+      if (typeof this.ytPlayer.unMute === 'function') this.ytPlayer.unMute();
+      if (typeof this.ytPlayer.setVolume === 'function') this.ytPlayer.setVolume(Math.round((this.currentVolume ?? 0.8) * 100));
       if (autoPlay) {
         this.ytPlayer.loadVideoById(cleanVideoId);
       } else {
@@ -572,16 +590,21 @@ class PlayerEngine {
   play() {
     this.isUserPaused = false;
     this.shouldBePlaying = true;
-    this.startBackgroundAudioAnchor();
     this.updateMediaSessionState('playing');
     this.requestWakeLock();
 
     if (this.isDirectAudio || this.isOfflinePlayback) {
+      this.stopBackgroundAudioAnchor();
       if (this.audioEl) {
+        this.audioEl.muted = false;
+        if (this.audioEl.volume === 0) this.audioEl.volume = this.currentVolume ?? 0.8;
         this.audioEl.play().catch(() => {});
       }
     } else if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
+      this.startBackgroundAudioAnchor();
       try {
+        if (typeof this.ytPlayer.unMute === 'function') this.ytPlayer.unMute();
+        if (typeof this.ytPlayer.setVolume === 'function') this.ytPlayer.setVolume(Math.round((this.currentVolume ?? 0.8) * 100));
         this.ytPlayer.playVideo();
       } catch (e) {}
       const iframe = document.getElementById('yt-audio-container')?.querySelector('iframe');
@@ -642,12 +665,21 @@ class PlayerEngine {
   }
 
   setVolume(fraction) {
-    const vol = Math.max(0, Math.min(1, fraction));
+    const vol = Math.max(0, Math.min(1, typeof fraction === 'number' && !isNaN(fraction) ? fraction : 0.8));
+    this.currentVolume = vol;
     if (this.audioEl) {
       this.audioEl.volume = vol;
+      this.audioEl.muted = (vol === 0);
     }
-    if (this.ytPlayer && typeof this.ytPlayer.setVolume === 'function') {
-      try { this.ytPlayer.setVolume(Math.round(vol * 100)); } catch (e) {}
+    if (this.ytPlayer) {
+      try {
+        if (vol === 0) {
+          if (typeof this.ytPlayer.mute === 'function') this.ytPlayer.mute();
+        } else {
+          if (typeof this.ytPlayer.unMute === 'function') this.ytPlayer.unMute();
+          if (typeof this.ytPlayer.setVolume === 'function') this.ytPlayer.setVolume(Math.round(vol * 100));
+        }
+      } catch (e) {}
     }
   }
 
