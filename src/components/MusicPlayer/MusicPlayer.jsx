@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   playPause,
+  togglePlayPauseNow,
   nextSong,
   prevSong,
   setCurrentTime,
@@ -106,11 +107,7 @@ const MusicPlayer = () => {
   };
 
   const handlePlayPause = () => {
-    if (isPlaying) {
-      playerEngine.pause();
-    } else {
-      playerEngine.play();
-    }
+    dispatch(togglePlayPauseNow());
   };
 
   const handleDownload = async () => {

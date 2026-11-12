@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import {
   nextSong,
   prevSong,
+  togglePlayPauseNow,
   toggleRepeat,
   toggleShuffle,
   toggleFavorite,
@@ -90,11 +91,7 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
   };
 
   const handleTogglePlay = () => {
-    if (isPlaying) {
-      playerEngine.pause();
-    } else {
-      playerEngine.play();
-    }
+    dispatch(togglePlayPauseNow());
   };
 
   const handleDownload = async () => {

@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   playSong,
   playTrackNow,
-  playPause,
+  togglePlayPauseNow,
   toggleFavorite,
   openAddToPlaylistModal,
 } from '../redux/features/playerSlice';
@@ -44,9 +44,9 @@ const SongCard = ({ song, songs = [], index = 0 }) => {
   }, [normalized.videoId]);
 
   const handlePlayClick = (e) => {
-    e.stopPropagation();
+    e?.stopPropagation?.();
     if (isCurrent) {
-      dispatch(playPause());
+      dispatch(togglePlayPauseNow());
     } else {
       dispatch(playTrackNow({ song: normalized, songs, index }));
     }

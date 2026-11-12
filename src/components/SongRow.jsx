@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   playSong,
   playTrackNow,
-  playPause,
+  togglePlayPauseNow,
   toggleFavorite,
   addToQueue,
   openAddToPlaylistModal,
@@ -65,9 +65,10 @@ const SongRow = ({ song, index, songs = [], showCover = true, isHighlightedLiked
     };
   }, [menuOpen]);
 
-  const handleRowClick = () => {
+  const handleRowClick = (e) => {
+    e?.stopPropagation?.();
     if (isCurrent) {
-      dispatch(playPause());
+      dispatch(togglePlayPauseNow());
     } else {
       dispatch(playTrackNow({ song: normalized, songs, index }));
     }
@@ -120,19 +121,28 @@ const SongRow = ({ song, index, songs = [], showCover = true, isHighlightedLiked
         {/* Index / Play / Equalizer */}
         <div className="w-6 flex items-center justify-center shrink-0">
           {isCurrent && isPlaying ? (
-            <div className="flex items-end gap-0.5 h-4">
-              <span className="w-0.5 bg-rose-500 rounded-full animate-equalizer-1" />
-              <span className="w-0.5 bg-rose-500 rounded-full animate-equalizer-2" />
-              <span className="w-0.5 bg-rose-500 rounded-full animate-equalizer-3" />
-            </div>
+            <button
+              type="button"
+              onClick={handleRowClick}
+              className="flex items-center justify-center hover:scale-110 transition-transform cursor-pointer"
+              title="Pause"
+            >
+              <div className="flex items-end gap-0.5 h-4">
+                <span className="w-0.5 bg-rose-500 rounded-full animate-equalizer-1" />
+                <span className="w-0.5 bg-rose-500 rounded-full animate-equalizer-2" />
+                <span className="w-0.5 bg-rose-500 rounded-full animate-equalizer-3" />
+              </div>
+            </button>
           ) : (
             <>
               <span className="text-xs theme-text-muted font-mono group-hover:hidden">
                 {typeof index === 'number' ? index + 1 : '•'}
               </span>
               <button
+                type="button"
                 className="hidden group-hover:flex theme-text-main hover:text-rose-500"
                 onClick={handleRowClick}
+                title={isCurrent && isPlaying ? 'Pause' : 'Play'}
               >
                 {isCurrent && isPlaying ? (
                   <FaPause className="text-xs" />

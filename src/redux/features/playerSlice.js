@@ -504,4 +504,27 @@ export const playTrackNow = ({ song, songs = [], index = 0 }) => (dispatch) => {
   dispatch(playSong({ song: normalized, songs, index }));
 };
 
+// Centralized play/pause action for 100% reliable audio engine & UI state synchronization
+export const togglePlayPauseNow = () => (dispatch, getState) => {
+  const { isPlaying, activeSong } = getState().player;
+  if (!activeSong) return;
+
+  if (isPlaying) {
+    try {
+      playerEngine.pause();
+    } catch (e) {
+      console.warn('playerEngine.pause error:', e);
+    }
+    dispatch(playPause(false));
+  } else {
+    try {
+      playerEngine.unlockAudio();
+      playerEngine.play();
+    } catch (e) {
+      console.warn('playerEngine.play error:', e);
+    }
+    dispatch(playPause(true));
+  }
+};
+
 export default playerSlice.reducer;
