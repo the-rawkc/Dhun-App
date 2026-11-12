@@ -344,6 +344,19 @@ const playerSlice = createSlice({
       triggerCloudSync(state);
     },
 
+    renamePlaylist: (state, action) => {
+      const { id, title } = action.payload || {};
+      if (!id || !title || !title.trim()) return;
+      state.playlists = state.playlists.map((pl) => {
+        if (pl.id === id) {
+          return { ...pl, title: title.trim() };
+        }
+        return pl;
+      });
+      saveItem('tunetide_playlists', state.playlists);
+      triggerCloudSync(state);
+    },
+
     addTrackToPlaylist: (state, action) => {
       const { playlistId, song } = action.payload;
       const norm = normalizeSong(song);
@@ -351,12 +364,27 @@ const playerSlice = createSlice({
 
       state.playlists = state.playlists.map((pl) => {
         if (pl.id === playlistId) {
-          const alreadyIn = pl.tracks.some((t) => t.videoId === norm.videoId);
+          const alreadyIn = pl.tracks.some((t) => {
+            const v1 = (t.videoId || '').trim();
+            const v2 = (norm.videoId || '').trim();
+            if (v1 && v2 && v1 === v2) return true;
+            const id1 = (t.id || '').trim();
+            const id2 = (norm.id || '').trim();
+            if (id1 && id2 && id1 === id2) return true;
+            const t1 = (t.title || '').trim().toLowerCase();
+            const t2 = (norm.title || '').trim().toLowerCase();
+            const a1 = (t.artist || '').trim().toLowerCase();
+            const a2 = (norm.artist || '').trim().toLowerCase();
+            if (t1 && t2 && t1 === t2 && a1 && a2 && a1 === a2) return true;
+            return false;
+          });
           if (!alreadyIn) {
+            const newTracks = [...pl.tracks, norm];
+            const firstImg = newTracks[0]?.thumbnail || newTracks[0]?.cover || newTracks[0]?.image;
             return {
               ...pl,
-              tracks: [...pl.tracks, norm],
-              cover: pl.cover || norm.thumbnail,
+              tracks: newTracks,
+              cover: firstImg || pl.cover,
             };
           }
         }
@@ -370,9 +398,12 @@ const playerSlice = createSlice({
       const { playlistId, videoId } = action.payload;
       state.playlists = state.playlists.map((pl) => {
         if (pl.id === playlistId) {
+          const newTracks = pl.tracks.filter((t) => t.videoId !== videoId);
+          const firstImg = newTracks.length > 0 ? (newTracks[0]?.thumbnail || newTracks[0]?.cover || newTracks[0]?.image) : null;
           return {
             ...pl,
-            tracks: pl.tracks.filter((t) => t.videoId !== videoId),
+            tracks: newTracks,
+            cover: firstImg || pl.cover,
           };
         }
         return pl;
@@ -448,6 +479,7 @@ export const {
   toggleFavoriteArtist,
   createPlaylist,
   deletePlaylist,
+  renamePlaylist,
   addTrackToPlaylist,
   removeTrackFromPlaylist,
   openAddToPlaylistModal,

@@ -72,15 +72,36 @@ const AddToPlaylistModal = () => {
         <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-2">
           {playlists.map((pl) => {
             const trks = Array.isArray(pl.tracks) ? pl.tracks : [];
-            const isAlreadyAdded = trks.some(
-              (t) => t && t.videoId === songToAddToPlaylist.videoId
-            );
+            const isSongInPlaylist = (track, target) => {
+              if (!track || !target) return false;
+              const v1 = (track.videoId || '').trim();
+              const v2 = (target.videoId || '').trim();
+              if (v1 && v2 && v1 === v2) return true;
+              const id1 = (track.id || '').trim();
+              const id2 = (target.id || '').trim();
+              if (id1 && id2 && id1 === id2) return true;
+              const t1 = (track.title || '').trim().toLowerCase();
+              const t2 = (target.title || '').trim().toLowerCase();
+              const a1 = (track.artist || '').trim().toLowerCase();
+              const a2 = (target.artist || '').trim().toLowerCase();
+              if (t1 && t2 && t1 === t2 && a1 && a2 && a1 === a2) return true;
+              return false;
+            };
+
+            const isAlreadyAdded = trks.some((t) => isSongInPlaylist(t, songToAddToPlaylist));
             const isJustAdded = addedMap[pl.id];
+            const firstTrack = trks.length > 0 ? trks[0] : null;
+            const plCover =
+              firstTrack?.thumbnail ||
+              firstTrack?.cover ||
+              firstTrack?.image ||
+              pl.cover ||
+              'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80';
 
             return (
               <div
                 key={pl.id}
-                onClick={() => !isAlreadyAdded && handleAddToPlaylist(pl.id)}
+                onClick={() => !isAlreadyAdded && !isJustAdded && handleAddToPlaylist(pl.id)}
                 className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all ${
                   isAlreadyAdded || isJustAdded
                     ? 'bg-rose-500/10 border border-rose-500/20'
@@ -90,7 +111,7 @@ const AddToPlaylistModal = () => {
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-xl overflow-hidden bg-dark-800 shrink-0">
                     <img
-                      src={pl.cover}
+                      src={plCover}
                       alt={pl.title}
                       className="w-full h-full object-cover"
                     />
@@ -100,19 +121,29 @@ const AddToPlaylistModal = () => {
                       {pl.title}
                     </span>
                     <span className="text-xs theme-text-muted">
-                      {trks.length} songs
+                      {trks.length} {trks.length === 1 ? 'song' : 'songs'}
                     </span>
                   </div>
                 </div>
 
-                <div className="text-sm">
+                <div className="text-sm shrink-0 pl-2">
                   {isAlreadyAdded || isJustAdded ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-500">
-                      <FaCheck /> Added
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/20 text-xs font-bold text-rose-500">
+                      <FaCheck className="text-[10px]" />
+                      <span>Added</span>
                     </span>
                   ) : (
-                    <button className="p-2 rounded-full hover:bg-rose-500/20 text-rose-500">
-                      <FaPlus />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddToPlaylist(pl.id);
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm hover:scale-105 active:scale-95 transition-all"
+                      title="Add to this playlist"
+                    >
+                      <FaPlus className="text-[10px]" />
+                      <span>Add</span>
                     </button>
                   )}
                 </div>

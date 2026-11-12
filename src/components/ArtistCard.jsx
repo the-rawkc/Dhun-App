@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { toggleFavoriteArtist } from '../redux/features/playerSlice';
 import { FaCheckCircle, FaHeart, FaRegHeart } from 'react-icons/fa';
+import { getArtistPhoto } from '../utils/artistPhotos';
 
 const ArtistCard = ({ artist }) => {
   const navigate = useNavigate();
@@ -10,11 +11,12 @@ const ArtistCard = ({ artist }) => {
   const { favoriteArtists } = useSelector((state) => state.player);
 
   const name = artist.name || artist.title || 'Artist';
-  const image =
+  const rawImage =
     artist.image ||
     (artist.thumbnails && artist.thumbnails[0]?.url) ||
     artist.thumbnail ||
-    'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=60';
+    '';
+  const image = getArtistPhoto(name, rawImage);
   const browseId = artist.browseId || artist.id || encodeURIComponent(name);
 
   const isFav = favoriteArtists.some((a) => a.name.toLowerCase() === name.toLowerCase());

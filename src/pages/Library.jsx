@@ -178,29 +178,39 @@ const Library = () => {
           </div>
 
           {/* User Custom Playlists as Compact List-Item Boxes */}
-          {playlists.map((pl) => (
-            <div
-              key={pl.id}
-              onClick={() => navigate(`/playlist/${pl.id}`)}
-              className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border theme-border shadow-sm"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-dark-800 shrink-0 shadow-md">
-                  <img
-                    src={pl.cover}
-                    alt={pl.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
+          {playlists.map((pl) => {
+            const trks = Array.isArray(pl.tracks) ? pl.tracks : [];
+            const firstTrack = trks.length > 0 ? trks[0] : null;
+            const plCover =
+              firstTrack?.thumbnail ||
+              firstTrack?.cover ||
+              firstTrack?.image ||
+              pl.cover ||
+              'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80';
+
+            return (
+              <div
+                key={pl.id}
+                onClick={() => navigate(`/playlist/${pl.id}`)}
+                className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border theme-border shadow-sm"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-dark-800 shrink-0 shadow-md">
+                    <img
+                      src={plCover}
+                      alt={pl.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-sm sm:text-base theme-text-main group-hover:text-rose-500 truncate transition-colors">
+                      {pl.title}
+                    </h3>
+                    <p className="text-xs theme-text-muted mt-0.5 truncate">
+                      {trks.length} {trks.length === 1 ? 'song' : 'songs'}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-sm sm:text-base theme-text-main group-hover:text-rose-500 truncate transition-colors">
-                    {pl.title}
-                  </h3>
-                  <p className="text-xs theme-text-muted mt-0.5 truncate">
-                    {(pl.tracks || []).length} {(pl.tracks || []).length === 1 ? 'song' : 'songs'}
-                  </p>
-                </div>
-              </div>
 
               <div className="flex items-center gap-1.5 shrink-0 pl-2">
                 <button
@@ -236,7 +246,8 @@ const Library = () => {
                 </button>
               </div>
             </div>
-          ))}
+          );
+        })}
         </div>
       )}
 

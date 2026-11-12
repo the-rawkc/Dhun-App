@@ -6,6 +6,7 @@ import {
   playTrackNow,
   playPlaylistWithShuffle,
   deletePlaylist,
+  renamePlaylist,
   removeTrackFromPlaylist,
   addTrackToPlaylist,
 } from '../redux/features/playerSlice';
@@ -21,6 +22,7 @@ import {
   FaSpinner,
   FaSearch,
   FaTimes,
+  FaEdit,
 } from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
 import { API_BASE } from '../services/apiConfig';
@@ -39,6 +41,29 @@ const PlaylistDetails = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(playlist?.title || '');
+
+  useEffect(() => {
+    if (playlist?.title) {
+      setEditedTitle(playlist.title);
+    }
+  }, [playlist?.title]);
+
+  const handleSaveTitle = (e) => {
+    if (e) e.preventDefault();
+    if (editedTitle.trim() && playlist) {
+      dispatch(renamePlaylist({ id: playlist.id, title: editedTitle.trim() }));
+    } else if (playlist) {
+      setEditedTitle(playlist.title);
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditedTitle(playlist?.title || '');
+    setIsEditingTitle(false);
+  };
 
   if (!playlist) {
     return (
@@ -174,13 +199,21 @@ const PlaylistDetails = () => {
     }
   };
 
+  const firstTrack = tracks.length > 0 ? tracks[0] : null;
+  const playlistCover =
+    firstTrack?.thumbnail ||
+    firstTrack?.cover ||
+    firstTrack?.image ||
+    playlist.cover ||
+    'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80';
+
   return (
     <div className="flex flex-col gap-8 pb-24 select-none animate-fade-in">
       {/* Playlist Hero */}
       <div className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 md:p-8 rounded-3xl bg-gradient-to-r from-rose-600/20 via-rose-500/10 to-transparent border theme-border">
         <div className="w-40 h-40 md:w-52 md:h-52 rounded-2xl overflow-hidden bg-dark-950 shadow-2xl shrink-0 border theme-border">
           <img
-            src={playlist.cover}
+            src={playlistCover}
             alt={playlist.title}
             className="w-full h-full object-cover"
           />
@@ -190,9 +223,53 @@ const PlaylistDetails = () => {
           <span className="text-xs font-bold uppercase tracking-widest text-rose-500">
             Playlist
           </span>
-          <h1 className="text-2xl md:text-4xl font-extrabold theme-text-main mt-1">
-            {playlist.title}
-          </h1>
+          {isEditingTitle ? (
+            <form onSubmit={handleSaveTitle} className="flex items-center gap-2 mt-1 justify-center md:justify-start">
+              <input
+                type="text"
+                autoFocus
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') handleCancelEdit();
+                }}
+                className="px-3 py-1.5 rounded-xl bg-slate-500/20 border border-rose-500 text-lg md:text-2xl font-extrabold theme-text-main focus:outline-none w-full max-w-sm"
+                placeholder="Playlist name..."
+              />
+              <button
+                type="submit"
+                className="p-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-md"
+                title="Save name"
+              >
+                <FaCheck />
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="p-2.5 rounded-xl bg-slate-500/20 hover:bg-slate-500/30 theme-text-main text-xs transition-all"
+                title="Cancel"
+              >
+                <FaTimes />
+              </button>
+            </form>
+          ) : (
+            <div className="flex items-center justify-center md:justify-start gap-2.5 mt-1 group">
+              <h1
+                onClick={() => setIsEditingTitle(true)}
+                className="text-2xl md:text-4xl font-extrabold theme-text-main hover:text-rose-500 cursor-pointer transition-colors"
+                title="Click to rename playlist"
+              >
+                {playlist.title}
+              </h1>
+              <button
+                onClick={() => setIsEditingTitle(true)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-500/10 opacity-70 group-hover:opacity-100 transition-all text-xs"
+                title="Click to rename playlist"
+              >
+                <FaEdit />
+              </button>
+            </div>
+          )}
           {playlist.description && (
             <p className="text-xs md:text-sm theme-text-muted mt-1">{playlist.description}</p>
           )}

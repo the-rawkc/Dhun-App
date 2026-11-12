@@ -1,20 +1,27 @@
 import React from 'react';
 import ArtistCard from '../components/ArtistCard';
 import { FaUserFriends } from 'react-icons/fa';
+import { KNOWN_ARTIST_PHOTOS } from '../utils/artistPhotos';
 
 const indianArtistsList = [
-  { name: 'Arijit Singh', image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&auto=format&fit=crop&q=80', subscribers: '38M+ Listeners' },
-  { name: 'Diljit Dosanjh', image: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&auto=format&fit=crop&q=80', subscribers: '24M+ Listeners' },
-  { name: 'Shreya Ghoshal', image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&auto=format&fit=crop&q=80', subscribers: '22M+ Listeners' },
-  { name: 'Karan Aujla', image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&auto=format&fit=crop&q=80', subscribers: '18M+ Listeners' },
-  { name: 'Anirudh Ravichander', image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&auto=format&fit=crop&q=80', subscribers: '19M+ Listeners' },
-  { name: 'Sid Sriram', image: 'https://images.unsplash.com/photo-1445985543470-41fdd6ce388d?w=400&auto=format&fit=crop&q=80', subscribers: '15M+ Listeners' },
-  { name: 'A.R. Rahman', image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80', subscribers: '28M+ Listeners' },
-  { name: 'AP Dhillon', image: 'https://images.unsplash.com/photo-1520523839898-507125cd53c1?w=400&auto=format&fit=crop&q=80', subscribers: '16M+ Listeners' },
-  { name: 'Pritam', image: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=400&auto=format&fit=crop&q=80', subscribers: '30M+ Listeners' },
-  { name: 'Sonu Nigam', image: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&auto=format&fit=crop&q=80', subscribers: '20M+ Listeners' },
-  { name: 'Neha Kakkar', image: 'https://images.unsplash.com/photo-1518972559570-7cc1309f3229?w=400&auto=format&fit=crop&q=80', subscribers: '25M+ Listeners' },
-  { name: 'Badshah', image: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&auto=format&fit=crop&q=80', subscribers: '17M+ Listeners' },
+  { name: 'Arijit Singh', image: KNOWN_ARTIST_PHOTOS['arijit singh'], subscribers: '38M+ Listeners' },
+  { name: 'Diljit Dosanjh', image: KNOWN_ARTIST_PHOTOS['diljit dosanjh'], subscribers: '24M+ Listeners' },
+  { name: 'Shreya Ghoshal', image: KNOWN_ARTIST_PHOTOS['shreya ghoshal'], subscribers: '22M+ Listeners' },
+  { name: 'Karan Aujla', image: KNOWN_ARTIST_PHOTOS['karan aujla'], subscribers: '18M+ Listeners' },
+  { name: 'Anirudh Ravichander', image: KNOWN_ARTIST_PHOTOS['anirudh ravichander'], subscribers: '19M+ Listeners' },
+  { name: 'Sid Sriram', image: KNOWN_ARTIST_PHOTOS['sid sriram'], subscribers: '15M+ Listeners' },
+  { name: 'A. R. Rahman', image: KNOWN_ARTIST_PHOTOS['a. r. rahman'], subscribers: '28M+ Listeners' },
+  { name: 'AP Dhillon', image: KNOWN_ARTIST_PHOTOS['ap dhillon'], subscribers: '16M+ Listeners' },
+  { name: 'Pritam', image: KNOWN_ARTIST_PHOTOS['pritam'], subscribers: '30M+ Listeners' },
+  { name: 'Sonu Nigam', image: KNOWN_ARTIST_PHOTOS['sonu nigam'], subscribers: '20M+ Listeners' },
+  { name: 'Neha Kakkar', image: KNOWN_ARTIST_PHOTOS['neha kakkar'], subscribers: '25M+ Listeners' },
+  { name: 'Badshah', image: KNOWN_ARTIST_PHOTOS['badshah'], subscribers: '17M+ Listeners' },
+  { name: 'Sidhu Moose Wala', image: KNOWN_ARTIST_PHOTOS['sidhu moose wala'], subscribers: '21M+ Listeners' },
+  { name: 'Jubin Nautiyal', image: KNOWN_ARTIST_PHOTOS['jubin nautiyal'], subscribers: '18M+ Listeners' },
+  { name: 'B Praak', image: KNOWN_ARTIST_PHOTOS['b praak'], subscribers: '14M+ Listeners' },
+  { name: 'Guru Randhawa', image: KNOWN_ARTIST_PHOTOS['guru randhawa'], subscribers: '19M+ Listeners' },
+  { name: 'Yo Yo Honey Singh', image: KNOWN_ARTIST_PHOTOS['yo yo honey singh'], subscribers: '22M+ Listeners' },
+  { name: 'Sunidhi Chauhan', image: KNOWN_ARTIST_PHOTOS['sunidhi chauhan'], subscribers: '16M+ Listeners' },
 ];
 
 const Artists = () => {

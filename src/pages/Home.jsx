@@ -5,6 +5,7 @@ import { playTrackNow } from '../redux/features/playerSlice';
 import SongCard from '../components/SongCard';
 import SongRow from '../components/SongRow';
 import ArtistCard from '../components/ArtistCard';
+import { KNOWN_ARTIST_PHOTOS } from '../utils/artistPhotos';
 import { FaPlay, FaFire, FaMusic } from 'react-icons/fa';
 import { HiSparkles } from 'react-icons/hi';
 import { normalizeSong } from '../utils/normalizeSong';
@@ -97,12 +98,12 @@ const indianGenres = [
 ];
 
 const topIndianArtists = [
-  { name: 'Arijit Singh', image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80', subscribers: '38M+ Listeners' },
-  { name: 'Diljit Dosanjh', image: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=300&auto=format&fit=crop&q=80', subscribers: '24M+ Listeners' },
-  { name: 'Shreya Ghoshal', image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=300&auto=format&fit=crop&q=80', subscribers: '22M+ Listeners' },
-  { name: 'Karan Aujla', image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300&auto=format&fit=crop&q=80', subscribers: '18M+ Listeners' },
-  { name: 'Anirudh Ravichander', image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&auto=format&fit=crop&q=80', subscribers: '19M+ Listeners' },
-  { name: 'Sid Sriram', image: 'https://images.unsplash.com/photo-1445985543470-41fdd6ce388d?w=300&auto=format&fit=crop&q=80', subscribers: '15M+ Listeners' },
+  { name: 'Arijit Singh', image: KNOWN_ARTIST_PHOTOS['arijit singh'], subscribers: '38M+ Listeners' },
+  { name: 'Diljit Dosanjh', image: KNOWN_ARTIST_PHOTOS['diljit dosanjh'], subscribers: '24M+ Listeners' },
+  { name: 'Shreya Ghoshal', image: KNOWN_ARTIST_PHOTOS['shreya ghoshal'], subscribers: '22M+ Listeners' },
+  { name: 'Karan Aujla', image: KNOWN_ARTIST_PHOTOS['karan aujla'], subscribers: '18M+ Listeners' },
+  { name: 'Anirudh Ravichander', image: KNOWN_ARTIST_PHOTOS['anirudh ravichander'], subscribers: '19M+ Listeners' },
+  { name: 'Sid Sriram', image: KNOWN_ARTIST_PHOTOS['sid sriram'], subscribers: '15M+ Listeners' },
 ];
 
 const Home = () => {

@@ -264,19 +264,7 @@ const Search = () => {
 
       {!loading && (
         <>
-          {/* Artists Match */}
-          {artists.length > 0 && (
-            <div>
-              <h3 className="text-base md:text-lg font-bold theme-text-main mb-3">Artists</h3>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 sm:gap-3">
-                {artists.map((artist, i) => (
-                  <ArtistCard key={i} artist={artist} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* All Songs */}
+          {/* All Songs — Shown on Top */}
           {prioritizedSongs.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -330,7 +318,19 @@ const Search = () => {
             </div>
           )}
 
-          {/* Albums */}
+          {/* Artists Match — Down the Order */}
+          {artists.length > 0 && (
+            <div>
+              <h3 className="text-base md:text-lg font-bold theme-text-main mb-3">Artists</h3>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 sm:gap-3">
+                {artists.map((artist, i) => (
+                  <ArtistCard key={i} artist={artist} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Albums — Down the Order */}
           {albums.length > 0 && (
             <div>
               <h3 className="text-base md:text-lg font-bold theme-text-main mb-3">Albums & Singles</h3>

@@ -5,6 +5,7 @@ import { playTrackNow, toggleFavoriteArtist } from '../redux/features/playerSlic
 import SongRow from '../components/SongRow';
 import { FaPlay, FaCheckCircle, FaHeart, FaRegHeart, FaSpinner } from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
+import { getArtistPhoto } from '../utils/artistPhotos';
 import { API_BASE } from '../services/apiConfig';
 
 export const isTrackByArtist = (track, artistName) => {
@@ -211,11 +212,13 @@ const SingerDetails = () => {
   };
 
   const displayName = artistData?.name || artistName || 'Artist';
-  const displayImage =
+  const rawImage =
     artistData?.thumbnail ||
     artistData?.thumbnails?.[0]?.url ||
     songs[0]?.thumbnail ||
-    'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&auto=format&fit=crop&q=60';
+    songs[0]?.cover ||
+    '';
+  const displayImage = getArtistPhoto(displayName, rawImage);
 
   const handleFollowArtist = () => {
     dispatch(toggleFavoriteArtist({ name: displayName, image: displayImage, browseId: id }));
