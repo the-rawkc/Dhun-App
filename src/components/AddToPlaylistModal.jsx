@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   closeAddToPlaylistModal,
   addTrackToPlaylist,
@@ -9,6 +10,7 @@ import { FaTimes, FaPlus, FaCheck, FaFolderPlus } from 'react-icons/fa';
 
 const AddToPlaylistModal = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { isAddToPlaylistModalOpen, songToAddToPlaylist, playlists } = useSelector(
     (state) => state.player
   );
@@ -30,9 +32,18 @@ const AddToPlaylistModal = () => {
     e.preventDefault();
     if (!newPlaylistTitle.trim()) return;
 
-    dispatch(createPlaylist({ title: newPlaylistTitle.trim() }));
+    const newId = `pl-${Date.now()}`;
+    dispatch(
+      createPlaylist({
+        id: newId,
+        title: newPlaylistTitle.trim(),
+        initialTrack: songToAddToPlaylist,
+      })
+    );
     setNewPlaylistTitle('');
     setShowCreateInput(false);
+    dispatch(closeAddToPlaylistModal());
+    navigate(`/playlist/${newId}`);
   };
 
   return (

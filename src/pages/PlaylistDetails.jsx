@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -7,17 +7,33 @@ import {
   playPlaylistWithShuffle,
   deletePlaylist,
   removeTrackFromPlaylist,
+  addTrackToPlaylist,
 } from '../redux/features/playerSlice';
 import SongRow from '../components/SongRow';
-import { FaPlay, FaRandom, FaTrashAlt, FaMusic } from 'react-icons/fa';
+import {
+  FaPlay,
+  FaRandom,
+  FaTrashAlt,
+  FaMusic,
+  FaPlus,
+  FaCheck,
+  FaRedo,
+  FaSpinner,
+} from 'react-icons/fa';
+import { normalizeSong } from '../utils/normalizeSong';
+import { API_BASE } from '../services/apiConfig';
 
 const PlaylistDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { playlists } = useSelector((state) => state.player);
+  const { playlists, activeSong } = useSelector((state) => state.player);
 
   const playlist = playlists.find((p) => p.id === id);
+
+  const [suggestions, setSuggestions] = useState([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [addedSuggestionIds, setAddedSuggestionIds] = useState({});
 
   if (!playlist) {
     return (
@@ -35,6 +51,72 @@ const PlaylistDetails = () => {
   }
 
   const tracks = Array.isArray(playlist.tracks) ? playlist.tracks : [];
+  const lastAddedTrack = tracks.length > 0 ? tracks[tracks.length - 1] : activeSong;
+  const lastVideoId = lastAddedTrack?.videoId;
+
+  const fetchSuggestions = async () => {
+    if (!lastAddedTrack) return;
+    setLoadingSuggestions(true);
+    try {
+      const currentIds = new Set(tracks.map((t) => t.videoId));
+      const pool = [];
+
+      // 1. Fetch related tracks from /api/related/:id
+      if (lastAddedTrack.videoId) {
+        try {
+          const res = await fetch(
+            `${API_BASE}/api/related/${encodeURIComponent(lastAddedTrack.videoId)}`
+          );
+          const data = await res.json();
+          const items = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+          pool.push(...items);
+        } catch (e) {}
+      }
+
+      // 2. Supplement with similar/popular songs by same singer/artist
+      if (pool.length < 6 && lastAddedTrack.artist) {
+        try {
+          const sRes = await fetch(
+            `${API_BASE}/api/search?q=${encodeURIComponent(`${lastAddedTrack.artist} songs`)}&filter=songs`
+          );
+          const sData = await sRes.json();
+          if (Array.isArray(sData?.results)) pool.push(...sData.results);
+        } catch (e) {}
+      }
+
+      // Deduplicate and filter out songs already inside the playlist
+      const seen = new Set();
+      const filtered = [];
+      for (const item of pool) {
+        const norm = normalizeSong(item);
+        if (!norm || !norm.videoId) continue;
+        if (currentIds.has(norm.videoId) || seen.has(norm.videoId)) continue;
+        seen.add(norm.videoId);
+        filtered.push(norm);
+        if (filtered.length >= 8) break;
+      }
+
+      setSuggestions(filtered);
+    } catch (err) {
+      console.warn('Error fetching playlist suggestions:', err);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  useEffect(() => {
+    if (lastVideoId) {
+      fetchSuggestions();
+    }
+  }, [lastVideoId]);
+
+  const handleAddSuggestedTrack = (song) => {
+    dispatch(addTrackToPlaylist({ playlistId: playlist.id, song }));
+    setAddedSuggestionIds((prev) => ({ ...prev, [song.videoId]: true }));
+    setTimeout(() => {
+      setSuggestions((prev) => prev.filter((s) => s.videoId !== song.videoId));
+    }, 400);
+  };
 
   const handlePlayAll = () => {
     if (tracks.length > 0) {
@@ -134,8 +216,107 @@ const PlaylistDetails = () => {
           ))}
         </div>
       ) : (
-        <div className="py-20 text-center theme-text-muted text-sm">
-          This playlist is empty. Search any Hindi, Punjabi, or Bollywood track and click "+ Add to Playlist"!
+        <div className="py-12 text-center theme-text-muted text-sm">
+          This playlist is currently empty. Add tracks below to start listening!
+        </div>
+      )}
+
+      {/* ─── SUGGESTIONS / RECOMMENDED SONGS BASED ON LAST ADDED SONG ─── */}
+      {lastAddedTrack && (
+        <div className="mt-8 pt-6 border-t theme-border flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base sm:text-lg font-bold theme-text-main flex items-center gap-2">
+                <span>✨ Recommended Songs</span>
+              </h3>
+              <p className="text-xs theme-text-muted mt-0.5">
+                Suggested based on {tracks.length > 0 ? 'the last added song' : 'your playing song'} •{' '}
+                <span className="text-rose-500 font-semibold">{lastAddedTrack.title}</span>
+              </p>
+            </div>
+            <button
+              onClick={fetchSuggestions}
+              disabled={loadingSuggestions}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-500/10 hover:bg-slate-500/20 text-xs font-semibold theme-text-main transition-all disabled:opacity-50"
+              title="Refresh Suggestions"
+            >
+              <FaRedo className={`text-[10px] ${loadingSuggestions ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          </div>
+
+          {loadingSuggestions ? (
+            <div className="flex items-center justify-center py-10 gap-2.5 theme-text-muted text-xs">
+              <FaSpinner className="animate-spin text-rose-500 text-base" />
+              <span>Finding songs matching "{lastAddedTrack.title}"...</span>
+            </div>
+          ) : suggestions.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {suggestions.map((song) => {
+                const isJustAdded = addedSuggestionIds[song.videoId];
+                return (
+                  <div
+                    key={song.videoId}
+                    className="flex items-center justify-between p-2.5 rounded-2xl glass-card border theme-border hover:bg-slate-500/10 transition-all group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-xl overflow-hidden bg-dark-800 shrink-0 shadow-sm">
+                        <img
+                          src={song.thumbnail}
+                          alt={song.title}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => dispatch(playTrackNow({ song, songs: suggestions }))}
+                          className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Preview Track"
+                        >
+                          <FaPlay className="text-white text-xs" />
+                        </button>
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-semibold theme-text-main truncate group-hover:text-rose-500">
+                          {song.title}
+                        </span>
+                        <span className="text-xs theme-text-muted truncate mt-0.5">
+                          {song.artist}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleAddSuggestedTrack(song)}
+                      disabled={isJustAdded}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm shrink-0 ml-2 ${
+                        isJustAdded
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/30 hover:scale-105 active:scale-95'
+                      }`}
+                    >
+                      {isJustAdded ? (
+                        <>
+                          <FaCheck className="text-[10px]" />
+                          <span>Added</span>
+                        </>
+                      ) : (
+                        <>
+                          <FaPlus className="text-[10px]" />
+                          <span>Add</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-6 text-center theme-text-muted text-xs">
+              No further recommendations found. Add more songs to discover more!
+            </div>
+          )}
         </div>
       )}
     </div>

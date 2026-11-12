@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   playPause,
   togglePlayPauseNow,
@@ -50,6 +51,36 @@ const formatTime = (secs) => {
 
 const MusicPlayer = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const handleArtistClick = (artistName, e) => {
+    e?.stopPropagation?.();
+    if (!artistName) return;
+    const clean = artistName.trim();
+    navigate(`/artists/${encodeURIComponent(clean)}?name=${encodeURIComponent(clean)}`);
+  };
+
+  const renderArtistLinks = (artistString, customClass = '') => {
+    if (!artistString) return null;
+    const parts = artistString.split(/,\s*|\s+&\s+/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length === 0) return <span>{artistString}</span>;
+    return (
+      <span>
+        {parts.map((art, idx) => (
+          <React.Fragment key={idx}>
+            {idx > 0 && <span className="opacity-60">, </span>}
+            <span
+              onClick={(e) => handleArtistClick(art, e)}
+              className={`hover:underline hover:text-rose-500 cursor-pointer transition-colors ${customClass}`}
+              title={`View all songs by ${art}`}
+            >
+              {art}
+            </span>
+          </React.Fragment>
+        ))}
+      </span>
+    );
+  };
   const {
     activeSong,
     isPlaying,
@@ -144,12 +175,12 @@ const MusicPlayer = () => {
           </div>
 
           <div className="flex flex-col min-w-0 pr-1">
-            <h4 className="text-sm font-semibold theme-text-main truncate hover:text-rose-500 cursor-pointer">
+            <h4 className="text-sm font-semibold theme-text-main truncate">
               {activeSong.title}
             </h4>
-            <p className="text-xs theme-text-muted truncate mt-0.5 hover:underline cursor-pointer">
-              {activeSong.artist}
-            </p>
+            <div className="text-xs theme-text-muted truncate mt-0.5">
+              {renderArtistLinks(activeSong.artist)}
+            </div>
           </div>
 
           <div className="flex items-center gap-1">
@@ -382,9 +413,9 @@ const MusicPlayer = () => {
             <span className="text-xs font-semibold theme-text-main truncate">
               {activeSong.title}
             </span>
-            <span className="text-[11px] theme-text-muted truncate mt-0.5">
-              {activeSong.artist}
-            </span>
+            <div className="text-[11px] theme-text-muted truncate mt-0.5">
+              {renderArtistLinks(activeSong.artist)}
+            </div>
           </div>
         </div>
 

@@ -351,13 +351,15 @@ const playerSlice = createSlice({
     },
 
     createPlaylist: (state, action) => {
-      const { title, description = '' } = action.payload;
+      const { id, title, description = '', initialTrack = null, cover = '' } = action.payload || {};
+      const normInitial = initialTrack ? normalizeSong(initialTrack) : null;
+      const initialTracks = normInitial ? [normInitial] : [];
       const newPlaylist = {
-        id: `pl-${Date.now()}`,
-        title: title.trim() || 'My Desi Playlist',
+        id: id || `pl-${Date.now()}`,
+        title: (title && title.trim()) || 'My Desi Playlist',
         description,
-        cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&auto=format&fit=crop&q=80',
-        tracks: [],
+        cover: normInitial?.thumbnail || cover || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&auto=format&fit=crop&q=80',
+        tracks: initialTracks,
         createdAt: Date.now(),
       };
       state.playlists = [newPlaylist, ...state.playlists];

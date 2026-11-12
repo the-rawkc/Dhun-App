@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   nextSong,
   prevSong,
@@ -41,6 +42,37 @@ const formatTime = (secs) => {
 
 const MobilePlayerModal = ({ onOpenQueue }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const handleArtistClick = (artistName, e) => {
+    e?.stopPropagation?.();
+    if (!artistName) return;
+    dispatch(toggleMobilePlayer());
+    const clean = artistName.trim();
+    navigate(`/artists/${encodeURIComponent(clean)}?name=${encodeURIComponent(clean)}`);
+  };
+
+  const renderArtistLinks = (artistString, customClass = '') => {
+    if (!artistString) return null;
+    const parts = artistString.split(/,\s*|\s+&\s+/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length === 0) return <span>{artistString}</span>;
+    return (
+      <span>
+        {parts.map((art, idx) => (
+          <React.Fragment key={idx}>
+            {idx > 0 && <span className="text-white/60">, </span>}
+            <span
+              onClick={(e) => handleArtistClick(art, e)}
+              className={`hover:underline cursor-pointer transition-colors ${customClass}`}
+              title={`View all songs by ${art}`}
+            >
+              {art}
+            </span>
+          </React.Fragment>
+        ))}
+      </span>
+    );
+  };
   const {
     activeSong,
     isPlaying,
@@ -230,9 +262,9 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
           <h2 className="text-xl sm:text-2xl font-black text-white truncate drop-shadow-lg">
             {activeSong.title}
           </h2>
-          <p className="text-sm font-semibold text-white/80 truncate mt-0.5 drop-shadow-sm">
-            {activeSong.artist}
-          </p>
+          <div className="text-sm font-semibold text-white/80 truncate mt-0.5 drop-shadow-sm">
+            {renderArtistLinks(activeSong.artist, 'text-rose-400 hover:text-white')}
+          </div>
         </div>
         <div className="flex items-center gap-1.5">
           {/* Add to playlist */}

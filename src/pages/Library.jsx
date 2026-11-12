@@ -25,13 +25,14 @@ import { getOfflineTracks } from '../services/offlineStorage';
 const Library = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { favorites, playlists, favoriteArtists } = useSelector((state) => state.player);
+  const { favorites, playlists, favoriteArtists, activeSong } = useSelector((state) => state.player);
 
   const [activeTab, setActiveTab] = useState('playlists'); // 'playlists' | 'downloads' | 'liked' | 'artists'
   const [offlineSongs, setOfflineSongs] = useState([]);
   const [loadingOffline, setLoadingOffline] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [playlistTitle, setPlaylistTitle] = useState('');
+  const [includeActiveSong, setIncludeActiveSong] = useState(true);
 
   useEffect(() => {
     // Refresh library from cloud database on opening Library page
@@ -70,9 +71,12 @@ const Library = () => {
   const handleCreatePlaylist = (e) => {
     e.preventDefault();
     if (!playlistTitle.trim()) return;
-    dispatch(createPlaylist({ title: playlistTitle.trim() }));
+    const newId = `pl-${Date.now()}`;
+    const initial = includeActiveSong && activeSong ? activeSong : null;
+    dispatch(createPlaylist({ id: newId, title: playlistTitle.trim(), initialTrack: initial }));
     setPlaylistTitle('');
     setShowCreateModal(false);
+    navigate(`/playlist/${newId}`);
   };
 
   return (
@@ -347,6 +351,24 @@ const Library = () => {
               placeholder="e.g. My Bollywood Favorites"
               className="px-4 py-2.5 rounded-xl bg-slate-500/10 border theme-border theme-text-main text-sm focus:outline-none focus:border-rose-500"
             />
+            {activeSong && (
+              <label className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-slate-500/10 border theme-border cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={includeActiveSong}
+                  onChange={(e) => setIncludeActiveSong(e.target.checked)}
+                  className="rounded text-rose-600 focus:ring-rose-500 h-4 w-4"
+                />
+                <div className="flex flex-col min-w-0 text-left">
+                  <span className="text-xs font-semibold theme-text-main">
+                    Seed with currently playing song
+                  </span>
+                  <span className="text-[11px] theme-text-muted truncate">
+                    {activeSong.title} • {activeSong.artist}
+                  </span>
+                </div>
+              </label>
+            )}
             <div className="flex justify-end gap-2 mt-2">
               <button
                 type="button"
