@@ -7,6 +7,43 @@ import { FaPlay, FaCheckCircle, FaHeart, FaRegHeart, FaSpinner } from 'react-ico
 import { normalizeSong } from '../utils/normalizeSong';
 import { API_BASE } from '../services/apiConfig';
 
+export const isTrackByArtist = (track, artistName) => {
+  if (!artistName || !track) return true;
+  const targetName = artistName.trim().toLowerCase();
+  const targetClean = targetName.replace(/[^a-z0-9]/g, '');
+  const tokens = targetName
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-z0-9]/g, ''))
+    .filter((w) => w.length >= 3);
+
+  const artistFields = [
+    track.artist,
+    track.author,
+    track.channelTitle,
+    track.channel,
+    track.uploader,
+    track.singers,
+    track.primary_artists,
+    Array.isArray(track.artists)
+      ? track.artists.map((a) => (typeof a === 'string' ? a : a.name || '')).join(' ')
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  const artistClean = artistFields.replace(/[^a-z0-9]/g, '');
+  if (artistClean.includes(targetClean)) return true;
+  if (tokens.length > 0 && tokens.every((tok) => artistFields.includes(tok))) return true;
+
+  const titleStr = (track.title || track.name || '').toLowerCase();
+  const titleClean = titleStr.replace(/[^a-z0-9]/g, '');
+  if (titleClean.includes(targetClean)) return true;
+  if (tokens.length > 0 && tokens.every((tok) => titleStr.includes(tok))) return true;
+
+  return false;
+};
+
 const SingerDetails = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -58,15 +95,17 @@ const SingerDetails = () => {
         let nextTok = null;
         if (artistName) {
           try {
-            const [songsRes, hitsRes] = await Promise.all([
+            const [songsRes, hitsRes, topRes] = await Promise.all([
               fetch(`${API_BASE}/api/search?q=${encodeURIComponent(`${artistName} songs`)}&filter=songs&language=en&hl=en`).then((r) => r.json()).catch(() => ({})),
               fetch(`${API_BASE}/api/search?q=${encodeURIComponent(`${artistName} all hits`)}&filter=songs&language=en&hl=en`).then((r) => r.json()).catch(() => ({})),
+              fetch(`${API_BASE}/api/search?q=${encodeURIComponent(`${artistName} popular songs`)}&filter=songs&language=en&hl=en`).then((r) => r.json()).catch(() => ({})),
             ]);
 
             if (songsRes?.results?.length) tracks.push(...songsRes.results);
             if (hitsRes?.results?.length) tracks.push(...hitsRes.results);
+            if (topRes?.results?.length) tracks.push(...topRes.results);
 
-            nextTok = songsRes?.continuationToken || hitsRes?.continuationToken || null;
+            nextTok = songsRes?.continuationToken || hitsRes?.continuationToken || topRes?.continuationToken || null;
           } catch (e) {}
         }
 
@@ -79,9 +118,12 @@ const SingerDetails = () => {
           return true;
         });
 
+        // STRICT SINGER FILTER: Keep ONLY tracks that actually belong to / feature this singer!
+        const filteredTracks = uniqueTracks.filter((t) => isTrackByArtist(t, artistName));
+
         if (isMounted) {
           setArtistData(fetchedData?.artist || fetchedData || { name: artistName });
-          setSongs(uniqueTracks.map((t) => normalizeSong(t, artistName)).filter(Boolean));
+          setSongs(filteredTracks.map((t) => normalizeSong(t)).filter(Boolean));
           setContinuationToken(nextTok);
         }
       } catch (err) {
@@ -109,7 +151,11 @@ const SingerDetails = () => {
 
       if (data?.results?.length) {
         let addedCount = 0;
-        const newSongs = data.results.map((t) => normalizeSong(t, artistName)).filter(Boolean);
+        const newSongs = data.results
+          .filter((t) => isTrackByArtist(t, artistName))
+          .map((t) => normalizeSong(t))
+          .filter(Boolean);
+
         setSongs((prev) => {
           const seen = new Set(prev.map((s) => s.videoId));
           const uniqueNew = newSongs.filter((s) => !seen.has(s.videoId));

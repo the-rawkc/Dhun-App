@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { playTrackNow } from '../redux/features/playerSlice';
 import SongRow from '../components/SongRow';
@@ -27,6 +27,9 @@ const chartTabs = [
 const Charts = () => {
   const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState(chartTabs[0]);
+  const [continuationToken, setContinuationToken] = useState(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const sentinelRef = useRef(null);
 
   const getCached = (key) => {
     try {
@@ -47,22 +50,105 @@ const Charts = () => {
       setTracks(cached);
     }
 
-    fetch(`${API_BASE}/api/search?q=${encodeURIComponent(activeTab.query)}&filter=songs&language=en&hl=en`)
-      .then((res) => res.json())
-      .then((data) => {
+    const loadChartData = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(activeTab.query)}&filter=songs&language=en&hl=en`);
+        const data = await res.json();
         if (!mounted) return;
+
+        let songList = [];
+        let nextTok = data?.continuationToken || null;
+
         if (data?.results?.length > 0) {
-          const norm = data.results.map(normalizeSong).filter(Boolean);
-          setTracks(norm);
-          try { sessionStorage.setItem(cacheKey, JSON.stringify(norm)); } catch {}
+          songList = data.results.map(normalizeSong).filter(Boolean);
         }
-      })
-      .catch(() => {});
+
+        // For "India Top 50" (or if song list is under 35), auto-fetch continuation immediately so all 50 songs show
+        if (nextTok && songList.length < 35) {
+          try {
+            const nextRes = await fetch(`${API_BASE}/api/search?continuationToken=${encodeURIComponent(nextTok)}&language=en&hl=en`);
+            const nextData = await nextRes.json();
+            if (nextData?.results?.length > 0) {
+              const moreSongs = nextData.results.map(normalizeSong).filter(Boolean);
+              const seen = new Set(songList.map((s) => s.videoId));
+              moreSongs.forEach((s) => {
+                if (!seen.has(s.videoId)) {
+                  seen.add(s.videoId);
+                  songList.push(s);
+                }
+              });
+              nextTok = nextData.continuationToken || null;
+            }
+          } catch (e) {}
+        }
+
+        if (mounted && songList.length > 0) {
+          setTracks(songList);
+          setContinuationToken(nextTok);
+          try { sessionStorage.setItem(cacheKey, JSON.stringify(songList)); } catch {}
+        }
+      } catch (err) {
+        console.warn('Charts load error:', err);
+      }
+    };
+
+    loadChartData();
 
     return () => {
       mounted = false;
     };
   }, [activeTab]);
+
+  const handleLoadMore = async () => {
+    if (!continuationToken || isLoadingMore) return;
+    setIsLoadingMore(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/search?continuationToken=${encodeURIComponent(continuationToken)}&language=en&hl=en`);
+      const data = await res.json();
+
+      if (data?.results?.length) {
+        let addedCount = 0;
+        const newSongs = data.results.map(normalizeSong).filter(Boolean);
+
+        setTracks((prev) => {
+          const seen = new Set(prev.map((s) => s.videoId));
+          const uniqueNew = newSongs.filter((s) => !seen.has(s.videoId));
+          addedCount = uniqueNew.length;
+          return [...prev, ...uniqueNew];
+        });
+
+        if (addedCount === 0 || !data?.continuationToken) {
+          setContinuationToken(null);
+        } else {
+          setContinuationToken(data.continuationToken);
+        }
+      } else {
+        setContinuationToken(null);
+      }
+    } catch (err) {
+      console.warn('Load more error:', err);
+      setContinuationToken(null);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!sentinelRef.current || !continuationToken || isLoadingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          handleLoadMore();
+        }
+      },
+      { rootMargin: '300px' }
+    );
+
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [continuationToken, isLoadingMore]);
 
   const handlePlayAll = () => {
     if (tracks.length > 0) {
@@ -86,7 +172,7 @@ const Charts = () => {
               {activeTab.name}
             </h1>
             <p className="text-xs md:text-sm theme-text-muted mt-2">
-              The highest streaming tracks across India right now
+              Showing {tracks.length} songs • Official trending music in India
             </p>
           </div>
         </div>
@@ -106,7 +192,10 @@ const Charts = () => {
         {chartTabs.map((tab) => (
           <button
             key={tab.name}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => {
+              setActiveTab(tab);
+              setContinuationToken(null);
+            }}
             className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
               activeTab.name === tab.name
                 ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-600/30'
@@ -123,6 +212,30 @@ const Charts = () => {
           <SongRow key={song.videoId || i} song={song} index={i} songs={tracks} />
         ))}
       </div>
+
+      {/* Sentinel for auto infinite-scroll */}
+      {continuationToken && !isLoadingMore && (
+        <div ref={sentinelRef} className="h-4" />
+      )}
+
+      {/* Load More Button */}
+      {continuationToken && (
+        <div className="flex flex-col items-center justify-center py-6 gap-2">
+          {isLoadingMore ? (
+            <div className="flex items-center gap-2 text-rose-500 text-xs font-semibold">
+              <div className="w-5 h-5 border-2 border-rose-500/30 border-t-rose-500 rounded-full animate-spin" />
+              <span>Loading more songs...</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleLoadMore}
+              className="px-6 py-2.5 rounded-full bg-slate-500/10 hover:bg-rose-600 hover:text-white theme-text-main font-bold text-xs transition-all shadow-sm flex items-center gap-2"
+            >
+              <span>Load More Songs</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };

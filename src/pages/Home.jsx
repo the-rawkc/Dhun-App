@@ -242,7 +242,7 @@ const Home = () => {
         </div>
 
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 sm:gap-3">
-          {trendingIndia.slice(0, 16).map((song, i) => (
+          {trendingIndia.slice(0, 24).map((song, i) => (
             <SongCard key={song.videoId || i} song={song} songs={trendingIndia} index={i} />
           ))}
         </div>
@@ -281,7 +281,7 @@ const Home = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {punjabiHits.slice(0, 6).map((song, i) => (
+            {punjabiHits.slice(0, 12).map((song, i) => (
               <SongRow key={song.videoId || i} song={song} index={i} songs={punjabiHits} />
             ))}
           </div>

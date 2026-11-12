@@ -74,8 +74,8 @@ const Search = () => {
         combined = res?.results || (Array.isArray(res) ? res : []);
         nextTok = res?.continuationToken || null;
 
-        // If 'all' was selected and song count was low, append dedicated songs query quickly in parallel
-        if (!activeFilter && combined.filter((i) => i.videoId || i.resultType === 'song').length < 8) {
+        // In 'All Results' tab or whenever song count is under 25, append dedicated songs query so all songs for this topic/search show
+        if (!activeFilter && combined.filter((i) => i.videoId || i.resultType === 'song').length < 25) {
           try {
             const songsRes = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(queryTerm)}&filter=songs&language=en&hl=en`).then((r) => r.json());
             if (songsRes?.results?.length) {
