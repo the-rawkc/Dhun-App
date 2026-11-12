@@ -1,16 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <!-- Dhun Premium Crimson Gradient -->
-    <linearGradient id="dhunBg" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="dhunRed" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#f43f5e"/>
-      <stop offset="100%" stop-color="#be123c"/>
+      <stop offset="100%" stop-color="#e11d48"/>
     </linearGradient>
   </defs>
 
-  <!-- Sober, Crisp Circular Badge -->
-  <circle cx="256" cy="256" r="248" fill="url(#dhunBg)"/>
+  <!-- Premium Deep Black Background (Spotify Style) -->
+  <rect width="512" height="512" fill="#000000"/>
 
-  <!-- Soundwave Rhombus Graphic -->
+  <!-- Centered Vibrant Crimson Circle -->
+  <circle cx="256" cy="256" r="206" fill="url(#dhunRed)"/>
+
+  <!-- Crisp White Dhun Soundwave Emblem -->
   <g fill="#ffffff">
     <circle cx="114.6" cy="256" r="10.8" />
     <rect x="140.4" y="219.4" width="21.5" height="73.1" rx="10.75" />

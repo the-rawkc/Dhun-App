@@ -49,7 +49,7 @@ const Sidebar = () => {
         <img
           src="/icon.svg"
           alt="Dhun"
-          className="w-10 h-10 rounded-full shadow-lg shadow-rose-600/30 group-hover:scale-105 transition-transform duration-300"
+          className="w-10 h-10 rounded-xl shadow-lg shadow-rose-600/20 group-hover:scale-105 transition-transform duration-300"
         />
         <div>
           <span className="font-black text-2xl tracking-tight theme-text-main flex items-center">
