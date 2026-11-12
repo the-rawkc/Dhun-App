@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import CryptoJS from 'crypto-js';
 
 // Verome-API/src/services/ytmusic-parser.ts
 function parseSearchResults(data) {
@@ -1571,6 +1572,80 @@ async function handleStream(searchParams) {
   }
   return json({ success: false, error: "No streaming data found" }, 404);
 }
+async function handleAudioStream(searchParams) {
+  const query = searchParams.get("query") || searchParams.get("title") || "";
+  const artist = searchParams.get("artist") || "";
+  if (!query)
+    return error("Missing query");
+
+  try {
+    const cleanQuery = query.replace(/\s*[\(\[].*?[\)\]]/g, "").trim();
+    const searchTerm = `${cleanQuery} ${artist}`.trim();
+    const searchUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=5&p=1&_marker=0&ctx=web6dot0&q=${encodeURIComponent(searchTerm)}`;
+    const sRes = await fetch(searchUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
+    });
+    const sData = await sRes.json();
+    let item = sData?.results?.[0];
+
+    // If not found with artist, try clean query alone
+    if (!item?.encrypted_media_url && artist) {
+      const fallbackUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=5&p=1&_marker=0&ctx=web6dot0&q=${encodeURIComponent(cleanQuery)}`;
+      const fRes = await fetch(fallbackUrl, {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
+      });
+      const fData = await fRes.json();
+      item = fData?.results?.[0];
+    }
+
+    if (!item?.encrypted_media_url) {
+      // Fallback to autocomplete if search.getResults didn't find encrypted_media_url
+      const autoUrl = `https://www.jiosaavn.com/api.php?__call=autocomplete.get&_format=json&_marker=0&cc=in&includeMetaTags=1&query=${encodeURIComponent(cleanQuery)}`;
+      const aRes = await fetch(autoUrl, {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
+      });
+      const aData = await aRes.json();
+      const song = aData?.songs?.data?.[0];
+      if (song?.id) {
+        const detailsUrl = `https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0&_format=json&pids=${song.id}`;
+        const dRes = await fetch(detailsUrl, {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
+        });
+        const dData = await dRes.json();
+        item = dData[song.id];
+      }
+    }
+
+    if (!item?.encrypted_media_url) {
+      return json({ success: false, error: "Song not found in direct index" }, 404);
+    }
+
+    const key = CryptoJS.enc.Utf8.parse("38346591");
+    const decrypted = CryptoJS.DES.decrypt(
+      { ciphertext: CryptoJS.enc.Base64.parse(item.encrypted_media_url) },
+      key,
+      { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 }
+    );
+    let streamUrl = decrypted.toString(CryptoJS.enc.Utf8);
+    if (!streamUrl) {
+      return json({ success: false, error: "Decryption failed" }, 500);
+    }
+
+    // Upgrade to 320kbps high fidelity audio
+    streamUrl = streamUrl.replace("_96.mp4", "_320.mp4");
+
+    return json({
+      success: true,
+      streamUrl,
+      title: item.song || item.title,
+      artist: item.primary_artists || item.singers || artist,
+      duration: parseInt(item.duration, 10) || 0,
+      artwork: item.image ? item.image.replace("150x150", "500x500") : null
+    });
+  } catch (err) {
+    return json({ success: false, error: String(err) }, 500);
+  }
+}
 async function handleProxy(searchParams, req) {
   const audioUrl = searchParams.get("url");
   if (!audioUrl)
@@ -2161,6 +2236,8 @@ async function handleWebRequest(req) {
       response = await handleDiscoverRoutes(pathname, searchParams, ytmusic, youtubeSearch);
     if (!response && pathname === "/api/music/find")
       return await handleMusicFind(searchParams, ytmusic);
+    if (!response && pathname === "/api/audio-stream")
+      return await handleAudioStream(searchParams);
     if (!response && pathname === "/api/stream")
       return await handleStream(searchParams);
     if (!response && pathname === "/api/proxy")

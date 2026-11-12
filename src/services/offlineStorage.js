@@ -37,19 +37,35 @@ export const saveTrackOffline = async (track, onProgress = () => {}) => {
 
   onProgress({ status: 'fetching_audio', percent: 10 });
 
-  // First check if we can get stream url or proxy audio
+  // First check if we can get direct 320kbps stream url, or stream API, or proxy audio
   let blob = null;
   let audioUrl = '';
 
-  // Try stream API from Verome
+  // Try direct 320kbps audio-stream API first
   try {
-    const streamRes = await fetch(`${API_BASE}/api/stream?id=${encodeURIComponent(track.videoId)}`);
-    const streamData = await streamRes.json();
-    if (streamData?.streamingUrls?.audio?.length > 0) {
-      audioUrl = streamData.streamingUrls.audio[0].url;
+    const title = track.title || '';
+    const artist = track.artist || '';
+    const query = `${title} ${artist}`.trim();
+    const saavnRes = await fetch(`${API_BASE}/api/audio-stream?query=${encodeURIComponent(query)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`);
+    const saavnData = await saavnRes.json();
+    if (saavnData?.success && saavnData?.streamUrl) {
+      audioUrl = saavnData.streamUrl;
     }
   } catch (e) {
-    console.warn('Direct stream fetch failed, using proxy fallback:', e);
+    console.warn('Saavn stream fetch failed for offline save:', e);
+  }
+
+  // Fallback to Verome stream API
+  if (!audioUrl) {
+    try {
+      const streamRes = await fetch(`${API_BASE}/api/stream?id=${encodeURIComponent(track.videoId)}`);
+      const streamData = await streamRes.json();
+      if (streamData?.streamingUrls?.audio?.length > 0) {
+        audioUrl = streamData.streamingUrls.audio[0].url;
+      }
+    } catch (e) {
+      console.warn('Direct stream fetch failed, using proxy fallback:', e);
+    }
   }
 
   // If no direct stream url found, query proxy or fallback
