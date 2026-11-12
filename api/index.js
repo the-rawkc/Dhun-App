@@ -1954,12 +1954,7 @@ async function ensureDB(force = false) {
     if (res.ok) {
       const json = await res.json();
       if (json?.data?.users && typeof json.data.users === 'object') {
-        for (const [phoneKey, cloudUser] of Object.entries(json.data.users)) {
-          const localUser = usersCache[phoneKey];
-          if (!localUser || (cloudUser.updatedAt || 0) >= (localUser.updatedAt || 0)) {
-            usersCache[phoneKey] = cloudUser;
-          }
-        }
+        usersCache = { ...usersCache, ...json.data.users };
         isLoaded = true;
         lastCloudFetch = now;
         return;
@@ -1996,14 +1991,29 @@ async function persistDB() {
     fs.writeFileSync(dbFile, JSON.stringify(usersCache, null, 2), 'utf-8');
   } catch (err) {}
 
-  // 2. Persist to cloud database
+  // 2. Fetch latest from cloud database to ensure no concurrent user data is ever overwritten
+  let mergedUsers = { ...usersCache };
+  try {
+    const res = await fetch(CLOUD_DB_ENDPOINT);
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data?.users && typeof json.data.users === 'object') {
+        mergedUsers = { ...json.data.users, ...usersCache };
+        usersCache = mergedUsers;
+      }
+    }
+  } catch (e) {
+    console.warn('Pre-persist cloud fetch warning:', e);
+  }
+
+  // 3. Persist to cloud database
   try {
     await fetch(CLOUD_DB_ENDPOINT, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: 'dhun_users_db',
-        data: { users: usersCache },
+        data: { users: mergedUsers },
       }),
     });
   } catch (err) {

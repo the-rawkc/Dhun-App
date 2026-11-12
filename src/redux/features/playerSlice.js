@@ -89,57 +89,30 @@ const playerSlice = createSlice({
   name: 'player',
   initialState,
   reducers: {
-    // Hydrate & Smart-Merge everything from Cloud Database on Login for 100% Data Uniformity
+    // Hydrate everything from Cloud Database on Login/Refresh for 100% Data Uniformity
     loadCloudUserData: (state, action) => {
       const { favorites, playlists, favoriteArtists, themeMode } = action.payload || {};
 
-      // 1. Favorites: Cloud is authoritative. Deduplicate by videoId
-      const favMap = new Map();
+      // 1. Favorites: Cloud is authoritative
       if (Array.isArray(favorites)) {
-        favorites.forEach((f) => {
-          if (f && f.videoId) favMap.set(f.videoId, f);
-        });
+        state.favorites = favorites.filter((f) => f && f.videoId);
+        saveItem('tunetide_favorites', state.favorites);
       }
-      // Keep any unique local favorites not yet in cloud
-      (state.favorites || []).forEach((f) => {
-        if (f && f.videoId && !favMap.has(f.videoId)) {
-          favMap.set(f.videoId, f);
-        }
-      });
-      state.favorites = Array.from(favMap.values());
-      saveItem('tunetide_favorites', state.favorites);
 
       // 2. Playlists: Cloud is authoritative. Guarantee tracks is always an array.
-      if (Array.isArray(playlists) && playlists.length > 0) {
-        const sanitizedCloudPlaylists = playlists.map((p) => ({
+      if (Array.isArray(playlists)) {
+        state.playlists = playlists.map((p) => ({
           ...p,
           tracks: Array.isArray(p.tracks) ? p.tracks : [],
         }));
-        // Merge only non-default custom playlists created locally while offline
-        const cloudKeys = new Set(sanitizedCloudPlaylists.map((p) => p.id || p.title));
-        const localCustomPlaylists = (state.playlists || []).filter(
-          (p) =>
-            p &&
-            (p.id || p.title) &&
-            !cloudKeys.has(p.id || p.title) &&
-            !defaultPlaylists.some((dp) => dp.id === p.id)
-        );
-        state.playlists = [...sanitizedCloudPlaylists, ...localCustomPlaylists];
-      } else if (Array.isArray(playlists)) {
-        state.playlists = (state.playlists || []).map((p) => ({
-          ...p,
-          tracks: Array.isArray(p.tracks) ? p.tracks : [],
-        }));
+        saveItem('tunetide_playlists', state.playlists);
       }
-      saveItem('tunetide_playlists', state.playlists);
 
-      // 3. Smart-Merge Favorite Artists
-      const artistSet = new Set([
-        ...((Array.isArray(favoriteArtists) && favoriteArtists) || []),
-        ...(state.favoriteArtists || []),
-      ]);
-      state.favoriteArtists = Array.from(artistSet);
-      saveItem('tunetide_fav_artists', state.favoriteArtists);
+      // 3. Favorite Artists: Cloud is authoritative
+      if (Array.isArray(favoriteArtists)) {
+        state.favoriteArtists = favoriteArtists;
+        saveItem('tunetide_fav_artists', state.favoriteArtists);
+      }
 
       // 4. Theme
       if (themeMode) {
@@ -150,9 +123,6 @@ const playerSlice = createSlice({
           else document.documentElement.classList.remove('dark');
         }
       }
-
-      // Automatically sync unified merged library back to cloud database
-      triggerCloudSync(state);
     },
 
     resetUserLibrary: (state) => {

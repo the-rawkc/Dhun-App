@@ -86,7 +86,7 @@ const Library = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-extrabold theme-text-main">Your Library</h1>
-            <p className="text-xs theme-text-muted">Playlists, offline tracks, liked songs, and favorite artists</p>
+            <p className="text-xs theme-text-muted">Offline tracks, favorite artists, and custom collections</p>
           </div>
           {activeTab === 'playlists' && (
             <button

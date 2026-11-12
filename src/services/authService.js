@@ -53,7 +53,10 @@ export const loginWithPhoneAndPin = async (phone, pin, name = '', avatar = '') =
   let localTheme = 'dark';
   try {
     localFavorites = JSON.parse(localStorage.getItem('tunetide_favorites') || '[]');
-    localPlaylists = JSON.parse(localStorage.getItem('tunetide_playlists') || '[]');
+    const rawPlaylists = JSON.parse(localStorage.getItem('tunetide_playlists') || '[]');
+    localPlaylists = rawPlaylists.filter(
+      (p) => p && p.id && !['pl-desi-hits', 'pl-punjabi', 'pl-lofi'].includes(p.id)
+    );
     localArtists = JSON.parse(localStorage.getItem('tunetide_fav_artists') || '[]');
     localTheme = localStorage.getItem('tunetide_theme') || 'dark';
   } catch (e) {}

@@ -19,6 +19,8 @@ import {
   FaCheck,
   FaRedo,
   FaSpinner,
+  FaSearch,
+  FaTimes,
 } from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
 import { API_BASE } from '../services/apiConfig';
@@ -34,6 +36,9 @@ const PlaylistDetails = () => {
   const [suggestions, setSuggestions] = useState([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [addedSuggestionIds, setAddedSuggestionIds] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   if (!playlist) {
     return (
@@ -110,11 +115,43 @@ const PlaylistDetails = () => {
     }
   }, [lastVideoId]);
 
+  // Live search for songs to add to this playlist
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/search?q=${encodeURIComponent(searchQuery.trim())}&filter=songs`
+        );
+        const data = await res.json();
+        const results = Array.isArray(data?.results) ? data.results : [];
+        const currentIds = new Set(tracks.map((t) => t.videoId));
+        const filtered = results
+          .map((r) => normalizeSong(r))
+          .filter((s) => s && s.videoId && !currentIds.has(s.videoId));
+        setSearchResults(filtered.slice(0, 8));
+      } catch (e) {
+        console.warn('Playlist search error:', e);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, tracks]);
+
   const handleAddSuggestedTrack = (song) => {
     dispatch(addTrackToPlaylist({ playlistId: playlist.id, song }));
     setAddedSuggestionIds((prev) => ({ ...prev, [song.videoId]: true }));
     setTimeout(() => {
       setSuggestions((prev) => prev.filter((s) => s.videoId !== song.videoId));
+      setSearchResults((prev) => prev.filter((s) => s.videoId !== song.videoId));
     }, 400);
   };
 
@@ -221,104 +258,217 @@ const PlaylistDetails = () => {
         </div>
       )}
 
-      {/* ─── SUGGESTIONS / RECOMMENDED SONGS BASED ON LAST ADDED SONG ─── */}
-      {lastAddedTrack && (
-        <div className="mt-8 pt-6 border-t theme-border flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base sm:text-lg font-bold theme-text-main flex items-center gap-2">
-                <span>✨ Recommended Songs</span>
-              </h3>
-              <p className="text-xs theme-text-muted mt-0.5">
-                Suggested based on {tracks.length > 0 ? 'the last added song' : 'your playing song'} •{' '}
-                <span className="text-rose-500 font-semibold">{lastAddedTrack.title}</span>
-              </p>
-            </div>
+      {/* ─── ADD SONGS TO PLAYLIST & SUGGESTIONS SECTION ─── */}
+      <div className="mt-8 pt-6 border-t theme-border flex flex-col gap-5">
+        <div>
+          <h3 className="text-base sm:text-lg font-bold theme-text-main flex items-center gap-2">
+            <span>➕ Add Songs to this Playlist</span>
+          </h3>
+          <p className="text-xs theme-text-muted mt-0.5">
+            Search any Hindi, Punjabi, or Bollywood track or choose from recommendations below
+          </p>
+        </div>
+
+        {/* In-Playlist Search Bar */}
+        <div className="relative w-full max-w-xl">
+          <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search songs, artists, or movies to add..."
+            className="w-full pl-10 pr-10 py-3 rounded-2xl bg-slate-500/10 border theme-border theme-text-main text-sm focus:outline-none focus:border-rose-500 placeholder-slate-400 transition-all"
+          />
+          {searchQuery && (
             <button
-              onClick={fetchSuggestions}
-              disabled={loadingSuggestions}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-500/10 hover:bg-slate-500/20 text-xs font-semibold theme-text-main transition-all disabled:opacity-50"
-              title="Refresh Suggestions"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-slate-400 hover:text-white"
             >
-              <FaRedo className={`text-[10px] ${loadingSuggestions ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Refresh</span>
+              <FaTimes className="text-xs" />
             </button>
-          </div>
-
-          {loadingSuggestions ? (
-            <div className="flex items-center justify-center py-10 gap-2.5 theme-text-muted text-xs">
-              <FaSpinner className="animate-spin text-rose-500 text-base" />
-              <span>Finding songs matching "{lastAddedTrack.title}"...</span>
-            </div>
-          ) : suggestions.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-              {suggestions.map((song) => {
-                const isJustAdded = addedSuggestionIds[song.videoId];
-                return (
-                  <div
-                    key={song.videoId}
-                    className="flex items-center justify-between p-2.5 rounded-2xl glass-card border theme-border hover:bg-slate-500/10 transition-all group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-xl overflow-hidden bg-dark-800 shrink-0 shadow-sm">
-                        <img
-                          src={song.thumbnail}
-                          alt={song.title}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => dispatch(playTrackNow({ song, songs: suggestions }))}
-                          className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Preview Track"
-                        >
-                          <FaPlay className="text-white text-xs" />
-                        </button>
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-sm font-semibold theme-text-main truncate group-hover:text-rose-500">
-                          {song.title}
-                        </span>
-                        <span className="text-xs theme-text-muted truncate mt-0.5">
-                          {song.artist}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleAddSuggestedTrack(song)}
-                      disabled={isJustAdded}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm shrink-0 ml-2 ${
-                        isJustAdded
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/30 hover:scale-105 active:scale-95'
-                      }`}
-                    >
-                      {isJustAdded ? (
-                        <>
-                          <FaCheck className="text-[10px]" />
-                          <span>Added</span>
-                        </>
-                      ) : (
-                        <>
-                          <FaPlus className="text-[10px]" />
-                          <span>Add</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="py-6 text-center theme-text-muted text-xs">
-              No further recommendations found. Add more songs to discover more!
-            </div>
           )}
         </div>
-      )}
+
+        {/* Live Search Results */}
+        {searchQuery.trim() && (
+          <div className="flex flex-col gap-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-rose-500">
+              Search Results
+            </span>
+            {isSearching ? (
+              <div className="flex items-center justify-center py-8 gap-2 text-xs theme-text-muted">
+                <FaSpinner className="animate-spin text-rose-500" />
+                <span>Searching for "{searchQuery}"...</span>
+              </div>
+            ) : searchResults.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {searchResults.map((song) => {
+                  const isJustAdded = addedSuggestionIds[song.videoId];
+                  return (
+                    <div
+                      key={song.videoId}
+                      className="flex items-center justify-between p-2.5 rounded-2xl glass-card border theme-border hover:bg-slate-500/10 transition-all group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-xl overflow-hidden bg-dark-800 shrink-0 shadow-sm">
+                          <img
+                            src={song.thumbnail}
+                            alt={song.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => dispatch(playTrackNow({ song, songs: searchResults }))}
+                            className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Preview Track"
+                          >
+                            <FaPlay className="text-white text-xs" />
+                          </button>
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-semibold theme-text-main truncate group-hover:text-rose-500">
+                            {song.title}
+                          </span>
+                          <span className="text-xs theme-text-muted truncate mt-0.5">
+                            {song.artist}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleAddSuggestedTrack(song)}
+                        disabled={isJustAdded}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm shrink-0 ml-2 ${
+                          isJustAdded
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/30 hover:scale-105 active:scale-95'
+                        }`}
+                      >
+                        {isJustAdded ? (
+                          <>
+                            <FaCheck className="text-[10px]" />
+                            <span>Added</span>
+                          </>
+                        ) : (
+                          <>
+                            <FaPlus className="text-[10px]" />
+                            <span>Add</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-6 text-center theme-text-muted text-xs">
+                No songs found matching "{searchQuery}". Try another keyword!
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── SUGGESTIONS / RECOMMENDED SONGS BASED ON LAST ADDED SONG ─── */}
+        {lastAddedTrack && (
+          <div className="flex flex-col gap-3 pt-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm sm:text-base font-bold theme-text-main flex items-center gap-1.5">
+                  <span>✨ Recommended Songs</span>
+                </h4>
+                <p className="text-xs theme-text-muted mt-0.5">
+                  Suggested based on {tracks.length > 0 ? 'the last added song' : 'your playing song'} •{' '}
+                  <span className="text-rose-500 font-semibold">{lastAddedTrack.title}</span>
+                </p>
+              </div>
+              <button
+                onClick={fetchSuggestions}
+                disabled={loadingSuggestions}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-500/10 hover:bg-slate-500/20 text-xs font-semibold theme-text-main transition-all disabled:opacity-50"
+                title="Refresh Suggestions"
+              >
+                <FaRedo className={`text-[10px] ${loadingSuggestions ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+            </div>
+
+            {loadingSuggestions ? (
+              <div className="flex items-center justify-center py-10 gap-2.5 theme-text-muted text-xs">
+                <FaSpinner className="animate-spin text-rose-500 text-base" />
+                <span>Finding songs matching "{lastAddedTrack.title}"...</span>
+              </div>
+            ) : suggestions.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {suggestions.map((song) => {
+                  const isJustAdded = addedSuggestionIds[song.videoId];
+                  return (
+                    <div
+                      key={song.videoId}
+                      className="flex items-center justify-between p-2.5 rounded-2xl glass-card border theme-border hover:bg-slate-500/10 transition-all group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-xl overflow-hidden bg-dark-800 shrink-0 shadow-sm">
+                          <img
+                            src={song.thumbnail}
+                            alt={song.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => dispatch(playTrackNow({ song, songs: suggestions }))}
+                            className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Preview Track"
+                          >
+                            <FaPlay className="text-white text-xs" />
+                          </button>
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-semibold theme-text-main truncate group-hover:text-rose-500">
+                            {song.title}
+                          </span>
+                          <span className="text-xs theme-text-muted truncate mt-0.5">
+                            {song.artist}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleAddSuggestedTrack(song)}
+                        disabled={isJustAdded}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm shrink-0 ml-2 ${
+                          isJustAdded
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/30 hover:scale-105 active:scale-95'
+                        }`}
+                      >
+                        {isJustAdded ? (
+                          <>
+                            <FaCheck className="text-[10px]" />
+                            <span>Added</span>
+                          </>
+                        ) : (
+                          <>
+                            <FaPlus className="text-[10px]" />
+                            <span>Add</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-6 text-center theme-text-muted text-xs">
+                No further recommendations found. Add more songs to discover more!
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
