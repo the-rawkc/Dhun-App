@@ -217,8 +217,8 @@ const MusicPlayer = () => {
             {/* Prev */}
             <button
               onClick={() => {
+                playerEngine.unlockAudio();
                 dispatch(prevSong());
-                playerEngine.seekTo(0);
               }}
               className="theme-text-main hover:text-rose-600 transition-transform active:scale-90"
               title="Previous"
@@ -242,8 +242,8 @@ const MusicPlayer = () => {
             {/* Next */}
             <button
               onClick={() => {
+                playerEngine.unlockAudio();
                 dispatch(nextSong());
-                playerEngine.seekTo(0);
               }}
               className="theme-text-main hover:text-rose-600 transition-transform active:scale-90"
               title="Next"
@@ -404,8 +404,8 @@ const MusicPlayer = () => {
           {/* Previous Song Button */}
           <button
             onClick={() => {
+              playerEngine.unlockAudio();
               dispatch(prevSong());
-              playerEngine.seekTo(0);
             }}
             className="p-2 theme-text-main hover:text-rose-600 active:scale-90 transition-transform"
             title="Previous"
@@ -429,8 +429,8 @@ const MusicPlayer = () => {
           {/* Next Song Button */}
           <button
             onClick={() => {
+              playerEngine.unlockAudio();
               dispatch(nextSong());
-              playerEngine.seekTo(0);
             }}
             className="p-2 theme-text-main hover:text-rose-600 active:scale-90 transition-transform"
             title="Next"

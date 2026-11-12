@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   playSong,
+  playTrackNow,
   playPlaylistWithShuffle,
   createPlaylist,
 } from '../redux/features/playerSlice';
@@ -40,13 +41,13 @@ const Library = () => {
 
   const handlePlayFavorites = () => {
     if (favorites.length > 0) {
-      dispatch(playSong({ song: favorites[0], songs: favorites, index: 0 }));
+      dispatch(playTrackNow({ song: favorites[0], songs: favorites, index: 0 }));
     }
   };
 
   const handlePlayOfflineAll = () => {
     if (offlineSongs.length > 0) {
-      dispatch(playSong({ song: offlineSongs[0], songs: offlineSongs, index: 0 }));
+      dispatch(playTrackNow({ song: offlineSongs[0], songs: offlineSongs, index: 0 }));
     }
   };
 
@@ -216,7 +217,7 @@ const Library = () => {
                   onClick={(e) => {
                     e.stopPropagation();
                     if (pl.tracks.length > 0) {
-                      dispatch(playSong({ song: pl.tracks[0], songs: pl.tracks, index: 0 }));
+                      dispatch(playTrackNow({ song: pl.tracks[0], songs: pl.tracks, index: 0 }));
                     }
                   }}
                   disabled={pl.tracks.length === 0}

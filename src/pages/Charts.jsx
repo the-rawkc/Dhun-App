@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { playSong } from '../redux/features/playerSlice';
+import { playTrackNow } from '../redux/features/playerSlice';
 import SongRow from '../components/SongRow';
 import { FaFire, FaPlay } from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
@@ -66,7 +66,7 @@ const Charts = () => {
 
   const handlePlayAll = () => {
     if (tracks.length > 0) {
-      dispatch(playSong({ song: tracks[0], songs: tracks, index: 0 }));
+      dispatch(playTrackNow({ song: tracks[0], songs: tracks, index: 0 }));
     }
   };
 

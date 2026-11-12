@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   playSong,
+  playTrackNow,
   playPause,
   toggleFavorite,
   addToQueue,
@@ -65,12 +66,10 @@ const SongRow = ({ song, index, songs = [], showCover = true, isHighlightedLiked
   }, [menuOpen]);
 
   const handleRowClick = () => {
-    playerEngine.unlockAudio();
     if (isCurrent) {
       dispatch(playPause());
     } else {
-      playerEngine.loadVideo(normalized.videoId, true, normalized);
-      dispatch(playSong({ song: normalized, songs, index }));
+      dispatch(playTrackNow({ song: normalized, songs, index }));
     }
   };
 

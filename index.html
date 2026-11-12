@@ -3,17 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <script>
-      // Page Visibility spoofing to prevent mobile Chromium from pausing background playback
-      try {
-        Object.defineProperty(Document.prototype, 'hidden', { get: () => false, configurable: true });
-        Object.defineProperty(Document.prototype, 'visibilityState', { get: () => 'visible', configurable: true });
-        Object.defineProperty(Document.prototype, 'webkitHidden', { get: () => false, configurable: true });
-        Object.defineProperty(Document.prototype, 'webkitVisibilityState', { get: () => 'visible', configurable: true });
-        window.addEventListener('visibilitychange', (e) => e.stopImmediatePropagation(), true);
-        document.addEventListener('visibilitychange', (e) => e.stopImmediatePropagation(), true);
-      } catch (e) {}
-    </script>
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="alternate icon" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/icon.svg" />

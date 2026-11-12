@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { playSong } from '../redux/features/playerSlice';
+import { playTrackNow } from '../redux/features/playerSlice';
 import SongCard from '../components/SongCard';
 import SongRow from '../components/SongRow';
 import ArtistCard from '../components/ArtistCard';
@@ -193,7 +193,7 @@ const Search = () => {
 
   const handlePlayAllSongs = () => {
     if (prioritizedSongs.length > 0) {
-      dispatch(playSong({ song: prioritizedSongs[0], songs: prioritizedSongs, index: 0 }));
+      dispatch(playTrackNow({ song: prioritizedSongs[0], songs: prioritizedSongs, index: 0 }));
     }
   };
 

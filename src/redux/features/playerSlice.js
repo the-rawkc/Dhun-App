@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { normalizeSong } from '../../utils/normalizeSong';
 import { syncToCloudDatabase } from '../../services/authService';
+import { playerEngine } from '../../services/playerEngine';
 
 const loadSaved = (key, fallback) => {
   try {
@@ -474,5 +475,21 @@ export const {
   setEqualizerPreset,
   setAudioQuality,
 } = playerSlice.actions;
+
+// Centralized synchronous action for 100% reliable click-to-play across all devices & browsers
+export const playTrackNow = ({ song, songs = [], index = 0 }) => (dispatch) => {
+  if (!song) return;
+  const normalized = normalizeSong(song);
+  if (!normalized || !normalized.videoId) return;
+
+  try {
+    playerEngine.unlockAudio();
+    playerEngine.loadVideo(normalized.videoId, true, normalized);
+  } catch (e) {
+    console.warn('playerEngine loadVideo failed in playTrackNow:', e);
+  }
+
+  dispatch(playSong({ song: normalized, songs, index }));
+};
 
 export default playerSlice.reducer;

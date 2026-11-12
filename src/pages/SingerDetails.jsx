@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { playSong, toggleFavoriteArtist } from '../redux/features/playerSlice';
+import { playTrackNow, toggleFavoriteArtist } from '../redux/features/playerSlice';
 import SongRow from '../components/SongRow';
 import { FaPlay, FaCheckCircle, FaHeart, FaRegHeart, FaSpinner } from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
@@ -160,7 +160,7 @@ const SingerDetails = () => {
 
   const handlePlayAll = () => {
     if (prioritizedSongs.length > 0) {
-      dispatch(playSong({ song: prioritizedSongs[0], songs: prioritizedSongs, index: 0 }));
+      dispatch(playTrackNow({ song: prioritizedSongs[0], songs: prioritizedSongs, index: 0 }));
     }
   };
 

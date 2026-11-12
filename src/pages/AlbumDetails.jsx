@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { playSong } from '../redux/features/playerSlice';
+import { playTrackNow } from '../redux/features/playerSlice';
 import SongRow from '../components/SongRow';
 import { FaPlay, FaCompactDisc } from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
@@ -79,7 +79,7 @@ const AlbumDetails = () => {
 
   const handlePlayAll = () => {
     if (tracks.length > 0) {
-      dispatch(playSong({ song: tracks[0], songs: tracks, index: 0 }));
+      dispatch(playTrackNow({ song: tracks[0], songs: tracks, index: 0 }));
     }
   };
 

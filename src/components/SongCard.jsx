@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   playSong,
+  playTrackNow,
   playPause,
   toggleFavorite,
   openAddToPlaylistModal,
@@ -44,12 +45,10 @@ const SongCard = ({ song, songs = [], index = 0 }) => {
 
   const handlePlayClick = (e) => {
     e.stopPropagation();
-    playerEngine.unlockAudio();
     if (isCurrent) {
       dispatch(playPause());
     } else {
-      playerEngine.loadVideo(normalized.videoId, true, normalized);
-      dispatch(playSong({ song: normalized, songs, index }));
+      dispatch(playTrackNow({ song: normalized, songs, index }));
     }
   };
 

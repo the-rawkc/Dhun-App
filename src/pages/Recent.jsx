@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { playSong } from '../redux/features/playerSlice';
+import { playTrackNow } from '../redux/features/playerSlice';
 import SongRow from '../components/SongRow';
 import { FaHistory, FaPlay } from 'react-icons/fa';
 
@@ -10,7 +10,7 @@ const Recent = () => {
 
   const handlePlayAll = () => {
     if (recentTracks.length > 0) {
-      dispatch(playSong({ song: recentTracks[0], songs: recentTracks, index: 0 }));
+      dispatch(playTrackNow({ song: recentTracks[0], songs: recentTracks, index: 0 }));
     }
   };
 

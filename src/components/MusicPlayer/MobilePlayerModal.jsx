@@ -312,8 +312,8 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         {/* Previous */}
         <button
           onClick={() => {
+            playerEngine.unlockAudio();
             dispatch(prevSong());
-            playerEngine.seekTo(0);
           }}
           className="p-3 text-white hover:text-rose-400 transition-transform active:scale-90"
         >
@@ -335,8 +335,8 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         {/* Next */}
         <button
           onClick={() => {
+            playerEngine.unlockAudio();
             dispatch(nextSong());
-            playerEngine.seekTo(0);
           }}
           className="p-3 text-white hover:text-rose-400 transition-transform active:scale-90"
         >

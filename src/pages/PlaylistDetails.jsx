@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   playSong,
+  playTrackNow,
   playPlaylistWithShuffle,
   deletePlaylist,
   removeTrackFromPlaylist,
@@ -35,7 +36,7 @@ const PlaylistDetails = () => {
 
   const handlePlayAll = () => {
     if (playlist.tracks.length > 0) {
-      dispatch(playSong({ song: playlist.tracks[0], songs: playlist.tracks, index: 0 }));
+      dispatch(playTrackNow({ song: playlist.tracks[0], songs: playlist.tracks, index: 0 }));
     }
   };
 

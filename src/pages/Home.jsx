@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { playSong } from '../redux/features/playerSlice';
+import { playTrackNow } from '../redux/features/playerSlice';
 import SongCard from '../components/SongCard';
 import SongRow from '../components/SongRow';
 import ArtistCard from '../components/ArtistCard';
@@ -156,7 +156,7 @@ const Home = () => {
 
   const handlePlayTrending = () => {
     if (trendingIndia.length > 0) {
-      dispatch(playSong({ song: trendingIndia[0], songs: trendingIndia, index: 0 }));
+      dispatch(playTrackNow({ song: trendingIndia[0], songs: trendingIndia, index: 0 }));
     }
   };
 
