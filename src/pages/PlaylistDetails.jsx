@@ -25,7 +25,7 @@ import {
   FaEdit,
   FaEllipsisV,
 } from 'react-icons/fa';
-import { normalizeSong } from '../utils/normalizeSong';
+import { normalizeSong, isSameSong } from '../utils/normalizeSong';
 import { API_BASE } from '../services/apiConfig';
 
 /**
@@ -343,10 +343,13 @@ const PlaylistDetails = () => {
 
   const handleAddSuggestedTrack = (song) => {
     dispatch(addTrackToPlaylist({ playlistId: playlist.id, song }));
-    setAddedSuggestionIds((prev) => ({ ...prev, [song.videoId]: true }));
+    const sId = song.videoId || song.id;
+    if (sId) {
+      setAddedSuggestionIds((prev) => ({ ...prev, [sId]: true }));
+    }
     setTimeout(() => {
-      setSuggestions((prev) => prev.filter((s) => s.videoId !== song.videoId));
-      setSearchResults((prev) => prev.filter((s) => s.videoId !== song.videoId));
+      setSuggestions((prev) => prev.filter((s) => !isSameSong(s, song)));
+      setSearchResults((prev) => prev.filter((s) => !isSameSong(s, song)));
     }, 400);
   };
 
@@ -582,7 +585,9 @@ const PlaylistDetails = () => {
             ) : searchResults.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {searchResults.map((song) => {
-                  const isJustAdded = addedSuggestionIds[song.videoId];
+                  const sId = song.videoId || song.id;
+                  const isAlreadyIn = tracks.some((t) => isSameSong(t, song));
+                  const isJustAdded = isAlreadyIn || (sId ? !!addedSuggestionIds[sId] : false);
                   return (
                     <div
                       key={song.videoId}
@@ -682,7 +687,9 @@ const PlaylistDetails = () => {
             ) : suggestions.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {suggestions.map((song) => {
-                  const isJustAdded = addedSuggestionIds[song.videoId];
+                  const sId = song.videoId || song.id;
+                  const isAlreadyIn = tracks.some((t) => isSameSong(t, song));
+                  const isJustAdded = isAlreadyIn || (sId ? !!addedSuggestionIds[sId] : false);
                   return (
                     <div
                       key={song.videoId}

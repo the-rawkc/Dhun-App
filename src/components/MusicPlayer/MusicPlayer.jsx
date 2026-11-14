@@ -39,7 +39,8 @@ import {
 import SyncedLyrics from '../SyncedLyrics';
 import QueueDrawer from '../QueueDrawer';
 import MobilePlayerModal from './MobilePlayerModal';
-import { saveTrackOffline, getOfflineTrack } from '../../services/offlineStorage';
+import { saveTrackOffline, getOfflineTrack, isTrackDownloadedSync } from '../../services/offlineStorage';
+import { isValidVideoId } from '../../utils/normalizeSong';
 
 const formatTime = (secs) => {
   if (isNaN(secs) || secs < 0) return '0:00';
@@ -87,15 +88,21 @@ const MusicPlayer = () => {
 
   // Load new song when activeSong changes
   useEffect(() => {
-    if (activeSong?.videoId) {
-      if (playerEngine.currentVideoId !== activeSong.videoId) {
-        playerEngine.loadVideo(activeSong.videoId, true, activeSong);
+    const vId = activeSong?.videoId;
+    if (vId && isValidVideoId(vId)) {
+      if (playerEngine.currentVideoId !== vId) {
+        playerEngine.loadVideo(vId, true, activeSong);
       }
 
-      // Check if downloaded offline
-      getOfflineTrack(activeSong.videoId).then((item) => {
+      // Immediate synchronous cache check then verify with IndexedDB
+      setDownloadStatus(isTrackDownloadedSync(vId) ? 'downloaded' : 'idle');
+      getOfflineTrack(vId).then((item) => {
         setDownloadStatus(item ? 'downloaded' : 'idle');
+      }).catch(() => {
+        setDownloadStatus('idle');
       });
+    } else {
+      setDownloadStatus('idle');
     }
   }, [activeSong?.videoId]);
 

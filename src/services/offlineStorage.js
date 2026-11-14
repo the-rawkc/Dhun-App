@@ -5,6 +5,8 @@ const DB_VERSION = 1;
 const STORE_TRACKS = 'offline_tracks';
 
 let dbInstance = null;
+const downloadedVideoIds = new Set();
+let isCacheHydrated = false;
 
 export const openDB = () => {
   return new Promise((resolve, reject) => {
@@ -23,6 +25,19 @@ export const openDB = () => {
 
     request.onsuccess = (e) => {
       dbInstance = e.target.result;
+      // Populate synchronous lookup cache
+      try {
+        const tx = dbInstance.transaction(STORE_TRACKS, 'readonly');
+        const store = tx.objectStore(STORE_TRACKS);
+        const req = store.getAllKeys();
+        req.onsuccess = () => {
+          if (Array.isArray(req.result)) {
+            downloadedVideoIds.clear();
+            req.result.forEach((k) => downloadedVideoIds.add(k));
+            isCacheHydrated = true;
+          }
+        };
+      } catch (err) {}
       resolve(dbInstance);
     };
 
@@ -30,6 +45,11 @@ export const openDB = () => {
       reject(e.target.error);
     };
   });
+};
+
+export const isTrackDownloadedSync = (videoId) => {
+  if (!videoId) return false;
+  return downloadedVideoIds.has(videoId);
 };
 
 export const saveTrackOffline = async (track, onProgress = () => {}) => {
@@ -105,6 +125,7 @@ export const saveTrackOffline = async (track, onProgress = () => {}) => {
     const putReq = store.put(record);
 
     putReq.onsuccess = () => {
+      downloadedVideoIds.add(record.videoId);
       onProgress({ status: 'completed', percent: 100 });
       resolve(record);
     };
@@ -144,7 +165,10 @@ export const removeOfflineTrack = async (videoId) => {
     const store = tx.objectStore(STORE_TRACKS);
     const req = store.delete(videoId);
 
-    req.onsuccess = () => resolve(true);
+    req.onsuccess = () => {
+      downloadedVideoIds.delete(videoId);
+      resolve(true);
+    };
     req.onerror = (e) => reject(e.target.error);
   });
 };
@@ -156,7 +180,10 @@ export const clearAllOfflineTracks = async () => {
     const store = tx.objectStore(STORE_TRACKS);
     const req = store.clear();
 
-    req.onsuccess = () => resolve(true);
+    req.onsuccess = () => {
+      downloadedVideoIds.clear();
+      resolve(true);
+    };
     req.onerror = (e) => reject(e.target.error);
   });
 };

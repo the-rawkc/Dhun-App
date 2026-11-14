@@ -31,7 +31,8 @@ import {
   FaSlidersH,
 } from 'react-icons/fa';
 import SyncedLyrics from '../SyncedLyrics';
-import { saveTrackOffline, getOfflineTrack } from '../../services/offlineStorage';
+import { saveTrackOffline, getOfflineTrack, isTrackDownloadedSync } from '../../services/offlineStorage';
+import { isValidVideoId } from '../../utils/normalizeSong';
 
 const formatTime = (secs) => {
   if (isNaN(secs) || secs < 0) return '0:00';
@@ -90,9 +91,13 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
   // Verify offline download status specifically for the current activeSong
   useEffect(() => {
     let mounted = true;
-    if (activeSong?.videoId) {
-      getOfflineTrack(activeSong.videoId).then((item) => {
+    const vId = activeSong?.videoId;
+    if (vId && isValidVideoId(vId)) {
+      setDownloadStatus(isTrackDownloadedSync(vId) ? 'downloaded' : 'idle');
+      getOfflineTrack(vId).then((item) => {
         if (mounted) setDownloadStatus(item ? 'downloaded' : 'idle');
+      }).catch(() => {
+        if (mounted) setDownloadStatus('idle');
       });
     } else {
       setDownloadStatus('idle');

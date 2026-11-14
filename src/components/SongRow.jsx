@@ -20,8 +20,8 @@ import {
   FaPlus,
   FaTrashAlt,
 } from 'react-icons/fa';
-import { normalizeSong } from '../utils/normalizeSong';
-import { saveTrackOffline, getOfflineTrack } from '../services/offlineStorage';
+import { normalizeSong, isValidVideoId } from '../utils/normalizeSong';
+import { saveTrackOffline, getOfflineTrack, isTrackDownloadedSync } from '../services/offlineStorage';
 import { playerEngine } from '../services/playerEngine';
 
 const SongRow = ({
@@ -47,9 +47,13 @@ const SongRow = ({
 
   useEffect(() => {
     let mounted = true;
-    if (normalized?.videoId) {
-      getOfflineTrack(normalized.videoId).then((item) => {
+    const vId = normalized?.videoId;
+    if (vId && isValidVideoId(vId)) {
+      setDownloadStatus(isTrackDownloadedSync(vId) ? 'downloaded' : 'idle');
+      getOfflineTrack(vId).then((item) => {
         if (mounted) setDownloadStatus(item ? 'downloaded' : 'idle');
+      }).catch(() => {
+        if (mounted) setDownloadStatus('idle');
       });
     } else {
       setDownloadStatus('idle');

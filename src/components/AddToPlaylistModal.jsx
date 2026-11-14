@@ -7,6 +7,7 @@ import {
   createPlaylist,
 } from '../redux/features/playerSlice';
 import { FaTimes, FaPlus, FaCheck, FaFolderPlus } from 'react-icons/fa';
+import { isSameSong } from '../utils/normalizeSong';
 
 const AddToPlaylistModal = () => {
   const dispatch = useDispatch();
@@ -16,33 +17,27 @@ const AddToPlaylistModal = () => {
   );
   const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
   const [showCreateInput, setShowCreateInput] = useState(false);
-  const [addedMap, setAddedMap] = useState({});
+  const [justAddedPlaylistId, setJustAddedPlaylistId] = useState(null);
 
-  const songKey = songToAddToPlaylist
-    ? songToAddToPlaylist.videoId || songToAddToPlaylist.id || songToAddToPlaylist.title
-    : null;
-
-  // Crucial fix: Clear temporary added flags whenever a new song is opened or modal toggles
+  // Crucial: Clear temporary added flags and inputs whenever target song or modal state changes
   useEffect(() => {
-    setAddedMap({});
+    setJustAddedPlaylistId(null);
     setShowCreateInput(false);
     setNewPlaylistTitle('');
-  }, [songKey, isAddToPlaylistModalOpen]);
+  }, [songToAddToPlaylist?.videoId, songToAddToPlaylist?.id, isAddToPlaylistModalOpen]);
 
   if (!isAddToPlaylistModalOpen || !songToAddToPlaylist) return null;
 
   const handleClose = () => {
-    setAddedMap({});
+    setJustAddedPlaylistId(null);
     setShowCreateInput(false);
     setNewPlaylistTitle('');
     dispatch(closeAddToPlaylistModal());
   };
 
   const handleAddToPlaylist = (playlistId) => {
+    setJustAddedPlaylistId(playlistId);
     dispatch(addTrackToPlaylist({ playlistId, song: songToAddToPlaylist }));
-    if (songKey) {
-      setAddedMap((prev) => ({ ...prev, [`${songKey}-${playlistId}`]: true }));
-    }
     setTimeout(() => {
       handleClose();
     }, 600);
@@ -92,24 +87,8 @@ const AddToPlaylistModal = () => {
         <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-2">
           {playlists.map((pl) => {
             const trks = Array.isArray(pl.tracks) ? pl.tracks : [];
-            const isSongInPlaylist = (track, target) => {
-              if (!track || !target) return false;
-              const v1 = (track.videoId || '').trim();
-              const v2 = (target.videoId || '').trim();
-              if (v1 && v2 && v1 === v2) return true;
-              const id1 = (track.id || '').trim();
-              const id2 = (target.id || '').trim();
-              if (id1 && id2 && id1 === id2) return true;
-              const t1 = (track.title || '').trim().toLowerCase();
-              const t2 = (target.title || '').trim().toLowerCase();
-              const a1 = (track.artist || '').trim().toLowerCase();
-              const a2 = (target.artist || '').trim().toLowerCase();
-              if (t1 && t2 && t1 === t2 && a1 && a2 && a1 === a2) return true;
-              return false;
-            };
-
-            const isAlreadyAdded = trks.some((t) => isSongInPlaylist(t, songToAddToPlaylist));
-            const isJustAdded = songKey ? !!addedMap[`${songKey}-${pl.id}`] : false;
+            const isAlreadyAdded = trks.some((t) => isSameSong(t, songToAddToPlaylist));
+            const isJustAdded = justAddedPlaylistId === pl.id;
             const firstTrack = trks.length > 0 ? trks[0] : null;
             const plCover =
               firstTrack?.thumbnail ||

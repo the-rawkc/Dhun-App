@@ -212,6 +212,60 @@ export const normalizeSong = (song, fallbackArtist = '') => {
   };
 };
 
+export const isValidVideoId = (vid) => {
+  if (!vid || typeof vid !== 'string') return false;
+  const v = vid.trim();
+  if (v.length < 6 || v.length > 64) return false;
+  if (v === 'undefined' || v === 'null' || v === 'none') return false;
+  if (v.startsWith('UC') || v.startsWith('MPRE') || v.startsWith('VL') || v.startsWith('FEmusic')) return false;
+  return true;
+};
+
+export const isValidSongId = (id) => {
+  if (!id || typeof id !== 'string') return false;
+  const clean = id.trim();
+  if (clean.length < 5 || clean.length > 64) return false;
+  if (clean === 'undefined' || clean === 'null' || clean === 'none') return false;
+  if (clean.startsWith('0.') || clean.startsWith('UC') || clean.startsWith('MPRE') || clean.startsWith('VL') || clean.startsWith('FEmusic')) return false;
+  return true;
+};
+
+export const isSameSong = (songA, songB) => {
+  if (!songA || !songB) return false;
+
+  const v1 = (songA.videoId || '').trim();
+  const v2 = (songB.videoId || '').trim();
+  if (isValidVideoId(v1) && isValidVideoId(v2)) {
+    return v1 === v2;
+  }
+
+  const id1 = (songA.id || '').trim();
+  const id2 = (songB.id || '').trim();
+  if (isValidSongId(id1) && isValidSongId(id2) && id1 === id2) {
+    return true;
+  }
+
+  if (isValidVideoId(v1) && isValidSongId(id2) && v1 === id2) return true;
+  if (isValidSongId(id1) && isValidVideoId(v2) && id1 === v2) return true;
+
+  const t1 = (songA.title || songA.name || '').trim().toLowerCase();
+  const t2 = (songB.title || songB.name || '').trim().toLowerCase();
+  const a1 = (songA.artist || '').trim().toLowerCase();
+  const a2 = (songB.artist || '').trim().toLowerCase();
+
+  const isGenericA = !a1 || a1 === 'indian artist' || a1 === 'unknown artist' || a1 === 'various artists';
+  const isGenericB = !a2 || a2 === 'indian artist' || a2 === 'unknown artist' || a2 === 'various artists';
+  const isGenericT = (t) => !t || t.length < 3 || t === 'unknown title' || t === 'untitled' || t.startsWith('track ');
+
+  if (!isGenericT(t1) && !isGenericT(t2) && t1 === t2) {
+    if (!isGenericA && !isGenericB && a1 === a2) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 export const parseLRC = (lrcString) => {
   if (!lrcString || typeof lrcString !== 'string') return [];
   const lines = lrcString.split('\n');
