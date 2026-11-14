@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { playTrackNow, toggleFavoriteArtist } from '../redux/features/playerSlice';
 import SongRow from '../components/SongRow';
-import { FaPlay, FaCheckCircle, FaHeart, FaRegHeart, FaSpinner } from 'react-icons/fa';
+import { FaPlay, FaCheckCircle, FaHeart, FaRegHeart, FaSpinner, FaSearch, FaTimes } from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
 import { getArtistPhoto } from '../utils/artistPhotos';
 import { API_BASE } from '../services/apiConfig';
@@ -246,9 +246,20 @@ const SingerDetails = () => {
   const otherSongs = songs.filter((s) => !favSet.has(s.videoId));
   const prioritizedSongs = [...likedByArtist, ...otherSongs];
 
+  const [filterQuery, setFilterQuery] = useState('');
+
+  const displayedSongs = filterQuery.trim()
+    ? prioritizedSongs.filter((s) => {
+        const q = filterQuery.toLowerCase().trim();
+        const tMatch = (s.title || '').toLowerCase().includes(q);
+        const aMatch = (s.artist || '').toLowerCase().includes(q);
+        return tMatch || aMatch;
+      })
+    : prioritizedSongs;
+
   const handlePlayAll = () => {
-    if (prioritizedSongs.length > 0) {
-      dispatch(playTrackNow({ song: prioritizedSongs[0], songs: prioritizedSongs, index: 0 }));
+    if (displayedSongs.length > 0) {
+      dispatch(playTrackNow({ song: displayedSongs[0], songs: displayedSongs, index: 0 }));
     }
   };
 
@@ -311,24 +322,47 @@ const SingerDetails = () => {
 
       {/* All Discography Songs */}
       <div>
-        <h2 className="text-xl md:text-2xl font-bold theme-text-main mb-4">
-          All Songs by {displayName} ({prioritizedSongs.length})
-        </h2>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+          <h2 className="text-xl md:text-2xl font-bold theme-text-main">
+            All Songs by {displayName} ({displayedSongs.length})
+          </h2>
+
+          {/* In-page search bar to search inside singer's playlist */}
+          <div className="relative w-full sm:w-72">
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder={`Search in ${displayName}...`}
+              className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-500/10 border theme-border theme-text-main placeholder-slate-400 text-xs focus:outline-none focus:border-rose-500 transition-all"
+            />
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-xs theme-text-muted" />
+            {filterQuery && (
+              <button
+                type="button"
+                onClick={() => setFilterQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 theme-text-muted hover:theme-text-main"
+              >
+                <FaTimes className="text-xs" />
+              </button>
+            )}
+          </div>
+        </div>
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
             <div className="w-8 h-8 border-3 border-rose-500/30 border-t-rose-500 rounded-full animate-spin" />
             <p className="text-xs">Loading complete songs...</p>
           </div>
-        ) : prioritizedSongs.length > 0 ? (
+        ) : displayedSongs.length > 0 ? (
           <div>
             <div className="space-y-1">
-              {prioritizedSongs.map((song, i) => (
+              {displayedSongs.map((song, i) => (
                 <SongRow
                   key={song.videoId || i}
                   song={song}
                   index={i}
-                  songs={prioritizedSongs}
+                  songs={displayedSongs}
                   isHighlightedLiked={favSet.has(song.videoId)}
                 />
               ))}
@@ -360,7 +394,9 @@ const SingerDetails = () => {
           </div>
         ) : (
           <div className="py-12 text-center theme-text-muted text-sm">
-            No tracks found for this artist.
+            {filterQuery
+              ? `No songs found matching "${filterQuery}" by ${displayName}`
+              : 'No tracks found for this artist.'}
           </div>
         )}
       </div>

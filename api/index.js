@@ -1586,20 +1586,42 @@ async function handleAudioStream(searchParams) {
       headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
     });
     const sData = await sRes.json();
-    let item = sData?.results?.[0];
+    const isGoodMatch = (cand) => {
+      if (!cand || !cand.encrypted_media_url) return false;
+      const candTitle = (cand.song || cand.title || "").toLowerCase().replace(/[\.\,\-\_\'\"]/g, " ").replace(/\s+/g, " ").trim();
+      const reqTitle = cleanQuery.toLowerCase().replace(/[\.\,\-\_\'\"]/g, " ").replace(/\s+/g, " ").trim();
+      const titleMatch = candTitle === reqTitle || candTitle.includes(reqTitle) || reqTitle.includes(candTitle);
+      if (!titleMatch) return false;
 
-    // If not found with artist, try clean query alone
-    if (!item?.encrypted_media_url && artist) {
+      if (artist && artist !== 'Indian Artist' && artist !== 'Unknown Artist') {
+        const candArtist = (cand.primary_artists || cand.singers || cand.artist || "").toLowerCase();
+        const reqArtist = artist.toLowerCase().trim();
+        const artistWords = reqArtist.split(/[\s,]+/).filter((w) => w.length > 2);
+        const artistMatch = candArtist.includes(reqArtist) || (artistWords.length > 0 && artistWords.some((w) => candArtist.includes(w)));
+        if (!artistMatch) return false;
+      }
+
+      if (candTitle.includes("tribute") || candTitle.includes("mashup") || candTitle.includes("karaoke")) {
+        return false;
+      }
+
+      return true;
+    };
+
+    let item = Array.isArray(sData?.results) ? sData.results.find(isGoodMatch) : null;
+
+    // If not found with artist, try clean query alone with validation
+    if (!item && artist) {
       const fallbackUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=5&p=1&_marker=0&ctx=web6dot0&q=${encodeURIComponent(cleanQuery)}`;
       const fRes = await fetch(fallbackUrl, {
         headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
       });
       const fData = await fRes.json();
-      item = fData?.results?.[0];
+      item = Array.isArray(fData?.results) ? fData.results.find(isGoodMatch) : null;
     }
 
-    if (!item?.encrypted_media_url) {
-      // Fallback to autocomplete if search.getResults didn't find encrypted_media_url
+    if (!item) {
+      // Fallback to autocomplete if search.getResults didn't find a matching encrypted_media_url
       const autoUrl = `https://www.jiosaavn.com/api.php?__call=autocomplete.get&_format=json&_marker=0&cc=in&includeMetaTags=1&query=${encodeURIComponent(cleanQuery)}`;
       const aRes = await fetch(autoUrl, {
         headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
@@ -1612,7 +1634,10 @@ async function handleAudioStream(searchParams) {
           headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
         });
         const dData = await dRes.json();
-        item = dData[song.id];
+        const candItem = dData[song.id];
+        if (isGoodMatch(candItem)) {
+          item = candItem;
+        }
       }
     }
 

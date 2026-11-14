@@ -548,6 +548,15 @@ class PlayerEngine {
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.streamUrl && this.currentVideoId === cleanVideoId) {
+            const dataTitle = (data.title || '').toLowerCase().trim();
+            const reqTitle = title.toLowerCase().trim();
+            const isMatch = !dataTitle || dataTitle.includes(reqTitle) || reqTitle.includes(dataTitle);
+            if (!isMatch) {
+              console.warn('Direct stream title mismatch, falling back to authentic YouTube video:', data.title, 'vs', title);
+              this.fallbackToYouTube(cleanVideoId, autoPlay);
+              return;
+            }
+
             this.isDirectAudio = true;
             this.stopBackgroundAudioAnchor();
             if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {

@@ -67,13 +67,21 @@ const TopBar = () => {
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (!query.trim()) return;
+    setSuggestions([]);
     setIsFocused(false);
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
     navigate(`/search/${encodeURIComponent(query.trim())}`);
   };
 
   const handleSuggestionClick = (suggestion) => {
     setQuery(suggestion);
+    setSuggestions([]);
     setIsFocused(false);
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
     navigate(`/search/${encodeURIComponent(suggestion)}`);
   };
 
