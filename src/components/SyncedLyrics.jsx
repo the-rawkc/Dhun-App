@@ -22,8 +22,14 @@ const SyncedLyrics = ({ onClose }) => {
     setError(false);
     setLyricsData(null);
 
-    const cleanTitle = activeSong.title.replace(/\([^)]*\)|\[[^\]]*\]/g, '').trim();
-    const cleanArtist = (activeSong.artist || '').split(',')[0].trim();
+    const cleanTitle =
+      activeSong.title
+        .replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
+        .split(/\||\-|\:/)[0]
+        .replace(/\b(official video|official audio|lyric video|lyrical|video song|full song|audio|hd|4k|remix)\b/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim() || activeSong.title;
+    const cleanArtist = (activeSong.artist || '').split(',')[0].split('&')[0].trim();
 
     fetch(`${API_BASE}/api/lyrics?title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(cleanArtist)}`)
       .then((res) => res.json())

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
 import {
   playPause,
   togglePlayPauseNow,
@@ -51,35 +50,12 @@ const formatTime = (secs) => {
 
 const MusicPlayer = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
 
-  const handleArtistClick = (artistName, e) => {
-    e?.stopPropagation?.();
-    if (!artistName) return;
-    const clean = artistName.trim();
-    navigate(`/artists/${encodeURIComponent(clean)}?name=${encodeURIComponent(clean)}`);
-  };
-
+  // In the bottom small player bar, artist name is displayed as plain text (no redirect).
+  // Artist redirect is provided exclusively in the full-size player window (MobilePlayerModal).
   const renderArtistLinks = (artistString, customClass = '') => {
     if (!artistString) return null;
-    const parts = artistString.split(/,\s*|\s+&\s+/).map((p) => p.trim()).filter(Boolean);
-    if (parts.length === 0) return <span>{artistString}</span>;
-    return (
-      <span>
-        {parts.map((art, idx) => (
-          <React.Fragment key={idx}>
-            {idx > 0 && <span className="opacity-60">, </span>}
-            <span
-              onClick={(e) => handleArtistClick(art, e)}
-              className={`hover:underline hover:text-rose-500 cursor-pointer transition-colors ${customClass}`}
-              title={`View all songs by ${art}`}
-            >
-              {art}
-            </span>
-          </React.Fragment>
-        ))}
-      </span>
-    );
+    return <span className={`truncate ${customClass}`}>{artistString}</span>;
   };
   const {
     activeSong,

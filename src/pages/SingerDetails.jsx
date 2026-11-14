@@ -9,38 +9,62 @@ import { getArtistPhoto } from '../utils/artistPhotos';
 import { API_BASE } from '../services/apiConfig';
 
 export const isTrackByArtist = (track, artistName) => {
-  if (!artistName || !track) return true;
-  const targetName = artistName.trim().toLowerCase();
-  const targetClean = targetName.replace(/[^a-z0-9]/g, '');
-  const tokens = targetName
-    .split(/\s+/)
-    .map((w) => w.replace(/[^a-z0-9]/g, ''))
-    .filter((w) => w.length >= 3);
+  if (!artistName || !track) return false;
 
-  const artistFields = [
-    track.artist,
-    track.author,
-    track.channelTitle,
-    track.channel,
-    track.uploader,
-    track.singers,
-    track.primary_artists,
-    Array.isArray(track.artists)
-      ? track.artists.map((a) => (typeof a === 'string' ? a : a.name || '')).join(' ')
-      : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
+  // Clean target artist name (e.g. "Arijit Singh" -> "arijit singh")
+  const targetClean = artistName
+    .trim()
+    .toLowerCase()
+    .replace(/[\.\,\-\_]/g, ' ')
+    .replace(/\s+/g, ' ');
 
-  const artistClean = artistFields.replace(/[^a-z0-9]/g, '');
-  if (artistClean.includes(targetClean)) return true;
-  if (tokens.length > 0 && tokens.every((tok) => artistFields.includes(tok))) return true;
+  if (!targetClean) return false;
 
-  const titleStr = (track.title || track.name || '').toLowerCase();
-  const titleClean = titleStr.replace(/[^a-z0-9]/g, '');
-  if (titleClean.includes(targetClean)) return true;
-  if (tokens.length > 0 && tokens.every((tok) => titleStr.includes(tok))) return true;
+  // 1. Gather all strictly credited artist fields (exclude channels/uploaders)
+  const creditedList = [];
+  if (typeof track.artist === 'string' && track.artist.trim()) creditedList.push(track.artist);
+  if (typeof track.author === 'string' && track.author.trim()) creditedList.push(track.author);
+  if (typeof track.singers === 'string' && track.singers.trim()) creditedList.push(track.singers);
+  if (typeof track.primary_artists === 'string' && track.primary_artists.trim()) creditedList.push(track.primary_artists);
+  if (Array.isArray(track.artists)) {
+    track.artists.forEach((a) => {
+      if (typeof a === 'string') creditedList.push(a);
+      else if (a && typeof a.name === 'string') creditedList.push(a.name);
+    });
+  }
+
+  // Normalize credited artists string
+  const creditedStr = creditedList
+    .join(' , ')
+    .toLowerCase()
+    .replace(/[\.\,\-\_]/g, ' ')
+    .replace(/\s+/g, ' ');
+
+  // Direct full-name match in credited artists
+  if (creditedStr.includes(targetClean)) {
+    return true;
+  }
+
+  // Split credited artists into individual names (e.g. "Pritam, Arijit Singh" -> ["pritam", "arijit singh"])
+  const individualCredited = creditedList
+    .flatMap((s) => s.split(/[,&/|•\+]/))
+    .map((s) => s.trim().toLowerCase().replace(/[\.\,\-\_]/g, ' ').replace(/\s+/g, ' '))
+    .filter(Boolean);
+
+  if (individualCredited.some((name) => name === targetClean || name.includes(targetClean))) {
+    return true;
+  }
+
+  // 2. Title inspection - ONLY if title explicitly credits this artist as a singer
+  // e.g. "Song Name | Arijit Singh", "Song (feat. Arijit Singh)", "Song - Arijit Singh"
+  const rawTitle = (track.title || track.name || '')
+    .toLowerCase()
+    .replace(/[\.\,\-\_]/g, ' ')
+    .replace(/\s+/g, ' ');
+
+  if (rawTitle.includes(targetClean)) {
+    return true;
+  }
 
   return false;
 };

@@ -1743,14 +1743,44 @@ const INDIC_CHAR_MAP = {
   'શ': 'sh', 'ષ': 'sh', 'સ': 's', 'હ': 'h', 'ળ': 'l', 'ા': 'aa', 'િ': 'i', 'ી': 'ee', 'ુ': 'u', 'ૂ': 'oo', 'ે': 'e', 'ૈ': 'ai', 'ો': 'o', 'ૌ': 'au', '્': '', 'ં': 'n'
 };
 
+const GURMUKHI_TO_DEVANAGARI = {
+  'ਅ': 'अ', 'ਆ': 'आ', 'ਇ': 'इ', 'ਈ': 'ई', 'ਉ': 'उ', 'ਊ': 'ऊ', 'ਏ': 'ए', 'ਐ': 'ऐ', 'ਓ': 'ओ', 'ਔ': 'औ',
+  'ਕ': 'क', 'ਖ': 'ख', 'ਗ': 'ग', 'ਘ': 'घ', 'ਙ': 'ङ', 'ਚ': 'च', 'ਛ': 'छ', 'ਜ': 'ज', 'ਝ': 'झ', 'ਞ': 'ञ',
+  'ਟ': 'ट', 'ਠ': 'ठ', 'ਡ': 'ड', 'ਢ': 'ढ', 'ਣ': 'ण', 'ਤ': 'त', 'ਥ': 'थ', 'ਦ': 'द', 'ਧ': 'ध', 'ਨ': 'न',
+  'ਪ': 'प', 'ਫ': 'फ', 'ਬ': 'ब', 'ਭ': 'भ', 'ਮ': 'म', 'ਯ': 'य', 'ਰ': 'र', 'ਲ': 'ल', 'ਵ': 'व', 'ਸ': 'स', 'ਹ': 'ह',
+  'ੜ': 'ड़', 'ਸ਼': 'श', 'ਖ਼': 'ख़', 'ਗ਼': 'ग़', 'ਜ਼': 'ज़', 'ਫ਼': 'फ़', 'ਲ਼': 'ळ',
+  'ਾ': 'ा', 'ਿ': 'ि', 'ੀ': 'ी', 'ੁ': 'ु', 'ੂ': 'ू', 'ੇ': 'े', 'ੈ': 'ै', 'ੋ': 'ो', 'ੌ': 'ौ',
+  'ੰ': 'ं', 'ਂ': 'ं', '੍': '्', '਼': '़', 'ੴ': 'एक ओंकार'
+};
+
 function formatLyricsByLang(text) {
   if (!text || typeof text !== 'string') return text;
-  // If Devanagari Hindi only, leave as Hindi!
-  const hasHindi = /[\u0900-\u097F]/.test(text);
-  const hasNonHindiIndic = /[\u0980-\u0D7F]/.test(text);
-  if (hasHindi && !hasNonHindiIndic) return text;
-  if (!hasNonHindiIndic) return text;
 
+  // 1. Punjabi (Gurmukhi) -> Convert into Hindi (Devanagari) script!
+  if (/[\u0A00-\u0A7F]/.test(text)) {
+    let punjabiInHindi = '';
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === 'ੱ' && i + 1 < text.length) {
+        const nextCh = text[i + 1];
+        const nextDev = GURMUKHI_TO_DEVANAGARI[nextCh] || nextCh;
+        punjabiInHindi += nextDev + '्';
+      } else if (GURMUKHI_TO_DEVANAGARI[ch] !== undefined) {
+        punjabiInHindi += GURMUKHI_TO_DEVANAGARI[ch];
+      } else {
+        punjabiInHindi += ch;
+      }
+    }
+    return punjabiInHindi;
+  }
+
+  // 2. Hindi & Haryanvi (Devanagari \u0900-\u097F) -> Kept strictly in Hindi as-is!
+  const hasHindi = /[\u0900-\u097F]/.test(text);
+  const hasOtherIndic = /[\u0980-\u09FF\u0B80-\u0D7F]/.test(text);
+  if (hasHindi && !hasOtherIndic) return text;
+  if (!hasOtherIndic) return text;
+
+  // 3. Other regional scripts -> Roman transliteration
   let out = '';
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
@@ -1759,36 +1789,65 @@ function formatLyricsByLang(text) {
   return out;
 }
 
-// Verome-API/src/services/lyrics.ts
+function cleanTitleForLyrics(t) {
+  if (!t || typeof t !== 'string') return '';
+  return t
+    .replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
+    .split(/\||\-|\:/)[0]
+    .replace(/\b(official video|official audio|lyric video|lyrical|video song|full song|audio|hd|4k|remix|feat|ft)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function getLyrics(title, artist, duration) {
   try {
-    let url = `https://lrclib.net/api/get?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}`;
-    if (duration)
-      url += `&duration=${duration}`;
-    let response = await fetch(url);
-    let data = await response.json();
-    if (!data || data.statusCode === 404) {
-      const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(`${title} ${artist}`)}`;
-      response = await fetch(searchUrl);
-      const results = await response.json();
+    const cleanTitle = cleanTitleForLyrics(title) || title;
+    const cleanArtist = (artist || '').split(',')[0].split('&')[0].trim();
+
+    // 1. Try direct exact match with cleaned title & artist
+    let url = `https://lrclib.net/api/get?track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(cleanArtist)}`;
+    if (duration) url += `&duration=${duration}`;
+    let response = await fetch(url).catch(() => null);
+    let data = response && response.ok ? await response.json().catch(() => null) : null;
+
+    // 2. If not found, try search with cleaned title + artist
+    if (!data || data.statusCode === 404 || (!data.syncedLyrics && !data.plainLyrics)) {
+      const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(`${cleanTitle} ${cleanArtist}`)}`;
+      const sRes = await fetch(searchUrl).catch(() => null);
+      const results = sRes && sRes.ok ? await sRes.json().catch(() => []) : [];
       if (Array.isArray(results) && results.length > 0) {
-        // For non-Hindi songs, prefer Romanized/English results if available
-        const englishResult = results.find(
-          (r) =>
-            (r.syncedLyrics || r.plainLyrics) &&
-            /[a-zA-Z]/.test(r.syncedLyrics || r.plainLyrics) &&
-            !/[\u0980-\u0D7F]/.test(r.syncedLyrics || r.plainLyrics)
-        );
-        data = englishResult || results[0];
+        data = results.find((r) => r.syncedLyrics) || results[0];
       }
     }
-    if (!data || data.statusCode) {
+
+    // 3. If still not found, try search with clean title alone (finds covers / variant artist metadata)
+    if (!data || data.statusCode === 404 || (!data.syncedLyrics && !data.plainLyrics)) {
+      const searchUrlTitleOnly = `https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle)}`;
+      const sResTitle = await fetch(searchUrlTitleOnly).catch(() => null);
+      const resultsTitle = sResTitle && sResTitle.ok ? await sResTitle.json().catch(() => []) : [];
+      if (Array.isArray(resultsTitle) && resultsTitle.length > 0) {
+        data = resultsTitle.find((r) => r.syncedLyrics) || resultsTitle[0];
+      }
+    }
+
+    // 4. Fallback to raw original title & artist search
+    if (!data || data.statusCode === 404 || (!data.syncedLyrics && !data.plainLyrics)) {
+      const rawSearchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(`${title} ${artist}`)}`;
+      const rawRes = await fetch(rawSearchUrl).catch(() => null);
+      const rawResults = rawRes && rawRes.ok ? await rawRes.json().catch(() => []) : [];
+      if (Array.isArray(rawResults) && rawResults.length > 0) {
+        data = rawResults.find((r) => r.syncedLyrics) || rawResults[0];
+      }
+    }
+
+    if (!data || (!data.syncedLyrics && !data.plainLyrics)) {
       return { success: false, error: "Lyrics not found" };
     }
+
     return {
       success: true,
-      trackName: data.trackName,
-      artistName: data.artistName,
+      trackName: data.trackName || title,
+      artistName: data.artistName || artist,
       albumName: data.albumName,
       duration: data.duration,
       plainLyrics: formatLyricsByLang(data.plainLyrics),

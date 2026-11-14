@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -23,9 +23,162 @@ import {
   FaSearch,
   FaTimes,
   FaEdit,
+  FaEllipsisV,
 } from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
 import { API_BASE } from '../services/apiConfig';
+
+/**
+ * Intelligent Theme & Category Detector
+ * Categorizes a track by its musical genre/vibe/theme (e.g. Punjabi, Haryanvi, Romantic,
+ * Sad/Heartbreak, High-Energy Party, 90s Retro, Sufi, Desi Hip Hop) instead of just artist name.
+ */
+export const detectSongTheme = (track) => {
+  if (!track) return { name: 'Bollywood Hits', query: 'latest bollywood trending songs hits' };
+
+  const str = `${track.title || ''} ${track.artist || ''} ${track.subtitle || ''}`.toLowerCase();
+
+  // 1. Punjabi Hits & Beats
+  if (
+    str.includes('punjabi') ||
+    str.includes('diljit') ||
+    str.includes('aujla') ||
+    str.includes('dhillon') ||
+    str.includes('shubh') ||
+    str.includes('moose wala') ||
+    str.includes('karan aujla') ||
+    str.includes('b praak') ||
+    str.includes('sidhu') ||
+    str.includes('jatt') ||
+    str.includes('gabru') ||
+    str.includes('yaari') ||
+    str.includes('guru randhawa') ||
+    str.includes('harrdy sandhu')
+  ) {
+    return {
+      name: 'Punjabi Hits & Beats',
+      query: 'top trending punjabi songs latest beats',
+    };
+  }
+
+  // 2. Haryanvi Desi Hits
+  if (
+    str.includes('haryanvi') ||
+    str.includes('sapna') ||
+    str.includes('renuka') ||
+    str.includes('panwar') ||
+    str.includes('gulzaar') ||
+    str.includes('chhaniwala') ||
+    str.includes('dhanda') ||
+    str.includes('masoom sharma') ||
+    str.includes('raju punjabi') ||
+    str.includes('daman') ||
+    str.includes('desi records')
+  ) {
+    return {
+      name: 'Haryanvi Desi Hits',
+      query: 'top haryanvi songs latest desi hits',
+    };
+  }
+
+  // 3. Sad / Emotional / Heartbreak
+  if (
+    str.includes('sad') ||
+    str.includes('bewafa') ||
+    str.includes('judai') ||
+    str.includes('dard') ||
+    str.includes('roye') ||
+    str.includes('tanha') ||
+    str.includes('yaad') ||
+    str.includes('breakup') ||
+    str.includes('khamosh') ||
+    str.includes('bhula')
+  ) {
+    return {
+      name: 'Emotional & Heartbreak Melodies',
+      query: 'hindi sad songs heartbreak emotional hits',
+    };
+  }
+
+  // 4. Party / Dance / Club Beats
+  if (
+    str.includes('party') ||
+    str.includes('dance') ||
+    str.includes('nach') ||
+    str.includes('club') ||
+    str.includes('dhol') ||
+    str.includes('badshah') ||
+    str.includes('honey singh') ||
+    str.includes('remix') ||
+    str.includes('thumka') ||
+    str.includes('tauba')
+  ) {
+    return {
+      name: 'High-Energy Party & Dance',
+      query: 'bollywood party dance club hits high energy songs',
+    };
+  }
+
+  // 5. 90s & Retro Classics
+  if (
+    str.includes('90s') ||
+    str.includes('retro') ||
+    str.includes('classic') ||
+    str.includes('kumar sanu') ||
+    str.includes('alka yagnik') ||
+    str.includes('udit narayan') ||
+    str.includes('lata') ||
+    str.includes('kishore') ||
+    str.includes('rafi') ||
+    str.includes('evergreen')
+  ) {
+    return {
+      name: '90s Evergreen Classics',
+      query: '90s evergreen bollywood classic hit songs',
+    };
+  }
+
+  // 6. Sufi / Devotional / Soulful
+  if (
+    str.includes('sufi') ||
+    str.includes('qawwali') ||
+    str.includes('maula') ||
+    str.includes('khwaja') ||
+    str.includes('peer') ||
+    str.includes('bhajan') ||
+    str.includes('krishna') ||
+    str.includes('ram') ||
+    str.includes('shiv')
+  ) {
+    return {
+      name: 'Sufi & Soulful Melodies',
+      query: 'sufi hindi songs soulful qawwali spiritual',
+    };
+  }
+
+  // 7. Desi Hip Hop & Rap
+  if (
+    str.includes('rap') ||
+    str.includes('hip hop') ||
+    str.includes('hiphop') ||
+    str.includes('divine') ||
+    str.includes('mc stan') ||
+    str.includes('raftaar') ||
+    str.includes('emiway') ||
+    str.includes('king')
+  ) {
+    return {
+      name: 'Desi Hip Hop & Rap',
+      query: 'desi hip hop rap songs indian underground',
+    };
+  }
+
+  // 8. Romantic / Melodic Bollywood (Default)
+  return {
+    name: 'Romantic Bollywood Melodies',
+    query: 'top romantic hindi songs bollywood love hits',
+  };
+};
 
 const PlaylistDetails = () => {
   const { id } = useParams();
@@ -43,6 +196,20 @@ const PlaylistDetails = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(playlist?.title || '');
+  const [showMenu, setShowMenu] = useState(false);
+  const [detectedTheme, setDetectedTheme] = useState('');
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
 
   useEffect(() => {
     if (playlist?.title) {
@@ -91,7 +258,7 @@ const PlaylistDetails = () => {
       const currentIds = new Set(tracks.map((t) => t.videoId));
       const pool = [];
 
-      // 1. Fetch related tracks from /api/related/:id
+      // 1. Fetch related tracks from /api/related/:id (acoustic similarity)
       if (lastAddedTrack.videoId) {
         try {
           const res = await fetch(
@@ -103,16 +270,19 @@ const PlaylistDetails = () => {
         } catch (e) {}
       }
 
-      // 2. Supplement with similar/popular songs by same singer/artist
-      if (pool.length < 6 && lastAddedTrack.artist) {
-        try {
-          const sRes = await fetch(
-            `${API_BASE}/api/search?q=${encodeURIComponent(`${lastAddedTrack.artist} songs`)}&filter=songs`
-          );
-          const sData = await sRes.json();
-          if (Array.isArray(sData?.results)) pool.push(...sData.results);
-        } catch (e) {}
-      }
+      // 2. Fetch category & theme based songs (NOT singer based)
+      const theme = detectSongTheme(lastAddedTrack);
+      setDetectedTheme(theme.name);
+
+      try {
+        const themeRes = await fetch(
+          `${API_BASE}/api/search?q=${encodeURIComponent(theme.query)}&filter=songs&language=en&hl=en`
+        );
+        const themeData = await themeRes.json();
+        if (Array.isArray(themeData?.results)) {
+          pool.push(...themeData.results);
+        }
+      } catch (e) {}
 
       // Deduplicate and filter out songs already inside the playlist
       const seen = new Set();
@@ -298,14 +468,45 @@ const PlaylistDetails = () => {
               <span>Shuffle Play</span>
             </button>
 
-            {/* Delete Playlist */}
-            <button
-              onClick={handleDelete}
-              className="p-3 rounded-full bg-slate-500/10 hover:bg-rose-500/20 text-slate-400 hover:text-rose-500 transition-all"
-              title="Delete Playlist"
-            >
-              <FaTrashAlt className="text-sm" />
-            </button>
+            {/* 3-Dot Options Menu */}
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setShowMenu((prev) => !prev)}
+                className="p-3 rounded-full bg-slate-500/10 hover:bg-slate-500/25 text-slate-300 hover:text-white transition-all shadow-sm"
+                title="Playlist Options"
+                aria-label="Playlist Options"
+              >
+                <FaEllipsisV className="text-sm" />
+              </button>
+
+              {showMenu && (
+                <div className="absolute right-0 md:left-0 top-full mt-2 w-48 rounded-2xl theme-bg-card border theme-border shadow-2xl py-1.5 z-30 animate-fade-in backdrop-blur-xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMenu(false);
+                      setIsEditingTitle(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold theme-text-main hover:bg-slate-500/15 transition-colors text-left"
+                  >
+                    <FaEdit className="text-slate-400" />
+                    <span>Rename Playlist</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMenu(false);
+                      handleDelete();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 transition-colors text-left border-t theme-border"
+                  >
+                    <FaTrashAlt />
+                    <span>Delete Playlist</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -456,8 +657,9 @@ const PlaylistDetails = () => {
                   <span>✨ Recommended Songs</span>
                 </h4>
                 <p className="text-xs theme-text-muted mt-0.5">
-                  Suggested based on {tracks.length > 0 ? 'the last added song' : 'your playing song'} •{' '}
-                  <span className="text-rose-500 font-semibold">{lastAddedTrack.title}</span>
+                  Suggested by theme:{' '}
+                  <span className="text-rose-500 font-semibold">{detectedTheme || 'Genre & Vibe'}</span> •{' '}
+                  <span className="text-slate-400">{lastAddedTrack.title}</span>
                 </p>
               </div>
               <button

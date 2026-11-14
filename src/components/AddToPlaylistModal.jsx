@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -18,13 +18,33 @@ const AddToPlaylistModal = () => {
   const [showCreateInput, setShowCreateInput] = useState(false);
   const [addedMap, setAddedMap] = useState({});
 
+  const songKey = songToAddToPlaylist
+    ? songToAddToPlaylist.videoId || songToAddToPlaylist.id || songToAddToPlaylist.title
+    : null;
+
+  // Crucial fix: Clear temporary added flags whenever a new song is opened or modal toggles
+  useEffect(() => {
+    setAddedMap({});
+    setShowCreateInput(false);
+    setNewPlaylistTitle('');
+  }, [songKey, isAddToPlaylistModalOpen]);
+
   if (!isAddToPlaylistModalOpen || !songToAddToPlaylist) return null;
+
+  const handleClose = () => {
+    setAddedMap({});
+    setShowCreateInput(false);
+    setNewPlaylistTitle('');
+    dispatch(closeAddToPlaylistModal());
+  };
 
   const handleAddToPlaylist = (playlistId) => {
     dispatch(addTrackToPlaylist({ playlistId, song: songToAddToPlaylist }));
-    setAddedMap((prev) => ({ ...prev, [playlistId]: true }));
+    if (songKey) {
+      setAddedMap((prev) => ({ ...prev, [`${songKey}-${playlistId}`]: true }));
+    }
     setTimeout(() => {
-      dispatch(closeAddToPlaylistModal());
+      handleClose();
     }, 600);
   };
 
@@ -61,7 +81,7 @@ const AddToPlaylistModal = () => {
             </p>
           </div>
           <button
-            onClick={() => dispatch(closeAddToPlaylistModal())}
+            onClick={handleClose}
             className="p-2 rounded-full hover:bg-slate-500/10 theme-text-muted hover:theme-text-main"
           >
             <FaTimes />
@@ -89,7 +109,7 @@ const AddToPlaylistModal = () => {
             };
 
             const isAlreadyAdded = trks.some((t) => isSongInPlaylist(t, songToAddToPlaylist));
-            const isJustAdded = addedMap[pl.id];
+            const isJustAdded = songKey ? !!addedMap[`${songKey}-${pl.id}`] : false;
             const firstTrack = trks.length > 0 ? trks[0] : null;
             const plCover =
               firstTrack?.thumbnail ||

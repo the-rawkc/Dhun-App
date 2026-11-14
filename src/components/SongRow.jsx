@@ -39,15 +39,17 @@ const SongRow = ({ song, index, songs = [], showCover = true, isHighlightedLiked
 
   useEffect(() => {
     let mounted = true;
-    if (normalized.videoId) {
+    if (normalized?.videoId) {
       getOfflineTrack(normalized.videoId).then((item) => {
-        if (mounted && item) setDownloadStatus('downloaded');
+        if (mounted) setDownloadStatus(item ? 'downloaded' : 'idle');
       });
+    } else {
+      setDownloadStatus('idle');
     }
     return () => {
       mounted = false;
     };
-  }, [normalized.videoId]);
+  }, [normalized?.videoId]);
 
   // Click outside to close 3-dot menu
   useEffect(() => {

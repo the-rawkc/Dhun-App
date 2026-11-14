@@ -87,6 +87,21 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
   const [activeTab, setActiveTab] = useState('art'); // 'art' | 'lyrics'
   const [downloadStatus, setDownloadStatus] = useState('idle');
 
+  // Verify offline download status specifically for the current activeSong
+  useEffect(() => {
+    let mounted = true;
+    if (activeSong?.videoId) {
+      getOfflineTrack(activeSong.videoId).then((item) => {
+        if (mounted) setDownloadStatus(item ? 'downloaded' : 'idle');
+      });
+    } else {
+      setDownloadStatus('idle');
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [activeSong?.videoId]);
+
   // Handle mobile phone physical/gesture Back button via history popstate
   useEffect(() => {
     if (!isMobilePlayerOpen) return;
