@@ -1,9 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { playTrackNow, toggleFavoriteArtist } from '../redux/features/playerSlice';
 import SongRow from '../components/SongRow';
-import { FaPlay, FaCheckCircle, FaHeart, FaRegHeart, FaSpinner, FaSearch, FaTimes } from 'react-icons/fa';
+import ArtistCard from '../components/ArtistCard';
+import {
+  FaPlay,
+  FaCheckCircle,
+  FaHeart,
+  FaRegHeart,
+  FaSearch,
+  FaTimes,
+  FaCompactDisc,
+  FaMusic,
+  FaUsers,
+  FaChevronDown,
+  FaChevronUp,
+} from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
 import { getArtistPhoto } from '../utils/artistPhotos';
 import { API_BASE } from '../services/apiConfig';
@@ -25,7 +38,7 @@ export const isTrackByArtist = (track, artistName) => {
   const titleForbidden = [
     'mashup', 'jukebox', 'remix collection', 'top 10', 'top 20', 'non stop', 'non-stop',
     'playlist', 'best of', 'all songs', 'tribute to', 'in the style of', 'karaoke',
-    'cover by', 'reaction', 'guitar lesson', 'flute version', 'instrumental cover'
+    'cover by', 'reaction', 'guitar lesson', 'flute version', 'instrumental cover',
   ];
   if (titleForbidden.some((f) => rawTitle.includes(f))) {
     return false;
@@ -65,13 +78,10 @@ export const isTrackByArtist = (track, artistName) => {
     });
 
     if (hasArtist) return true;
-
-    // Explicit artists provided, but target artist NOT among them -> definitely another singer's song!
     return false;
   }
 
   // 3. Only if NO credited artists were provided by the API:
-  // Check if title has explicit singer credit: e.g. "Song Name ft. Artist"
   const titleClean = rawTitle.replace(/[\.\,\-\_]/g, ' ').replace(/\s+/g, ' ');
   if (
     titleClean.includes(`feat ${targetClean}`) ||
@@ -89,17 +99,26 @@ export const isTrackByArtist = (track, artistName) => {
 const SingerDetails = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
-  const artistName = searchParams.get('name') || decodeURIComponent(id || '');
+  const navigate = useNavigate();
   const dispatch = useDispatch();
+
+  const artistName = searchParams.get('name') || decodeURIComponent(id || '');
   const { favorites, favoriteArtists } = useSelector((state) => state.player);
 
   const [artistData, setArtistData] = useState(null);
   const [bio, setBio] = useState('');
-  const [songs, setSongs] = useState([]);
+  const [topSongs, setTopSongs] = useState([]);
+  const [allSongs, setAllSongs] = useState([]);
+  const [albums, setAlbums] = useState([]);
+  const [singles, setSingles] = useState([]);
+  const [featuredOn, setFeaturedOn] = useState([]);
+  const [relatedArtists, setRelatedArtists] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [continuationToken, setContinuationToken] = useState(null);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const sentinelRef = useRef(null);
+
+  // Spotify-style tabs & controls
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'albums' | 'singles' | 'featured'
+  const [showAllPopular, setShowAllPopular] = useState(false);
+  const [filterQuery, setFilterQuery] = useState('');
 
   const isFavoriteArtist = favoriteArtists.some(
     (a) => a.name.toLowerCase() === artistName.toLowerCase()
@@ -111,62 +130,65 @@ const SingerDetails = () => {
 
     const fetchArtistInfo = async () => {
       try {
-        if (artistName) {
-          const bioRes = await fetch(
-            `${API_BASE}/api/artist/info?artist=${encodeURIComponent(artistName)}`
-          );
-          const bioData = await bioRes.json();
-          if (isMounted && bioData?.bio) {
-            setBio(bioData.bio.replace(/<[^>]*>/g, '').split('Read more')[0].trim());
+        const queryId = id || artistName;
+        const res = await fetch(`${API_BASE}/api/artists/${encodeURIComponent(queryId)}`);
+        const data = await res.json();
+
+        if (isMounted && data?.success) {
+          setArtistData(data.artist || { name: artistName });
+
+          if (data.artist?.description) {
+            setBio(data.artist.description.replace(/<[^>]*>/g, '').split('Read more')[0].trim());
           }
+
+          // Top Songs (Popular)
+          const normTop = (data.topSongs || [])
+            .map((t) => normalizeSong(t, data.artist?.name || artistName))
+            .filter(Boolean);
+          setTopSongs(normTop);
+
+          // All Songs (Verified full discography)
+          let normAll = (data.allSongs || [])
+            .map((t) => normalizeSong(t, data.artist?.name || artistName))
+            .filter(Boolean);
+
+          // If no songs returned or very few, perform strict fallback
+          if (normAll.length === 0 && normTop.length > 0) {
+            normAll = [...normTop];
+          }
+
+          setAllSongs(normAll);
+          setAlbums(data.albums || []);
+          setSingles(data.singles || []);
+          setFeaturedOn(data.featuredOn || []);
+          setRelatedArtists(data.relatedArtists || []);
+        } else if (isMounted) {
+          // Fallback if backend returned error
+          setArtistData({ name: artistName });
+          const searchRes = await fetch(
+            `${API_BASE}/api/search?q=${encodeURIComponent(artistName)}&filter=songs&language=en&hl=en`
+          ).then((r) => r.json()).catch(() => ({}));
+
+          const fallbackSongs = (searchRes?.results || [])
+            .filter((t) => isTrackByArtist(t, artistName))
+            .map((t) => normalizeSong(t, artistName))
+            .filter(Boolean);
+
+          setTopSongs(fallbackSongs.slice(0, 10));
+          setAllSongs(fallbackSongs);
         }
 
-        const tracks = [];
-        let fetchedData = null;
-
-        if (id && id.startsWith('UC')) {
+        // Secondary bio fetch if needed
+        if (isMounted && !bio && artistName) {
           try {
-            const res = await fetch(`${API_BASE}/api/artists/${encodeURIComponent(id)}`);
-            fetchedData = await res.json();
-            if (fetchedData?.topSongs) tracks.push(...fetchedData.topSongs);
-            if (fetchedData?.songs?.results) tracks.push(...fetchedData.songs.results);
+            const bioRes = await fetch(
+              `${API_BASE}/api/artist/info?artist=${encodeURIComponent(artistName)}`
+            );
+            const bioData = await bioRes.json();
+            if (isMounted && bioData?.bio) {
+              setBio(bioData.bio.replace(/<[^>]*>/g, '').split('Read more')[0].trim());
+            }
           } catch (e) {}
-        }
-
-        // Comprehensive search for ALL songs by this artist
-        let nextTok = null;
-        if (artistName) {
-          try {
-            const [songsRes, hitsRes, topRes] = await Promise.all([
-              fetch(`${API_BASE}/api/search?q=${encodeURIComponent(`${artistName} songs`)}&filter=songs&language=en&hl=en`).then((r) => r.json()).catch(() => ({})),
-              fetch(`${API_BASE}/api/search?q=${encodeURIComponent(`${artistName} all hits`)}&filter=songs&language=en&hl=en`).then((r) => r.json()).catch(() => ({})),
-              fetch(`${API_BASE}/api/search?q=${encodeURIComponent(`${artistName} popular songs`)}&filter=songs&language=en&hl=en`).then((r) => r.json()).catch(() => ({})),
-            ]);
-
-            if (songsRes?.results?.length) tracks.push(...songsRes.results);
-            if (hitsRes?.results?.length) tracks.push(...hitsRes.results);
-            if (topRes?.results?.length) tracks.push(...topRes.results);
-
-            nextTok = songsRes?.continuationToken || hitsRes?.continuationToken || topRes?.continuationToken || null;
-          } catch (e) {}
-        }
-
-        // Deduplicate tracks by videoId
-        const seenIds = new Set();
-        const uniqueTracks = tracks.filter((t) => {
-          const vId = t.videoId || t.id;
-          if (!vId || seenIds.has(vId)) return false;
-          seenIds.add(vId);
-          return true;
-        });
-
-        // STRICT SINGER FILTER: Keep ONLY tracks that actually belong to / feature this singer!
-        const filteredTracks = uniqueTracks.filter((t) => isTrackByArtist(t, artistName));
-
-        if (isMounted) {
-          setArtistData(fetchedData?.artist || fetchedData || { name: artistName });
-          setSongs(filteredTracks.map((t) => normalizeSong(t)).filter(Boolean));
-          setContinuationToken(nextTok);
         }
       } catch (err) {
         console.warn('Artist details load error:', err);
@@ -182,132 +204,120 @@ const SingerDetails = () => {
     };
   }, [id, artistName]);
 
-  // Infinite Scroll Handler: loads songs, hides automatically when list is finished
-  const handleLoadMore = async () => {
-    if (!continuationToken || isLoadingMore) return;
-    setIsLoadingMore(true);
-
-    try {
-      const res = await fetch(`${API_BASE}/api/search?continuationToken=${encodeURIComponent(continuationToken)}&language=en&hl=en`);
-      const data = await res.json();
-
-      if (data?.results?.length) {
-        let addedCount = 0;
-        const newSongs = data.results
-          .filter((t) => isTrackByArtist(t, artistName))
-          .map((t) => normalizeSong(t))
-          .filter(Boolean);
-
-        setSongs((prev) => {
-          const seen = new Set(prev.map((s) => s.videoId));
-          const uniqueNew = newSongs.filter((s) => !seen.has(s.videoId));
-          addedCount = uniqueNew.length;
-          return [...prev, ...uniqueNew];
-        });
-
-        // If no new unique tracks were added, or no continuation token returned, list is finished!
-        if (addedCount === 0 || !data?.continuationToken) {
-          setContinuationToken(null);
-        } else {
-          setContinuationToken(data.continuationToken);
-        }
-      } else {
-        // No more results returned, list is finished!
-        setContinuationToken(null);
-      }
-    } catch (err) {
-      console.warn('Error loading more songs:', err);
-      setContinuationToken(null); // Clear token to hide load more indicator on end/error
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
-
-  // Auto-trigger infinite load when scrolling near bottom
-  useEffect(() => {
-    if (!sentinelRef.current || !continuationToken || isLoadingMore) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          handleLoadMore();
-        }
-      },
-      { rootMargin: '300px' }
-    );
-
-    observer.observe(sentinelRef.current);
-    return () => observer.disconnect();
-  }, [continuationToken, isLoadingMore]);
-
-  // Sort criteria: Liked songs by this artist at the very top!
+  // Liked songs by this artist prioritized at the top
   const favSet = new Set(favorites.map((f) => f.videoId));
-  const likedByArtist = songs.filter((s) => favSet.has(s.videoId));
-  const otherSongs = songs.filter((s) => !favSet.has(s.videoId));
-  const prioritizedSongs = [...likedByArtist, ...otherSongs];
+  const likedByArtist = allSongs.filter((s) => favSet.has(s.videoId));
+  const otherSongs = allSongs.filter((s) => !favSet.has(s.videoId));
+  const prioritizedAllSongs = [...likedByArtist, ...otherSongs];
 
-  const [filterQuery, setFilterQuery] = useState('');
-
-  const displayedSongs = filterQuery.trim()
-    ? prioritizedSongs.filter((s) => {
+  // In-page search filter for All Songs
+  const displayedAllSongs = filterQuery.trim()
+    ? prioritizedAllSongs.filter((s) => {
         const q = filterQuery.toLowerCase().trim();
         const tMatch = (s.title || '').toLowerCase().includes(q);
         const aMatch = (s.artist || '').toLowerCase().includes(q);
         return tMatch || aMatch;
       })
-    : prioritizedSongs;
-
-  const handlePlayAll = () => {
-    if (displayedSongs.length > 0) {
-      dispatch(playTrackNow({ song: displayedSongs[0], songs: displayedSongs, index: 0 }));
-    }
-  };
+    : prioritizedAllSongs;
 
   const displayName = artistData?.name || artistName || 'Artist';
   const rawImage =
     artistData?.thumbnail ||
     artistData?.thumbnails?.[0]?.url ||
-    songs[0]?.thumbnail ||
-    songs[0]?.cover ||
+    topSongs[0]?.thumbnail ||
+    allSongs[0]?.thumbnail ||
     '';
   const displayImage = getArtistPhoto(displayName, rawImage);
 
+  // Play controls
+  const handlePlayAll = () => {
+    const listToPlay = topSongs.length > 0 ? topSongs : displayedAllSongs;
+    if (listToPlay.length > 0) {
+      dispatch(playTrackNow({ song: listToPlay[0], songs: listToPlay, index: 0 }));
+    }
+  };
+
   const handleFollowArtist = () => {
-    dispatch(toggleFavoriteArtist({ name: displayName, image: displayImage, browseId: id }));
+    dispatch(
+      toggleFavoriteArtist({
+        name: displayName,
+        image: displayImage,
+        browseId: artistData?.browseId || id,
+      })
+    );
+  };
+
+  const popularLimit = showAllPopular ? 10 : 5;
+  const popularSongs = topSongs.slice(0, popularLimit);
+
+  const handlePlayAlbum = async (e, item) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch(`${API_BASE}/api/albums/${encodeURIComponent(item.browseId)}`);
+      const data = await res.json();
+      if (data?.tracks?.length > 0) {
+        const normTracks = data.tracks
+          .map((t) =>
+            normalizeSong(
+              {
+                ...t,
+                artist: t.artist || data.artist?.name || displayName,
+                thumbnail: t.thumbnail || item.thumbnail || data.album?.thumbnail,
+              },
+              displayName
+            )
+          )
+          .filter(Boolean);
+        if (normTracks.length > 0) {
+          dispatch(playTrackNow({ song: normTracks[0], songs: normTracks, index: 0 }));
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to quick-play album/single:', err);
+    }
+    navigate(`/album/${item.browseId}?name=${encodeURIComponent(item.title)}`);
   };
 
   return (
     <div className="flex flex-col gap-8 pb-28 select-none animate-fade-in">
-      {/* Compact Artist Header (Photo & Name only) */}
-      <div className="relative rounded-2xl overflow-hidden p-4 sm:p-5 bg-gradient-to-br from-rose-950/30 via-red-950/20 to-dark-900 border border-rose-500/20 shadow-lg flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-dark-950 shadow-md border-2 border-rose-500/30 shrink-0">
+      {/* ─── Spotify-Style Artist Header ────────────────────────────────────── */}
+      <div className="relative rounded-3xl overflow-hidden p-6 sm:p-8 bg-gradient-to-br from-rose-950/40 via-red-950/20 to-dark-900 border border-rose-500/20 shadow-xl flex flex-col sm:flex-row items-center sm:items-end gap-6">
+        <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full overflow-hidden bg-dark-950 shadow-2xl border-4 border-rose-500/30 shrink-0">
           <img src={displayImage} alt={displayName} className="w-full h-full object-cover" />
         </div>
 
         <div className="flex-1 text-center sm:text-left">
-          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[11px] font-semibold mb-1">
-            <FaCheckCircle className="text-[10px]" />
-            <span>Artist</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs font-bold mb-2">
+            <FaCheckCircle className="text-xs" />
+            <span>Verified Artist</span>
           </div>
 
-          <h1 className="text-xl sm:text-3xl font-extrabold theme-text-main tracking-tight">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-black theme-text-main tracking-tight leading-tight">
             {displayName}
           </h1>
 
-          <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+          {artistData?.subscribers && (
+            <p className="text-xs sm:text-sm theme-text-muted mt-1.5 flex items-center justify-center sm:justify-start gap-1.5">
+              <FaUsers className="text-rose-500 text-xs" />
+              <span>{artistData.subscribers} subscribers</span>
+            </p>
+          )}
+
+          {/* Action Row: Big Spotify Play & Follow */}
+          <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-3">
             <button
               onClick={handlePlayAll}
-              disabled={prioritizedSongs.length === 0}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
+              disabled={topSongs.length === 0 && allSongs.length === 0}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
             >
-              <FaPlay className="text-[10px]" />
-              <span>Play All</span>
+              <FaPlay className="text-xs" />
+              <span>Play</span>
             </button>
 
-            {/* Favorite / Follow Artist button */}
             <button
               onClick={handleFollowArtist}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-full border text-xs sm:text-sm font-bold transition-all shadow-sm ${
                 isFavoriteArtist
                   ? 'bg-rose-600 text-white border-rose-600'
                   : 'bg-slate-500/10 hover:bg-slate-500/20 theme-text-main border-slate-500/30'
@@ -320,86 +330,297 @@ const SingerDetails = () => {
         </div>
       </div>
 
-      {/* All Discography Songs */}
-      <div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-          <h2 className="text-xl md:text-2xl font-bold theme-text-main">
-            All Songs by {displayName} ({displayedSongs.length})
-          </h2>
-
-          {/* In-page search bar to search inside singer's playlist */}
-          <div className="relative w-full sm:w-72">
-            <input
-              type="text"
-              value={filterQuery}
-              onChange={(e) => setFilterQuery(e.target.value)}
-              placeholder={`Search in ${displayName}...`}
-              className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-500/10 border theme-border theme-text-main placeholder-slate-400 text-xs focus:outline-none focus:border-rose-500 transition-all"
-            />
-            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-xs theme-text-muted" />
-            {filterQuery && (
-              <button
-                type="button"
-                onClick={() => setFilterQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 theme-text-muted hover:theme-text-main"
-              >
-                <FaTimes className="text-xs" />
-              </button>
-            )}
-          </div>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+          <div className="w-10 h-10 border-3 border-rose-500/30 border-t-rose-500 rounded-full animate-spin" />
+          <p className="text-xs font-semibold">Loading official discography...</p>
         </div>
+      ) : (
+        <>
+          {/* ─── Spotify Section 1: Popular Tracks ───────────────────────────── */}
+          {topSongs.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xl md:text-2xl font-black theme-text-main">Popular</h2>
+              </div>
 
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
-            <div className="w-8 h-8 border-3 border-rose-500/30 border-t-rose-500 rounded-full animate-spin" />
-            <p className="text-xs">Loading complete songs...</p>
-          </div>
-        ) : displayedSongs.length > 0 ? (
+              <div className="space-y-1">
+                {popularSongs.map((song, i) => (
+                  <SongRow
+                    key={song.videoId || i}
+                    song={song}
+                    index={i}
+                    songs={topSongs}
+                    isHighlightedLiked={favSet.has(song.videoId)}
+                  />
+                ))}
+              </div>
+
+              {topSongs.length > 5 && (
+                <button
+                  onClick={() => setShowAllPopular(!showAllPopular)}
+                  className="mt-3 text-xs font-bold theme-text-muted hover:theme-text-main flex items-center gap-1.5 transition-colors"
+                >
+                  <span>{showAllPopular ? 'Show less' : 'See more'}</span>
+                  {showAllPopular ? <FaChevronUp className="text-[10px]" /> : <FaChevronDown className="text-[10px]" />}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ─── Spotify Section 2: Discography Tabs ─────────────────────────── */}
           <div>
-            <div className="space-y-1">
-              {displayedSongs.map((song, i) => (
-                <SongRow
-                  key={song.videoId || i}
-                  song={song}
-                  index={i}
-                  songs={displayedSongs}
-                  isHighlightedLiked={favSet.has(song.videoId)}
-                />
-              ))}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl md:text-2xl font-black theme-text-main">Discography</h2>
             </div>
 
-            {/* Sentinel for auto infinite-scroll - only when continuation exists and not loading */}
-            {continuationToken && !isLoadingMore && (
-              <div ref={sentinelRef} className="h-4" />
-            )}
+            {/* Filter Pills */}
+            <div className="flex flex-wrap items-center gap-2 mb-4 border-b theme-border pb-3">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  activeTab === 'all'
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                    : 'bg-slate-500/10 hover:bg-slate-500/20 theme-text-muted hover:theme-text-main'
+                }`}
+              >
+                All Songs ({displayedAllSongs.length})
+              </button>
 
-            {/* Load More Trigger & Indicator - completely hidden when list of songs is finished */}
-            {continuationToken && (
-              <div className="flex flex-col items-center justify-center py-6 gap-2">
-                {isLoadingMore ? (
-                  <div className="flex items-center gap-2 text-rose-500 text-xs font-semibold">
-                    <div className="w-5 h-5 border-2 border-rose-500/30 border-t-rose-500 rounded-full animate-spin" />
-                    <span>Loading more songs...</span>
+              {albums.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('albums')}
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                    activeTab === 'albums'
+                      ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                      : 'bg-slate-500/10 hover:bg-slate-500/20 theme-text-muted hover:theme-text-main'
+                  }`}
+                >
+                  Albums ({albums.length})
+                </button>
+              )}
+
+              {singles.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('singles')}
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                    activeTab === 'singles'
+                      ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                      : 'bg-slate-500/10 hover:bg-slate-500/20 theme-text-muted hover:theme-text-main'
+                  }`}
+                >
+                  Singles & EPs ({singles.length})
+                </button>
+              )}
+
+              {featuredOn.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('featured')}
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                    activeTab === 'featured'
+                      ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                      : 'bg-slate-500/10 hover:bg-slate-500/20 theme-text-muted hover:theme-text-main'
+                  }`}
+                >
+                  Appears On ({featuredOn.length})
+                </button>
+              )}
+            </div>
+
+            {/* TAB CONTENT: All Songs */}
+            {activeTab === 'all' && (
+              <div>
+                {/* In-page search bar inside artist catalog */}
+                <div className="relative w-full sm:w-80 mb-4">
+                  <input
+                    type="text"
+                    value={filterQuery}
+                    onChange={(e) => setFilterQuery(e.target.value)}
+                    placeholder={`Search within ${displayName}'s songs...`}
+                    className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-500/10 border theme-border theme-text-main placeholder-slate-400 text-xs focus:outline-none focus:border-rose-500 transition-all"
+                  />
+                  <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-xs theme-text-muted" />
+                  {filterQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 theme-text-muted hover:theme-text-main"
+                    >
+                      <FaTimes className="text-xs" />
+                    </button>
+                  )}
+                </div>
+
+                {displayedAllSongs.length > 0 ? (
+                  <div className="space-y-1">
+                    {displayedAllSongs.map((song, i) => (
+                      <SongRow
+                        key={song.videoId || i}
+                        song={song}
+                        index={i}
+                        songs={displayedAllSongs}
+                        isHighlightedLiked={favSet.has(song.videoId)}
+                      />
+                    ))}
                   </div>
                 ) : (
-                  <button
-                    onClick={handleLoadMore}
-                    className="px-6 py-2.5 rounded-full bg-slate-500/10 hover:bg-rose-600 hover:text-white theme-text-main font-bold text-xs transition-all shadow-sm flex items-center gap-2"
-                  >
-                    <span>Load More Songs</span>
-                  </button>
+                  <div className="py-12 text-center theme-text-muted text-sm">
+                    {filterQuery
+                      ? `No songs found matching "${filterQuery}"`
+                      : 'No tracks found in verified catalog.'}
+                  </div>
                 )}
               </div>
             )}
+
+            {/* TAB CONTENT: Albums */}
+            {activeTab === 'albums' && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {albums.map((album, idx) => (
+                  <div
+                    key={album.browseId || idx}
+                    onClick={() =>
+                      navigate(`/album/${album.browseId}?name=${encodeURIComponent(album.title)}`)
+                    }
+                    className="group relative p-3 rounded-2xl glass-card cursor-pointer select-none transition-all duration-300 hover:scale-[1.03]"
+                  >
+                    <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-dark-900 shadow-md mb-2.5">
+                      <img
+                        src={album.thumbnail || '/placeholder-album.png'}
+                        alt={album.title}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={(e) => handlePlayAlbum(e, album)}
+                          className="w-10 h-10 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg transform translate-y-2 group-hover:translate-y-0 hover:scale-110 transition-all cursor-pointer"
+                          title="Play album"
+                        >
+                          <FaPlay className="text-xs translate-x-0.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <h3 className="font-bold text-xs sm:text-sm theme-text-main truncate" title={album.title}>
+                      {album.title}
+                    </h3>
+                    <p className="text-[11px] theme-text-muted mt-0.5">
+                      {album.year ? `${album.year} • ` : ''}Album
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* TAB CONTENT: Singles & EPs */}
+            {activeTab === 'singles' && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {singles.map((single, idx) => (
+                  <div
+                    key={single.browseId || idx}
+                    onClick={() =>
+                      navigate(`/album/${single.browseId}?name=${encodeURIComponent(single.title)}`)
+                    }
+                    className="group relative p-3 rounded-2xl glass-card cursor-pointer select-none transition-all duration-300 hover:scale-[1.03]"
+                  >
+                    <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-dark-900 shadow-md mb-2.5">
+                      <img
+                        src={single.thumbnail || '/placeholder-album.png'}
+                        alt={single.title}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={(e) => handlePlayAlbum(e, single)}
+                          className="w-10 h-10 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg transform translate-y-2 group-hover:translate-y-0 hover:scale-110 transition-all cursor-pointer"
+                          title="Play single"
+                        >
+                          <FaPlay className="text-xs translate-x-0.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <h3 className="font-bold text-xs sm:text-sm theme-text-main truncate" title={single.title}>
+                      {single.title}
+                    </h3>
+                    <p className="text-[11px] theme-text-muted mt-0.5">
+                      {single.year ? `${single.year} • ` : ''}Single
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* TAB CONTENT: Featured On */}
+            {activeTab === 'featured' && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {featuredOn.map((feat, idx) => (
+                  <div
+                    key={feat.browseId || feat.videoId || idx}
+                    onClick={() => {
+                      if (feat.browseId) {
+                        navigate(`/album/${feat.browseId}?name=${encodeURIComponent(feat.title)}`);
+                      }
+                    }}
+                    className="group relative p-3 rounded-2xl glass-card cursor-pointer select-none transition-all duration-300 hover:scale-[1.03]"
+                  >
+                    <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-dark-900 shadow-md mb-2.5">
+                      <img
+                        src={feat.thumbnail || '/placeholder-album.png'}
+                        alt={feat.title}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    </div>
+                    <h3 className="font-bold text-xs sm:text-sm theme-text-main truncate" title={feat.title}>
+                      {feat.title}
+                    </h3>
+                    {feat.subtitle && (
+                      <p className="text-[11px] theme-text-muted mt-0.5 truncate">{feat.subtitle}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="py-12 text-center theme-text-muted text-sm">
-            {filterQuery
-              ? `No songs found matching "${filterQuery}" by ${displayName}`
-              : 'No tracks found for this artist.'}
-          </div>
-        )}
-      </div>
+
+          {/* ─── Spotify Section 3: Fans Also Like ──────────────────────────── */}
+          {relatedArtists.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xl md:text-2xl font-black theme-text-main">Fans Also Like</h2>
+              </div>
+
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                {relatedArtists.slice(0, 8).map((rel, idx) => (
+                  <ArtistCard
+                    key={rel.browseId || idx}
+                    artist={{
+                      name: rel.name,
+                      browseId: rel.browseId,
+                      thumbnail: rel.thumbnail,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ─── Spotify Section 4: About / Bio ─────────────────────────────── */}
+          {bio && (
+            <div className="rounded-2xl p-5 bg-slate-500/5 border theme-border shadow-sm">
+              <h3 className="text-base font-bold theme-text-main mb-2">About {displayName}</h3>
+              <p className="text-xs sm:text-sm theme-text-muted leading-relaxed line-clamp-4 hover:line-clamp-none transition-all cursor-pointer">
+                {bio}
+              </p>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

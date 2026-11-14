@@ -160,6 +160,7 @@ function parseMusicItem(item) {
     thumbnails: [{ url: thumbnail || (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "") }],
     videoId,
     browseId,
+    artist: (artists && artists[0]?.name) || "",
     artists,
     duration,
     resultType
@@ -294,12 +295,15 @@ var YTMusic = class {
     const header = data?.header?.musicImmersiveHeaderRenderer || data?.header?.musicVisualHeaderRenderer || {};
     const contents = data?.contents?.singleColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
     const topSongs = [], albums = [], singles = [], videos = [];
+    let topSongsPlaylistId = null;
+    const featuredOn = [], similar = [];
     for (const section of contents) {
       const shelf = section.musicShelfRenderer;
       const carousel = section.musicCarouselShelfRenderer;
       if (shelf) {
         const t = shelf.title?.runs?.[0]?.text?.toLowerCase() || "";
         if (t.includes("song")) {
+          topSongsPlaylistId = shelf.bottomEndpoint?.browseEndpoint?.browseId || shelf.title?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId || null;
           for (const item of shelf.contents || []) {
             const parsed = parseMusicItem(item.musicResponsiveListItemRenderer);
             if (parsed)
@@ -316,6 +320,10 @@ var YTMusic = class {
           singles.push(...items);
         else if (t.includes("video"))
           videos.push(...items);
+        else if (t.includes("featured") || t.includes("appears on"))
+          featuredOn.push(...items);
+        else if (t.includes("fans might also like") || t.includes("similar"))
+          similar.push(...items);
       }
     }
     return {
@@ -325,9 +333,12 @@ var YTMusic = class {
       thumbnail: header.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.slice(-1)[0]?.url,
       subscribers: header.subscriptionButton?.subscribeButtonRenderer?.subscriberCountText?.runs?.[0]?.text,
       topSongs,
+      topSongsPlaylistId,
       albums,
       singles,
-      videos
+      videos,
+      featuredOn,
+      similar
     };
   }
   async getArtistSummary(artistId, country = "US") {
@@ -978,25 +989,58 @@ async function getAlbumComplete(browseId, ytmusic2) {
   };
 }
 async function getArtistComplete(browseId, ytmusic2) {
-  const artist = await ytmusic2.getArtist(browseId);
+  let targetBrowseId = browseId;
+  let resolvedName = decodeURIComponent(browseId);
+  if (!targetBrowseId.startsWith("UC") && !targetBrowseId.startsWith("FE") && !targetBrowseId.startsWith("MPLA")) {
+    try {
+      const searchRes = await ytmusic2.search(resolvedName, "artists");
+      const cleanTarget = resolvedName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const match = searchRes?.results?.find(a => {
+        const cleanA = (a.title || a.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        return cleanA === cleanTarget || cleanA.includes(cleanTarget) || cleanTarget.includes(cleanA);
+      }) || searchRes?.results?.[0];
+      if (match?.browseId) {
+        targetBrowseId = match.browseId;
+      }
+    } catch (e) {
+      console.warn("Failed to search artist browseId:", e);
+    }
+  }
+
+  const artist = await ytmusic2.getArtist(targetBrowseId);
   if (!artist?.name)
     return { success: false, error: "Artist not found" };
-  const allSongs = [...artist.topSongs || []];
-  try {
-    const fullSongsSearch = await ytmusic2.search(artist.name, "songs");
-    if (fullSongsSearch?.results?.length) {
-      allSongs.push(...fullSongsSearch.results);
+
+  const topSongs = (artist.topSongs || []).map((s) => ({
+    videoId: s.videoId,
+    title: s.title,
+    artist: s.artist || s.artists?.[0]?.name || artist.name,
+    thumbnail: s.thumbnails?.[0]?.url || s.thumbnail,
+    duration: s.duration
+  }));
+
+  const allSongs = [...topSongs];
+  if (artist.topSongsPlaylistId) {
+    try {
+      const playlist = await ytmusic2.getPlaylist(artist.topSongsPlaylistId);
+      if (playlist?.tracks?.length) {
+        for (const t of playlist.tracks) {
+          if (t.videoId && !allSongs.some(s => s.videoId === t.videoId)) {
+            allSongs.push({
+              videoId: t.videoId,
+              title: t.title,
+              artist: t.artist || t.artists?.[0]?.name || artist.name,
+              thumbnail: t.thumbnails?.[0]?.url || t.thumbnail,
+              duration: t.duration
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch top songs playlist:", err);
     }
-  } catch (err) {
-    console.warn("Failed to fetch artist full songs catalog:", err);
   }
-  const seenIds = /* @__PURE__ */ new Set();
-  const dedupedSongs = allSongs.filter((s) => {
-    if (!s?.videoId || seenIds.has(s.videoId))
-      return false;
-    seenIds.add(s.videoId);
-    return true;
-  });
+
   return {
     success: true,
     artist: {
@@ -1006,24 +1050,37 @@ async function getArtistComplete(browseId, ytmusic2) {
       thumbnail: artist.thumbnail,
       subscribers: artist.subscribers
     },
-    topSongs: dedupedSongs.map((s) => ({
-      videoId: s.videoId,
-      title: s.title,
-      artist: s.artist || s.artists && s.artists[0]?.name || artist.name,
-      thumbnail: s.thumbnails?.[0]?.url || s.thumbnail,
-      duration: s.duration
-    })),
-    albums: artist.albums.map((a) => ({
+    topSongs: topSongs.slice(0, 10),
+    allSongs,
+    albums: (artist.albums || []).map((a) => ({
       browseId: a.browseId,
       title: a.title,
       year: a.subtitle?.match(/\d{4}/)?.[0] || null,
       thumbnail: a.thumbnails?.[0]?.url
     })),
-    singles: artist.singles.map((s) => ({
+    singles: (artist.singles || []).map((s) => ({
       browseId: s.browseId,
       title: s.title,
       year: s.subtitle?.match(/\d{4}/)?.[0] || null,
       thumbnail: s.thumbnails?.[0]?.url
+    })),
+    videos: (artist.videos || []).map((v) => ({
+      videoId: v.videoId,
+      title: v.title,
+      thumbnail: v.thumbnails?.[0]?.url
+    })),
+    featuredOn: (artist.featuredOn || []).map((f) => ({
+      browseId: f.browseId,
+      videoId: f.videoId,
+      playlistId: f.playlistId,
+      title: f.title,
+      subtitle: f.subtitle,
+      thumbnail: f.thumbnails?.[0]?.url
+    })),
+    relatedArtists: (artist.similar || []).map((r) => ({
+      browseId: r.browseId,
+      name: r.title,
+      thumbnail: r.thumbnails?.[0]?.url
     }))
   };
 }
