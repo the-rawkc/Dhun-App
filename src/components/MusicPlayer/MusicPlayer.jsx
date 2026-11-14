@@ -90,9 +90,7 @@ const MusicPlayer = () => {
   useEffect(() => {
     if (activeSong) {
       const vId = activeSong.videoId;
-      if (playerEngine.currentTrack?.title !== activeSong.title || (vId && playerEngine.currentVideoId !== vId)) {
-        playerEngine.loadVideo(vId || activeSong, true, activeSong);
-      }
+      playerEngine.loadVideo(vId || activeSong, true, activeSong);
 
       if (vId && isValidVideoId(vId)) {
         setDownloadStatus(isTrackDownloadedSync(vId) ? 'downloaded' : 'idle');
@@ -105,7 +103,7 @@ const MusicPlayer = () => {
         setDownloadStatus('idle');
       }
     }
-  }, [activeSong]);
+  }, [activeSong?.videoId, activeSong?.title]);
 
   // Sync volume & mute to engine
   useEffect(() => {

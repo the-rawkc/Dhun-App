@@ -158,6 +158,8 @@ class PlayerEngine {
     });
 
     this.audioEl.addEventListener('error', (err) => {
+      if (!this.audioEl?.src || this.audioEl.src === window.location.href) return;
+      if (!this.isDirectAudio && !this.isOfflinePlayback) return;
       console.warn('Direct native audio stream error, falling back to YouTube:', err);
       if (this.currentVideoId && !this.isOfflinePlayback) {
         this.fallbackToYouTube(this.currentVideoId, this.shouldBePlaying);
@@ -467,12 +469,11 @@ class PlayerEngine {
       this.activeAbortController = null;
     }
 
-    // Flush previous audio buffer to ensure instantaneous, smooth transition
+    // Pause and reset previous audio element cleanly without triggering empty-src MediaErrors
     if (this.audioEl) {
       try {
         this.audioEl.pause();
-        this.audioEl.removeAttribute('src');
-        this.audioEl.load();
+        this.audioEl.currentTime = 0;
       } catch (e) {}
     }
 
@@ -594,7 +595,7 @@ class PlayerEngine {
     if (this.audioEl) {
       try {
         this.audioEl.pause();
-        this.audioEl.src = '';
+        this.audioEl.currentTime = 0;
       } catch (e) {}
     }
 
