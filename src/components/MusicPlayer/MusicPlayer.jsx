@@ -88,23 +88,24 @@ const MusicPlayer = () => {
 
   // Load new song when activeSong changes
   useEffect(() => {
-    const vId = activeSong?.videoId;
-    if (vId && isValidVideoId(vId)) {
-      if (playerEngine.currentVideoId !== vId) {
-        playerEngine.loadVideo(vId, true, activeSong);
+    if (activeSong) {
+      const vId = activeSong.videoId;
+      if (playerEngine.currentTrack?.title !== activeSong.title || (vId && playerEngine.currentVideoId !== vId)) {
+        playerEngine.loadVideo(vId || activeSong, true, activeSong);
       }
 
-      // Immediate synchronous cache check then verify with IndexedDB
-      setDownloadStatus(isTrackDownloadedSync(vId) ? 'downloaded' : 'idle');
-      getOfflineTrack(vId).then((item) => {
-        setDownloadStatus(item ? 'downloaded' : 'idle');
-      }).catch(() => {
+      if (vId && isValidVideoId(vId)) {
+        setDownloadStatus(isTrackDownloadedSync(vId) ? 'downloaded' : 'idle');
+        getOfflineTrack(vId).then((item) => {
+          setDownloadStatus(item ? 'downloaded' : 'idle');
+        }).catch(() => {
+          setDownloadStatus('idle');
+        });
+      } else {
         setDownloadStatus('idle');
-      });
-    } else {
-      setDownloadStatus('idle');
+      }
     }
-  }, [activeSong?.videoId]);
+  }, [activeSong]);
 
   // Sync volume & mute to engine
   useEffect(() => {

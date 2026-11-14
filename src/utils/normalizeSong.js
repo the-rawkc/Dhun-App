@@ -51,53 +51,63 @@ export const transliterateToEnglish = (text) => {
   return res.replace(/a([aeiou])/gi, '$1').replace(/\s+/g, ' ').trim();
 };
 
-export const toEnglishText = (raw) => {
-  if (!raw || typeof raw !== 'string') return '';
-  let clean = raw.trim();
+export const cleanSongTitle = (rawTitle, artist = '') => {
+  if (!rawTitle || typeof rawTitle !== 'string') return 'Unknown Track';
+
+  let clean = rawTitle.trim();
 
   // Clean unicode replacement character artifacts
   clean = clean.replace(/\uFFFD/g, '').replace(/\?{2,}/g, '').trim();
 
   // Remove common YouTube video descriptors
   clean = clean.replace(
-    /\s*[\(\[](?:Official\s*(?:Music\s*)?Video|Full\s*Video|Official\s*Audio|Lyric\s*Video|Lyrical|Audio|Video|4K|8K|HQ|Visualizer|Teaser|Promo)[\)\]]/gi,
+    /\s*[\(\[](?:Official\s*(?:Music\s*)?Video|Full\s*Video|Official\s*Audio|Lyric\s*Video|Lyrical\s*Video|Lyrical|Audio|Video|4K|8K|HD|HQ|Visualizer|Teaser|Promo|Special\s*Version|Audio\s*Track)[\)\]]/gi,
     ''
   );
 
-  // If text has parentheses or brackets containing non-Latin characters, remove them if Latin text exists
+  // If title has pipe | (e.g. "Chaleya | Jawan | Shah Rukh Khan | Nayanthara")
+  // The first segment is the actual song title!
+  if (clean.includes('|')) {
+    const segments = clean.split('|').map((s) => s.trim()).filter(Boolean);
+    if (segments.length > 0 && segments[0].length >= 2) {
+      clean = segments[0];
+    }
+  }
+
+  // If title has " / " or " // "
+  if (clean.includes(' / ') || clean.includes(' // ')) {
+    const segments = clean.split(/\s*\/+\s*/).map((s) => s.trim()).filter(Boolean);
+    if (segments.length > 0 && segments[0].length >= 2) {
+      clean = segments[0];
+    }
+  }
+
+  // If title is "Artist - Song Title", extract the actual song title
+  if (clean.includes(' - ')) {
+    const parts = clean.split(' - ').map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      const artLower = (artist || '').toLowerCase().trim();
+      const firstLower = parts[0].toLowerCase().trim();
+      if (artLower && (firstLower === artLower || artLower.includes(firstLower) || firstLower.includes(artLower))) {
+        clean = parts.slice(1).join(' - ');
+      }
+    }
+  }
+
+  // Remove redundant non-Latin brackets if Latin text exists e.g. "52 Gaj Ka Daman (52 गज का दामन)"
   if (/[a-zA-Z]/.test(clean)) {
-    clean = clean.replace(/[\(\[][^\x00-\x7F]+[\)\]]/g, '');
-  }
-
-  // If text is divided by | or / or -, extract the English/Latin segments
-  if (clean.includes('|') || clean.includes(' / ')) {
-    const parts = clean.split(/\s*[\/|]\s*/).map((p) => p.trim()).filter(Boolean);
-    const latinParts = parts.filter((p) => /[a-zA-Z]{2,}/.test(p));
-    if (latinParts.length > 0) {
-      clean = latinParts.join(' - ');
-    }
-  }
-
-  // If there are still non-Latin characters
-  if (/[^\x00-\x7F]/.test(clean)) {
-    if (/[a-zA-Z]{3,}/.test(clean)) {
-      // Latin exists, strip non-Latin residues
-      clean = clean.replace(/[^\x00-\x7F]+/g, ' ');
-    } else {
-      // Pure non-Latin text -> Transliterate to English
-      clean = transliterateToEnglish(clean);
-    }
+    clean = clean.replace(/\s*[\(\[][^\x00-\x7F]+[\)\]]/g, '');
   }
 
   // Clean leading and trailing punctuation and spaces
   clean = clean.replace(/^[\s\-\|\/:]+|[\s\-\|\/:]+$/g, '').replace(/\s{2,}/g, ' ').trim();
 
-  // Capitalize properly
-  if (/^[a-z]/.test(clean)) {
-    clean = clean.replace(/\b[a-z]/g, (l) => l.toUpperCase());
-  }
+  return clean || rawTitle;
+};
 
-  return clean || raw;
+export const toEnglishText = (raw, artist = '') => {
+  if (!raw || typeof raw !== 'string') return '';
+  return cleanSongTitle(raw, artist);
 };
 
 export const getHighResArtwork = (url, videoId) => {
@@ -184,9 +194,9 @@ export const normalizeSong = (song, fallbackArtist = '') => {
     cleanTitle = rawTitle.replace(new RegExp(`^${artist}\\s*-\\s*`, 'i'), '').trim();
   }
 
-  // Ensure title and artist are completely in clean English
-  const title = toEnglishText(cleanTitle || rawTitle);
-  const finalArtist = toEnglishText(artist);
+  // Clean title using cleanSongTitle
+  const title = cleanSongTitle(cleanTitle || rawTitle, artist);
+  const finalArtist = artist && artist !== 'Unknown Artist' ? artist : 'Indian Artist';
 
   let rawThumbnail = '';
   if (Array.isArray(song.thumbnails) && song.thumbnails.length > 0) {

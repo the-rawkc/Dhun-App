@@ -1,5 +1,6 @@
 import { getOfflineTrack } from './offlineStorage';
 import { API_BASE } from './apiConfig';
+import { isValidVideoId } from '../utils/normalizeSong';
 
 class PlayerEngine {
   constructor() {
@@ -457,15 +458,41 @@ class PlayerEngine {
   }
 
   async loadVideo(videoId, autoPlay = true, trackMeta = null) {
-    if (!videoId) return;
-    const cleanVideoId = typeof videoId === 'object' ? (videoId.videoId || videoId.id) : String(videoId).trim();
-    if (!cleanVideoId) return;
+    if (!videoId && !trackMeta) return;
 
     if (this.activeAbortController) {
       try {
         this.activeAbortController.abort();
       } catch (e) {}
+      this.activeAbortController = null;
     }
+
+    // Flush previous audio buffer to ensure instantaneous, smooth transition
+    if (this.audioEl) {
+      try {
+        this.audioEl.pause();
+        this.audioEl.removeAttribute('src');
+        this.audioEl.load();
+      } catch (e) {}
+    }
+
+    let cleanVideoId = typeof videoId === 'object' ? (videoId.videoId || videoId.id) : String(videoId || '').trim();
+    const title = trackMeta?.title || trackMeta?.name || '';
+    const artist = trackMeta?.artist || trackMeta?.artists || trackMeta?.subtitle || '';
+
+    // If cleanVideoId is missing or invalid, automatically resolve it via search
+    if (!isValidVideoId(cleanVideoId) && title) {
+      try {
+        const query = `${title} ${artist}`.trim();
+        const searchRes = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}&filter=songs&language=en&hl=en`);
+        const searchData = await searchRes.json();
+        if (searchData?.results?.[0]?.videoId) {
+          cleanVideoId = searchData.results[0].videoId;
+        }
+      } catch (e) {}
+    }
+
+    if (!cleanVideoId) return;
 
     this.currentVideoId = cleanVideoId;
     this.currentTrack = trackMeta;
@@ -474,6 +501,7 @@ class PlayerEngine {
     if (autoPlay) {
       this.shouldBePlaying = true;
       this.isUserPaused = false;
+      this.listeners.stateChange(true);
       this.updateMediaSessionState('playing');
       this.requestWakeLock();
     }
@@ -503,14 +531,11 @@ class PlayerEngine {
 
     this.isOfflinePlayback = false;
 
-    // 2. Direct native HTML5 320kbps audio stream (100% background & lock-screen playback on Android & iOS)
-    const title = trackMeta?.title || trackMeta?.name || '';
-    const artist = trackMeta?.artist || trackMeta?.artists || trackMeta?.subtitle || '';
-
+    // 2. Direct native HTML5 320kbps audio stream with quick 1.2s timeout for instant smooth handoff
     if (title) {
       const abortCtrl = new AbortController();
       this.activeAbortController = abortCtrl;
-      const timeoutId = setTimeout(() => abortCtrl.abort(), 3500);
+      const timeoutId = setTimeout(() => abortCtrl.abort(), 1200);
 
       try {
         const query = `${title} ${artist}`.trim();

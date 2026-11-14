@@ -11,7 +11,6 @@ import { API_BASE } from '../services/apiConfig';
 export const isTrackByArtist = (track, artistName) => {
   if (!artistName || !track) return false;
 
-  // Clean target artist name (e.g. "Arijit Singh" -> "arijit singh")
   const targetClean = artistName
     .trim()
     .toLowerCase()
@@ -19,8 +18,20 @@ export const isTrackByArtist = (track, artistName) => {
     .replace(/\s+/g, ' ');
 
   if (!targetClean) return false;
+  const targetWords = targetClean.split(' ').filter((w) => w.length > 2);
 
-  // 1. Gather all strictly credited artist fields (exclude channels/uploaders)
+  // 1. Filter out obvious multi-artist compilations, mashups, jukeboxes, reactions, or covers
+  const rawTitle = (track.title || track.name || '').toLowerCase();
+  const titleForbidden = [
+    'mashup', 'jukebox', 'remix collection', 'top 10', 'top 20', 'non stop', 'non-stop',
+    'playlist', 'best of', 'all songs', 'tribute to', 'in the style of', 'karaoke',
+    'cover by', 'reaction', 'guitar lesson', 'flute version', 'instrumental cover'
+  ];
+  if (titleForbidden.some((f) => rawTitle.includes(f))) {
+    return false;
+  }
+
+  // 2. Gather all strictly credited artist fields (exclude channels/uploaders)
   const creditedList = [];
   if (typeof track.artist === 'string' && track.artist.trim()) creditedList.push(track.artist);
   if (typeof track.author === 'string' && track.author.trim()) creditedList.push(track.author);
@@ -33,36 +44,42 @@ export const isTrackByArtist = (track, artistName) => {
     });
   }
 
-  // Normalize credited artists string
-  const creditedStr = creditedList
-    .join(' , ')
-    .toLowerCase()
-    .replace(/[\.\,\-\_]/g, ' ')
-    .replace(/\s+/g, ' ');
+  // Filter out generic labels
+  const validCredited = creditedList.filter((a) => {
+    const l = a.toLowerCase().trim();
+    return l && l !== 'various artists' && l !== 'unknown artist' && l !== 'indian artist';
+  });
 
-  // Direct full-name match in credited artists
-  if (creditedStr.includes(targetClean)) {
-    return true;
+  // If explicit credited artists exist:
+  // The target singer MUST be one of the credited artists!
+  if (validCredited.length > 0) {
+    const allCreditedLower = validCredited.map((c) =>
+      c.toLowerCase().replace(/[\.\,\-\_]/g, ' ').replace(/\s+/g, ' ')
+    );
+
+    const hasArtist = allCreditedLower.some((c) => {
+      if (c === targetClean) return true;
+      if (c.includes(targetClean)) return true;
+      if (targetWords.length > 1 && targetWords.every((w) => c.includes(w))) return true;
+      return false;
+    });
+
+    if (hasArtist) return true;
+
+    // Explicit artists provided, but target artist NOT among them -> definitely another singer's song!
+    return false;
   }
 
-  // Split credited artists into individual names (e.g. "Pritam, Arijit Singh" -> ["pritam", "arijit singh"])
-  const individualCredited = creditedList
-    .flatMap((s) => s.split(/[,&/|•\+]/))
-    .map((s) => s.trim().toLowerCase().replace(/[\.\,\-\_]/g, ' ').replace(/\s+/g, ' '))
-    .filter(Boolean);
-
-  if (individualCredited.some((name) => name === targetClean || name.includes(targetClean))) {
-    return true;
-  }
-
-  // 2. Title inspection - ONLY if title explicitly credits this artist as a singer
-  // e.g. "Song Name | Arijit Singh", "Song (feat. Arijit Singh)", "Song - Arijit Singh"
-  const rawTitle = (track.title || track.name || '')
-    .toLowerCase()
-    .replace(/[\.\,\-\_]/g, ' ')
-    .replace(/\s+/g, ' ');
-
-  if (rawTitle.includes(targetClean)) {
+  // 3. Only if NO credited artists were provided by the API:
+  // Check if title has explicit singer credit: e.g. "Song Name ft. Artist"
+  const titleClean = rawTitle.replace(/[\.\,\-\_]/g, ' ').replace(/\s+/g, ' ');
+  if (
+    titleClean.includes(`feat ${targetClean}`) ||
+    titleClean.includes(`ft ${targetClean}`) ||
+    titleClean.includes(`by ${targetClean}`) ||
+    titleClean.includes(`singers ${targetClean}`) ||
+    (targetWords.length > 1 && targetWords.every((w) => titleClean.includes(w)))
+  ) {
     return true;
   }
 
