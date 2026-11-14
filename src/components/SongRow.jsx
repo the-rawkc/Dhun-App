@@ -18,12 +18,20 @@ import {
   FaListUl,
   FaEllipsisV,
   FaPlus,
+  FaTrashAlt,
 } from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
 import { saveTrackOffline, getOfflineTrack } from '../services/offlineStorage';
 import { playerEngine } from '../services/playerEngine';
 
-const SongRow = ({ song, index, songs = [], showCover = true, isHighlightedLiked = false }) => {
+const SongRow = ({
+  song,
+  index,
+  songs = [],
+  showCover = true,
+  isHighlightedLiked = false,
+  onRemoveTrack = null,
+}) => {
   const dispatch = useDispatch();
   const { activeSong, isPlaying, favorites } = useSelector((state) => state.player);
 
@@ -261,6 +269,22 @@ const SongRow = ({ song, index, songs = [], showCover = true, isHighlightedLiked
                 <FaPlus className="text-xs shrink-0" />
                 <span>Add to Queue</span>
               </button>
+
+              {/* Delete / Remove Option (inside 3-dot dropdown list) */}
+              {onRemoveTrack && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                    onRemoveTrack(normalized);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 transition-colors text-left border-t theme-border"
+                >
+                  <FaTrashAlt className="text-xs shrink-0" />
+                  <span>Delete from Playlist</span>
+                </button>
+              )}
             </div>
           )}
         </div>

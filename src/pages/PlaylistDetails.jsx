@@ -515,19 +515,20 @@ const PlaylistDetails = () => {
       {tracks.length > 0 ? (
         <div className="space-y-1">
           {tracks.map((song, i) => (
-            <div key={`${song.videoId}-${i}`} className="group relative">
-              <SongRow song={song} index={i} songs={tracks} />
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  dispatch(removeTrackFromPlaylist({ playlistId: playlist.id, videoId: song.videoId }));
-                }}
-                className="absolute right-24 top-1/2 -translate-y-1/2 p-2 rounded-full opacity-0 group-hover:opacity-100 hover:text-rose-500 text-slate-400 transition-opacity"
-                title="Remove from Playlist"
-              >
-                <FaTrashAlt className="text-xs" />
-              </button>
-            </div>
+            <SongRow
+              key={`${song.videoId}-${i}`}
+              song={song}
+              index={i}
+              songs={tracks}
+              onRemoveTrack={() =>
+                dispatch(
+                  removeTrackFromPlaylist({
+                    playlistId: playlist.id,
+                    videoId: song.videoId,
+                  })
+                )
+              }
+            />
           ))}
         </div>
       ) : (
