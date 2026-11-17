@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import CryptoJS from 'crypto-js';
 
 // Verome-API/src/services/ytmusic-parser.ts
@@ -2070,8 +2071,8 @@ function parseVideo(video, channelId, channelName) {
 }
 
 // Verome-API/src/routes/auth.ts
-const CLOUD_DB_ID = 'ff808181a09d98f701a1b064284550e3';
-const CLOUD_DB_ENDPOINT = `https://api.restful-api.dev/objects/${CLOUD_DB_ID}`;
+const CLOUD_MASTER_INDEX_ID = 'ff808181a09d98f701a1b064284550e3';
+const CLOUD_API_BASE = 'https://api.restful-api.dev/objects';
 
 function getDbPaths() {
   const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
@@ -2081,48 +2082,221 @@ function getDbPaths() {
 }
 
 var usersCache = {};
+var masterIndex = {};
 var isLoaded = false;
 var lastCloudFetch = 0;
 
-async function ensureDB(force = false) {
-  const now = Date.now();
-  // If memory cache was updated within last 5 seconds and force is false, it is fresh
-  if (!force && isLoaded && now - lastCloudFetch < 5000) return;
+function compressUser(user) {
+  if (!user) return '';
+  const compact = {
+    p: user.phone,
+    pin: user.pin,
+    n: user.name,
+    av: user.avatar,
+    j: user.joinedAt,
+    fav: (user.favorites || []).map((f) => [
+      f.videoId || f.id,
+      f.title || f.name || '',
+      f.artist || '',
+      f.duration || '',
+      f.thumbnail || '',
+    ]),
+    pls: (user.playlists || []).map((p) => ({
+      id: p.id,
+      t: p.title,
+      d: p.description || '',
+      c: p.cover || '',
+      trks: (p.tracks || []).map((t) => [
+        t.videoId || t.id,
+        t.title || t.name || '',
+        t.artist || '',
+        t.duration || '',
+        t.thumbnail || '',
+      ]),
+    })),
+    arts: user.favoriteArtists || [],
+    th: user.themeMode || 'dark',
+    u: user.updatedAt || Date.now(),
+  };
+  return zlib.gzipSync(JSON.stringify(compact)).toString('base64');
+}
 
-  // 1. Fetch from durable cloud database first (persists across all Vercel/Render serverless restarts!)
+function decompressUser(raw) {
+  if (!raw) return null;
+  let compact;
+  if (typeof raw === 'string') {
+    try {
+      compact = JSON.parse(zlib.gunzipSync(Buffer.from(raw, 'base64')).toString());
+    } catch {
+      try {
+        compact = JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+  } else {
+    compact = raw;
+  }
+  return {
+    phone: compact.p || compact.phone,
+    pin: compact.pin,
+    name: compact.n || compact.name,
+    avatar: compact.av || compact.avatar,
+    joinedAt: compact.j || compact.joinedAt,
+    favorites: (compact.fav || compact.favorites || []).map((f) =>
+      Array.isArray(f)
+        ? {
+            videoId: f[0],
+            id: f[0],
+            title: f[1],
+            name: f[1],
+            artist: f[2],
+            duration: f[3],
+            thumbnail: f[4] || `https://i.ytimg.com/vi/${f[0]}/hqdefault.jpg`,
+          }
+        : f
+    ),
+    playlists: (compact.pls || compact.playlists || []).map((p) => ({
+      id: p.id,
+      title: p.t || p.title,
+      description: p.d || p.description || '',
+      cover: p.c || p.cover || '',
+      tracks: (p.trks || p.tracks || []).map((t) =>
+        Array.isArray(t)
+          ? {
+              videoId: t[0],
+              id: t[0],
+              title: t[1],
+              name: t[1],
+              artist: t[2],
+              duration: t[3],
+              thumbnail: t[4] || `https://i.ytimg.com/vi/${t[0]}/hqdefault.jpg`,
+            }
+          : t
+      ),
+    })),
+    favoriteArtists: compact.arts || compact.favoriteArtists || [],
+    themeMode: compact.th || compact.themeMode || 'dark',
+    updatedAt: compact.u || compact.updatedAt || Date.now(),
+  };
+}
+
+async function fetchMasterIndex() {
   try {
-    const res = await fetch(CLOUD_DB_ENDPOINT);
+    const res = await fetch(`${CLOUD_API_BASE}/${CLOUD_MASTER_INDEX_ID}`);
     if (res.ok) {
       const json = await res.json();
-      if (json?.data?.users && typeof json.data.users === 'object') {
-        usersCache = { ...usersCache, ...json.data.users };
-        isLoaded = true;
-        lastCloudFetch = now;
-        return;
+      if (json?.data?.index && typeof json.data.index === 'object') {
+        masterIndex = json.data.index;
       }
     }
   } catch (err) {
-    console.warn('Cloud DB fetch failed, falling back to local storage:', err);
+    console.warn('Failed to fetch master index:', err);
+  }
+}
+
+async function saveMasterIndex() {
+  try {
+    await fetch(`${CLOUD_API_BASE}/${CLOUD_MASTER_INDEX_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'dhun_users_master_index',
+        data: { index: masterIndex },
+      }),
+    });
+  } catch (err) {
+    console.error('Failed to save master index:', err);
+  }
+}
+
+async function fetchUserFromCloud(cleanPhone) {
+  await fetchMasterIndex();
+  const objId = masterIndex[cleanPhone];
+  if (!objId) return null;
+
+  try {
+    const res = await fetch(`${CLOUD_API_BASE}/${objId}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data?.payload) {
+        const user = decompressUser(json.data.payload);
+        if (user) {
+          usersCache[cleanPhone] = user;
+          return user;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`Failed to fetch cloud user ${cleanPhone}:`, err);
+  }
+  return null;
+}
+
+async function persistUserToCloud(user) {
+  if (!user || !user.phone) return;
+  const cleanPhone = user.phone;
+  const compressed = compressUser(user);
+
+  let objId = masterIndex[cleanPhone];
+  if (objId) {
+    try {
+      const res = await fetch(`${CLOUD_API_BASE}/${objId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `dhun_user_${cleanPhone}`,
+          data: { payload: compressed },
+        }),
+      });
+      if (res.ok) return;
+    } catch (e) {
+      console.warn(`Failed to PUT user ${cleanPhone}:`, e);
+    }
   }
 
-  // 2. Fallback to local disk if cloud has network issue
-  const { dataDir, dbFile } = getDbPaths();
+  // If update failed or objId didn't exist, create a new object
   try {
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
+    const res = await fetch(CLOUD_API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: `dhun_user_${cleanPhone}`,
+        data: { payload: compressed },
+      }),
+    });
+    if (res.ok) {
+      const created = await res.json();
+      if (created?.id) {
+        masterIndex[cleanPhone] = created.id;
+        await saveMasterIndex();
+      }
     }
-  } catch (e) {}
+  } catch (err) {
+    console.error(`Failed to persist user ${cleanPhone} to cloud:`, err);
+  }
+}
+
+async function ensureDB(force = false) {
+  const now = Date.now();
+  if (!force && isLoaded && now - lastCloudFetch < 5000) return;
+
+  await fetchMasterIndex();
+
+  // Load local file fallback
+  const { dataDir, dbFile } = getDbPaths();
   try {
     if (fs.existsSync(dbFile)) {
       const content = fs.readFileSync(dbFile, 'utf-8');
       const parsed = JSON.parse(content);
-      usersCache = { ...usersCache, ...parsed };
+      usersCache = { ...parsed, ...usersCache };
     }
   } catch (e) {}
   isLoaded = true;
+  lastCloudFetch = now;
 }
 
-async function persistDB() {
+async function persistDB(singlePhone = null) {
   // 1. Write to local disk cache
   const { dataDir, dbFile } = getDbPaths();
   try {
@@ -2132,33 +2306,13 @@ async function persistDB() {
     fs.writeFileSync(dbFile, JSON.stringify(usersCache, null, 2), 'utf-8');
   } catch (err) {}
 
-  // 2. Fetch latest from cloud database to ensure no concurrent user data is ever overwritten
-  let mergedUsers = { ...usersCache };
-  try {
-    const res = await fetch(CLOUD_DB_ENDPOINT);
-    if (res.ok) {
-      const json = await res.json();
-      if (json?.data?.users && typeof json.data.users === 'object') {
-        mergedUsers = { ...json.data.users, ...usersCache };
-        usersCache = mergedUsers;
-      }
+  // 2. Persist to cloud database
+  if (singlePhone && usersCache[singlePhone]) {
+    await persistUserToCloud(usersCache[singlePhone]);
+  } else {
+    for (const phone of Object.keys(usersCache)) {
+      await persistUserToCloud(usersCache[phone]);
     }
-  } catch (e) {
-    console.warn('Pre-persist cloud fetch warning:', e);
-  }
-
-  // 3. Persist to cloud database
-  try {
-    await fetch(CLOUD_DB_ENDPOINT, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'dhun_users_db',
-        data: { users: mergedUsers },
-      }),
-    });
-  } catch (err) {
-    console.error('Failed to persist users to cloud DB:', err);
   }
 }
 
@@ -2178,6 +2332,9 @@ async function handleAuthLogin(req) {
 
   await ensureDB(true);
   let user = usersCache[cleanPhone];
+  if (!user) {
+    user = await fetchUserFromCloud(cleanPhone);
+  }
 
   if (user) {
     if (user.pin !== pin) {
@@ -2189,34 +2346,56 @@ async function handleAuthLogin(req) {
     // Smart-merge favorites if passed from client
     if (Array.isArray(favorites) && favorites.length > 0) {
       const favMap = new Map();
-      (user.favorites || []).forEach(f => { if (f && f.videoId) favMap.set(f.videoId, f); });
-      favorites.forEach(f => { if (f && f.videoId) favMap.set(f.videoId, f); });
+      (user.favorites || []).forEach((f) => {
+        const k = f && (f.videoId || f.id);
+        if (k) favMap.set(k, f);
+      });
+      favorites.forEach((f) => {
+        const k = f && (f.videoId || f.id);
+        if (k) favMap.set(k, f);
+      });
       user.favorites = Array.from(favMap.values());
     }
 
     // Smart-merge playlists if passed from client (guaranteeing tracks is array)
     if (Array.isArray(playlists) && playlists.length > 0) {
       const plMap = new Map();
-      (user.playlists || []).forEach(p => {
+      (user.playlists || []).forEach((p) => {
         if (p && (p.id || p.title)) {
-          plMap.set(p.id || p.title, {
+          plMap.set(p.id, {
             ...p,
-            tracks: Array.isArray(p.tracks) ? p.tracks : []
+            tracks: Array.isArray(p.tracks) ? p.tracks : [],
           });
         }
       });
-      playlists.forEach(p => {
+      playlists.forEach((p) => {
         if (p && (p.id || p.title)) {
-          const key = p.id || p.title;
-          const sanitizedTracks = Array.isArray(p.tracks) ? p.tracks : [];
-          const existing = plMap.get(key);
+          const existing =
+            plMap.get(p.id) ||
+            Array.from(plMap.values()).find(
+              (ep) => ep.title && ep.title.toLowerCase() === (p.title || '').toLowerCase()
+            );
           if (existing) {
             const trackMap = new Map();
-            (existing.tracks || []).forEach(t => { if (t && t.videoId) trackMap.set(t.videoId, t); });
-            sanitizedTracks.forEach(t => { if (t && t.videoId) trackMap.set(t.videoId, t); });
-            plMap.set(key, { ...existing, ...p, tracks: Array.from(trackMap.values()) });
+            (existing.tracks || []).forEach((t) => {
+              const k = t && (t.videoId || t.id);
+              if (k) trackMap.set(k, t);
+            });
+            (p.tracks || []).forEach((t) => {
+              const k = t && (t.videoId || t.id);
+              if (k) trackMap.set(k, t);
+            });
+            plMap.set(existing.id, {
+              ...existing,
+              ...p,
+              id: existing.id,
+              tracks: Array.from(trackMap.values()),
+            });
           } else {
-            plMap.set(key, { ...p, tracks: sanitizedTracks });
+            plMap.set(p.id, {
+              ...p,
+              tracks: Array.isArray(p.tracks) ? p.tracks : [],
+            });
           }
         }
       });
@@ -2224,31 +2403,41 @@ async function handleAuthLogin(req) {
     }
 
     if (Array.isArray(favoriteArtists) && favoriteArtists.length > 0) {
-      const artSet = new Set([...(user.favoriteArtists || []), ...favoriteArtists]);
-      user.favoriteArtists = Array.from(artSet);
+      const artMap = new Map();
+      (user.favoriteArtists || []).forEach((a) => {
+        if (a && a.name) artMap.set(a.name.toLowerCase(), a);
+      });
+      favoriteArtists.forEach((a) => {
+        if (a && a.name) artMap.set(a.name.toLowerCase(), a);
+      });
+      user.favoriteArtists = Array.from(artMap.values());
     }
 
     user.updatedAt = Date.now();
     usersCache[cleanPhone] = user;
-    await persistDB();
+    await persistDB(cleanPhone);
   } else {
     const chosenAvatar = avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanPhone}`;
-    const initialFavs = Array.isArray(favorites) ? favorites.filter(f => f && f.videoId) : [];
-    const initialPlaylists = Array.isArray(playlists) && playlists.length > 0
-      ? playlists.map(p => ({
-          ...p,
-          tracks: Array.isArray(p.tracks) ? p.tracks : []
-        }))
-      : [
-          {
-            id: `pl-${Date.now()}-1`,
-            title: 'My Favorite Songs',
-            description: 'Personal playlist',
-            cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80',
-            tracks: [],
-            createdAt: Date.now(),
-          },
-        ];
+    const initialFavs = Array.isArray(favorites)
+      ? favorites.filter((f) => f && (f.videoId || f.id))
+      : [];
+    const initialPlaylists =
+      Array.isArray(playlists) && playlists.length > 0
+        ? playlists.map((p) => ({
+            ...p,
+            tracks: Array.isArray(p.tracks) ? p.tracks : [],
+          }))
+        : [
+            {
+              id: `pl-${Date.now()}-1`,
+              title: 'My Favorite Songs',
+              description: 'Personal playlist',
+              cover:
+                'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80',
+              tracks: [],
+              createdAt: Date.now(),
+            },
+          ];
     user = {
       phone: cleanPhone,
       pin,
@@ -2262,12 +2451,12 @@ async function handleAuthLogin(req) {
       updatedAt: Date.now(),
     };
     usersCache[cleanPhone] = user;
-    await persistDB();
+    await persistDB(cleanPhone);
   }
 
-  const cleanPlaylists = (user.playlists || []).map(p => ({
+  const cleanPlaylists = (user.playlists || []).map((p) => ({
     ...p,
-    tracks: Array.isArray(p.tracks) ? p.tracks : []
+    tracks: Array.isArray(p.tracks) ? p.tracks : [],
   }));
 
   return json({
@@ -2296,25 +2485,28 @@ async function handleAuthSync(req) {
   const { phone, pin, favorites, playlists, favoriteArtists, themeMode } = body;
   if (!phone || !pin) return error('Phone and PIN required for sync', 400);
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-  await ensureDB(true);
-  const user = usersCache[cleanPhone];
+
+  let user = usersCache[cleanPhone];
+  if (!user) {
+    user = await fetchUserFromCloud(cleanPhone);
+  }
   if (!user || user.pin !== pin) {
     return error('Unauthorized sync: invalid credentials', 401);
   }
   if (Array.isArray(favorites)) {
-    user.favorites = favorites.filter(f => f && f.videoId);
+    user.favorites = favorites.filter((f) => f && (f.videoId || f.id));
   }
   if (Array.isArray(playlists)) {
-    user.playlists = playlists.map(p => ({
+    user.playlists = playlists.map((p) => ({
       ...p,
-      tracks: Array.isArray(p.tracks) ? p.tracks : []
+      tracks: Array.isArray(p.tracks) ? p.tracks : [],
     }));
   }
   if (Array.isArray(favoriteArtists)) user.favoriteArtists = favoriteArtists;
   if (themeMode) user.themeMode = themeMode;
   user.updatedAt = Date.now();
   usersCache[cleanPhone] = user;
-  await persistDB();
+  await persistDB(cleanPhone);
   return json({
     success: true,
     message: 'Cloud database synced successfully',
@@ -2327,8 +2519,11 @@ async function handleAuthProfile(searchParams) {
   const pin = searchParams.get('pin');
   if (!phone || !pin) return error('Phone and PIN required', 400);
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-  await ensureDB(true);
-  const user = usersCache[cleanPhone];
+
+  let user = usersCache[cleanPhone];
+  if (!user) {
+    user = await fetchUserFromCloud(cleanPhone);
+  }
   if (!user || user.pin !== pin) {
     return error('Invalid phone or PIN', 401);
   }
@@ -2341,9 +2536,9 @@ async function handleAuthProfile(searchParams) {
       joinedAt: user.joinedAt,
     },
     favorites: user.favorites || [],
-    playlists: (user.playlists || []).map(p => ({
+    playlists: (user.playlists || []).map((p) => ({
       ...p,
-      tracks: Array.isArray(p.tracks) ? p.tracks : []
+      tracks: Array.isArray(p.tracks) ? p.tracks : [],
     })),
     favoriteArtists: user.favoriteArtists || [],
     themeMode: user.themeMode || 'dark',
@@ -2361,16 +2556,18 @@ async function handleAuthUpdateProfile(req) {
   const { phone, pin, name, avatar } = body;
   if (!phone || !pin) return error('Phone and PIN required', 400);
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-  await ensureDB(true);
+
   let user = usersCache[cleanPhone];
   if (!user) {
-    // Auto-create/upsert user if not existing in cache
+    user = await fetchUserFromCloud(cleanPhone);
+  }
+  if (!user) {
     user = {
       phone: cleanPhone,
       pin,
       name: name?.trim() || 'Music Lover',
       avatar: avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-      joinedAt: Date.now(),
+      joinedAt: new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
       updatedAt: Date.now(),
       playlists: [],
       favorites: [],
@@ -2384,7 +2581,7 @@ async function handleAuthUpdateProfile(req) {
   if (avatar && avatar.trim()) user.avatar = avatar.trim();
   user.updatedAt = Date.now();
   usersCache[cleanPhone] = user;
-  await persistDB();
+  await persistDB(cleanPhone);
   return json({
     success: true,
     user: {
@@ -2402,6 +2599,11 @@ async function handleAdminUsers(req, searchParams) {
     return error('Unauthorized admin access. Please provide valid admin PIN.', 401);
   }
   await ensureDB(true);
+  for (const phone of Object.keys(masterIndex)) {
+    if (!usersCache[phone]) {
+      await fetchUserFromCloud(phone);
+    }
+  }
   const usersList = Object.values(usersCache).map((u) => ({
     phone: u.phone,
     name: u.name,
