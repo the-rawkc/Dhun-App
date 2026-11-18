@@ -37,6 +37,17 @@ if (typeof document !== 'undefined') {
   }
 }
 
+export const instantHaryanviTracks = [
+  { videoId: 'CZt-rVn2BJs', title: '52 Gaj Ka Daman', artist: 'Renuka Panwar', thumbnail: 'https://i.ytimg.com/vi/CZt-rVn2BJs/hqdefault.jpg', duration: '3:05' },
+  { videoId: 'cZSrWoBMSrg', title: 'Gypsy (Balam Thanedar)', artist: 'GD Kaur, Pranjal Dahiya', thumbnail: 'https://i.ytimg.com/vi/cZSrWoBMSrg/hqdefault.jpg', duration: '2:52' },
+  { videoId: 'nfs8NYg7yQM', title: 'Chatak Matak', artist: 'Renuka Panwar, Sapna Choudhary', thumbnail: 'https://i.ytimg.com/vi/nfs8NYg7yQM/hqdefault.jpg', duration: '3:21' },
+  { videoId: 'tJGBVigwPlU', title: 'Moto', artist: 'Diler Kharkiya, Ajay Hooda', thumbnail: 'https://i.ytimg.com/vi/tJGBVigwPlU/hqdefault.jpg', duration: '3:18' },
+  { videoId: 'T0H_LWLiOGk', title: 'Up To Date', artist: 'Dhanda Nyoliwala', thumbnail: 'https://i.ytimg.com/vi/T0H_LWLiOGk/hqdefault.jpg', duration: '3:00' },
+  { videoId: 'z6sDIc1Zqzs', title: 'Middle Class', artist: 'Gulzaar Chhaniwala', thumbnail: 'https://i.ytimg.com/vi/z6sDIc1Zqzs/hqdefault.jpg', duration: '3:45' },
+  { videoId: 'MVF-GCOY2kI', title: '2 Numbari', artist: 'Masoom Sharma', thumbnail: 'https://i.ytimg.com/vi/MVF-GCOY2kI/hqdefault.jpg', duration: '3:12' },
+  { videoId: 'kVtkC1I7-uc', title: 'Kothe Upar Kothri', artist: 'Renuka Panwar', thumbnail: 'https://i.ytimg.com/vi/kVtkC1I7-uc/hqdefault.jpg', duration: '3:30' },
+];
+
 const defaultPlaylists = [
   {
     id: 'pl-desi-hits',
@@ -54,7 +65,30 @@ const defaultPlaylists = [
     tracks: [],
     createdAt: Date.now(),
   },
+  {
+    id: 'pl-haryanvi-top-hits',
+    title: 'Haryanvi Top Beats',
+    description: 'High-energy desi bangers by Sapna Choudhary, Renuka Panwar, Dhanda Nyoliwala & Gulzaar',
+    cover: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&auto=format&fit=crop&q=80',
+    tracks: instantHaryanviTracks,
+    createdAt: Date.now(),
+  },
 ];
+
+const loadSavedPlaylists = () => {
+  const loaded = loadSaved('tunetide_playlists', defaultPlaylists);
+  if (Array.isArray(loaded)) {
+    if (!loaded.some((p) => p.id === 'pl-haryanvi-top-hits')) {
+      const haryanviPl = defaultPlaylists.find((p) => p.id === 'pl-haryanvi-top-hits');
+      if (haryanviPl) {
+        loaded.push(haryanviPl);
+        saveItem('tunetide_playlists', loaded);
+      }
+    }
+    return loaded;
+  }
+  return defaultPlaylists;
+};
 
 const initialState = {
   currentSongs: [],
@@ -75,7 +109,7 @@ const initialState = {
   themeMode: initialTheme,
   favorites: loadSaved('tunetide_favorites', []),
   recentTracks: loadSaved('tunetide_recent', []),
-  playlists: loadSaved('tunetide_playlists', defaultPlaylists),
+  playlists: loadSavedPlaylists(),
   favoriteArtists: loadSaved('tunetide_fav_artists', []),
   offlineTracks: [],
   isAddToPlaylistModalOpen: false,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { playTrackNow } from '../redux/features/playerSlice';
 import SongRow from '../components/SongRow';
@@ -17,19 +18,45 @@ const instantChartSeeds = [
   { videoId: 'dCmp56tSSmA', title: 'Hass Hass', artist: 'Diljit Dosanjh, Sia', thumbnail: 'https://i.ytimg.com/vi/dCmp56tSSmA/hqdefault.jpg', duration: '2:34' },
 ];
 
+const instantHaryanviChartSeeds = [
+  { videoId: 'CZt-rVn2BJs', title: '52 Gaj Ka Daman', artist: 'Renuka Panwar', thumbnail: 'https://i.ytimg.com/vi/CZt-rVn2BJs/hqdefault.jpg', duration: '3:05' },
+  { videoId: 'cZSrWoBMSrg', title: 'Gypsy (Balam Thanedar)', artist: 'GD Kaur, Pranjal Dahiya', thumbnail: 'https://i.ytimg.com/vi/cZSrWoBMSrg/hqdefault.jpg', duration: '2:52' },
+  { videoId: 'nfs8NYg7yQM', title: 'Chatak Matak', artist: 'Renuka Panwar, Sapna Choudhary', thumbnail: 'https://i.ytimg.com/vi/nfs8NYg7yQM/hqdefault.jpg', duration: '3:21' },
+  { videoId: 'tJGBVigwPlU', title: 'Moto', artist: 'Diler Kharkiya, Ajay Hooda', thumbnail: 'https://i.ytimg.com/vi/tJGBVigwPlU/hqdefault.jpg', duration: '3:18' },
+  { videoId: 'T0H_LWLiOGk', title: 'Up To Date', artist: 'Dhanda Nyoliwala', thumbnail: 'https://i.ytimg.com/vi/T0H_LWLiOGk/hqdefault.jpg', duration: '3:00' },
+  { videoId: 'z6sDIc1Zqzs', title: 'Middle Class', artist: 'Gulzaar Chhaniwala', thumbnail: 'https://i.ytimg.com/vi/z6sDIc1Zqzs/hqdefault.jpg', duration: '3:45' },
+  { videoId: 'MVF-GCOY2kI', title: '2 Numbari', artist: 'Masoom Sharma', thumbnail: 'https://i.ytimg.com/vi/MVF-GCOY2kI/hqdefault.jpg', duration: '3:12' },
+  { videoId: 'kVtkC1I7-uc', title: 'Kothe Upar Kothri', artist: 'Renuka Panwar', thumbnail: 'https://i.ytimg.com/vi/kVtkC1I7-uc/hqdefault.jpg', duration: '3:30' },
+];
+
 const chartTabs = [
-  { name: 'India Top 50', query: 'top 50 hindi songs 2026' },
-  { name: 'Bollywood Hits', query: 'bollywood top weekly songs' },
-  { name: 'Punjabi Hot 20', query: 'punjabi top 20 trending songs' },
-  { name: 'South India Top 20', query: 'tamil telugu top 20 songs anirudh' },
+  { id: 'india-50', name: 'India Top 50', query: 'top 50 hindi songs 2026' },
+  { id: 'haryanvi', name: 'Haryanvi Top 20', query: 'top haryanvi trending songs hits' },
+  { id: 'bollywood', name: 'Bollywood Hits', query: 'bollywood top weekly songs' },
+  { id: 'punjabi', name: 'Punjabi Hot 20', query: 'punjabi top 20 trending songs' },
+  { id: 'south', name: 'South India Top 20', query: 'tamil telugu top 20 songs anirudh' },
 ];
 
 const Charts = () => {
   const dispatch = useDispatch();
-  const [activeTab, setActiveTab] = useState(chartTabs[0]);
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+
+  const resolvedInitialTab = (tabParam && chartTabs.find((t) => t.id === tabParam || t.name.toLowerCase().includes(tabParam.toLowerCase()))) || chartTabs[0];
+  const [activeTab, setActiveTab] = useState(resolvedInitialTab);
   const [continuationToken, setContinuationToken] = useState(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const sentinelRef = useRef(null);
+
+  // Sync tab with URL search parameter if changed
+  useEffect(() => {
+    if (tabParam) {
+      const match = chartTabs.find((t) => t.id === tabParam || t.name.toLowerCase().includes(tabParam.toLowerCase()));
+      if (match && match.name !== activeTab.name) {
+        setActiveTab(match);
+      }
+    }
+  }, [tabParam]);
 
   const getCached = (key) => {
     try {
@@ -40,7 +67,14 @@ const Charts = () => {
     }
   };
 
-  const [tracks, setTracks] = useState(() => getCached(`tt_chart_${activeTab.name}`) || instantChartSeeds);
+  const [tracks, setTracks] = useState(() => {
+    const cached = getCached(`tt_chart_${activeTab.name}`);
+    if (cached) return cached;
+    if (activeTab.id === 'haryanvi' || activeTab.name.toLowerCase().includes('haryanvi')) {
+      return instantHaryanviChartSeeds;
+    }
+    return instantChartSeeds;
+  });
 
   useEffect(() => {
     let mounted = true;

@@ -128,6 +128,86 @@ const Explore = () => {
         </div>
       </div>
 
+      {/* Official Regional Playlists & Charts Banner */}
+      <div className="flex flex-col gap-3.5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base md:text-lg font-extrabold theme-text-main tracking-tight">
+            Official Playlists & Charts
+          </h2>
+          <span className="text-[11px] font-semibold text-rose-500">Live Rankings</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Haryanvi Playlist */}
+          <div
+            onClick={() => navigate('/playlist/pl-haryanvi-top-hits')}
+            className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-amber-600/30 to-yellow-950/40 border border-amber-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between">
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500 text-dark-950">
+                PLAYLIST
+              </span>
+              <FaMusic className="text-amber-500 text-xs" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-white">Haryanvi Top Beats</h3>
+              <p className="text-[11px] text-white/70">Renuka, Sapna, Dhanda & Gulzaar</p>
+            </div>
+          </div>
+
+          {/* Haryanvi Charts */}
+          <div
+            onClick={() => navigate('/charts?tab=haryanvi')}
+            className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-orange-600/30 to-red-950/40 border border-orange-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between">
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-orange-500 text-white">
+                CHART
+              </span>
+              <FaHeadphonesAlt className="text-orange-500 text-xs" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-white">Haryanvi Top 20</h3>
+              <p className="text-[11px] text-white/70">Haryana Official Trending Music</p>
+            </div>
+          </div>
+
+          {/* Punjabi Playlist */}
+          <div
+            onClick={() => navigate('/playlist/pl-punjabi-power')}
+            className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-rose-600/30 to-pink-950/40 border border-rose-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between">
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-500 text-white">
+                PLAYLIST
+              </span>
+              <FaMusic className="text-rose-500 text-xs" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-white">Punjabi Fire Wave</h3>
+              <p className="text-[11px] text-white/70">Diljit, Karan Aujla, Shubh</p>
+            </div>
+          </div>
+
+          {/* India Top 50 Chart */}
+          <div
+            onClick={() => navigate('/charts')}
+            className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-red-600/30 to-dark-900 border border-red-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between">
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-red-600 text-white">
+                CHART
+              </span>
+              <FaHeadphonesAlt className="text-red-500 text-xs" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-white">India Top 50</h3>
+              <p className="text-[11px] text-white/70">Nationwide Official Ranking</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {categories.map((cat, idx) => {
         const catTitle =
           cat.title === 'Moods & Genres' && idx === 0

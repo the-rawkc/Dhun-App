@@ -88,9 +88,69 @@ const instantPunjabiSeeds = [
   },
 ];
 
+const instantHaryanviSeeds = [
+  {
+    videoId: 'CZt-rVn2BJs',
+    title: '52 Gaj Ka Daman',
+    artist: 'Renuka Panwar',
+    thumbnail: 'https://i.ytimg.com/vi/CZt-rVn2BJs/hqdefault.jpg',
+    duration: '3:05',
+  },
+  {
+    videoId: 'cZSrWoBMSrg',
+    title: 'Gypsy (Balam Thanedar)',
+    artist: 'GD Kaur, Pranjal Dahiya',
+    thumbnail: 'https://i.ytimg.com/vi/cZSrWoBMSrg/hqdefault.jpg',
+    duration: '2:52',
+  },
+  {
+    videoId: 'nfs8NYg7yQM',
+    title: 'Chatak Matak',
+    artist: 'Renuka Panwar, Sapna Choudhary',
+    thumbnail: 'https://i.ytimg.com/vi/nfs8NYg7yQM/hqdefault.jpg',
+    duration: '3:21',
+  },
+  {
+    videoId: 'tJGBVigwPlU',
+    title: 'Moto',
+    artist: 'Diler Kharkiya, Ajay Hooda',
+    thumbnail: 'https://i.ytimg.com/vi/tJGBVigwPlU/hqdefault.jpg',
+    duration: '3:18',
+  },
+  {
+    videoId: 'T0H_LWLiOGk',
+    title: 'Up To Date',
+    artist: 'Dhanda Nyoliwala',
+    thumbnail: 'https://i.ytimg.com/vi/T0H_LWLiOGk/hqdefault.jpg',
+    duration: '3:00',
+  },
+  {
+    videoId: 'z6sDIc1Zqzs',
+    title: 'Middle Class',
+    artist: 'Gulzaar Chhaniwala',
+    thumbnail: 'https://i.ytimg.com/vi/z6sDIc1Zqzs/hqdefault.jpg',
+    duration: '3:45',
+  },
+  {
+    videoId: 'MVF-GCOY2kI',
+    title: '2 Numbari',
+    artist: 'Masoom Sharma',
+    thumbnail: 'https://i.ytimg.com/vi/MVF-GCOY2kI/hqdefault.jpg',
+    duration: '3:12',
+  },
+  {
+    videoId: 'kVtkC1I7-uc',
+    title: 'Kothe Upar Kothri',
+    artist: 'Renuka Panwar',
+    thumbnail: 'https://i.ytimg.com/vi/kVtkC1I7-uc/hqdefault.jpg',
+    duration: '3:30',
+  },
+];
+
 const indianGenres = [
   { name: 'Bollywood Romance', query: 'bollywood romantic hits songs', color: 'from-rose-600 to-red-900' },
-  { name: 'Punjabi Fire', query: 'punjabi party hits diljit karan aujla', color: 'from-amber-600 to-orange-900' },
+  { name: 'Haryanvi Power', query: 'top haryanvi songs sapna renuka dhanda', color: 'from-amber-600 to-yellow-950' },
+  { name: 'Punjabi Fire', query: 'punjabi party hits diljit karan aujla', color: 'from-orange-600 to-red-900' },
   { name: 'Desi Hip-Hop', query: 'desi hip hop divine seedhe maut', color: 'from-red-700 to-neutral-900' },
   { name: 'Sufi & Ghazals', query: 'soulful sufi ghazals rahat nusrat', color: 'from-emerald-700 to-teal-950' },
   { name: 'South Chartbusters', query: 'tamil telugu top hit songs anirudh', color: 'from-violet-700 to-purple-950' },
@@ -122,6 +182,7 @@ const Home = () => {
 
   const [trendingIndia, setTrendingIndia] = useState(() => getCached('tt_trending', instantTrendingSeeds));
   const [punjabiHits, setPunjabiHits] = useState(() => getCached('tt_punjabi', instantPunjabiSeeds));
+  const [haryanviHits, setHaryanviHits] = useState(() => getCached('tt_haryanvi', instantHaryanviSeeds));
 
   useEffect(() => {
     let mounted = true;
@@ -134,7 +195,10 @@ const Home = () => {
       fetch(`${API_BASE}/api/search?q=punjabi+top+trending+songs&filter=songs&language=en&hl=en`)
         .then((r) => r.json())
         .catch(() => null),
-    ]).then(([trendData, punjabiData]) => {
+      fetch(`${API_BASE}/api/search?q=top+haryanvi+songs+latest+trending+hits&filter=songs&language=en&hl=en`)
+        .then((r) => r.json())
+        .catch(() => null),
+    ]).then(([trendData, punjabiData, haryanviData]) => {
       if (!mounted) return;
 
       if (trendData?.results?.length > 0) {
@@ -147,6 +211,12 @@ const Home = () => {
         const norm = punjabiData.results.map(normalizeSong).filter(Boolean);
         setPunjabiHits(norm);
         try { sessionStorage.setItem('tt_punjabi', JSON.stringify(norm)); } catch {}
+      }
+
+      if (haryanviData?.results?.length > 0) {
+        const norm = haryanviData.results.map(normalizeSong).filter(Boolean);
+        setHaryanviHits(norm);
+        try { sessionStorage.setItem('tt_haryanvi', JSON.stringify(norm)); } catch {}
       }
     });
 
@@ -168,7 +238,7 @@ const Home = () => {
         <div className="relative z-10 max-w-xl">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[11px] font-semibold mb-1.5">
             <HiSparkles className="text-xs" />
-            <span>Desi Beats • Bollywood • Punjabi • South</span>
+            <span>Desi Beats • Bollywood • Punjabi • Haryanvi • South</span>
           </div>
 
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight theme-text-main">
@@ -270,6 +340,133 @@ const Home = () => {
           ))}
         </div>
       </div>
+
+      {/* ─── Featured Curated Playlists ────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-base md:text-xl font-bold theme-text-main">Curated Desi Playlists</h2>
+            <p className="text-[11px] theme-text-muted">Handpicked collections ready for non-stop streaming</p>
+          </div>
+          <button
+            onClick={() => navigate('/library')}
+            className="text-xs font-semibold text-rose-500 hover:text-rose-400"
+          >
+            All Playlists
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Haryanvi Playlist Card */}
+          <div
+            onClick={() => navigate('/playlist/pl-haryanvi-top-hits')}
+            className="p-3.5 rounded-2xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border border-amber-500/30 shadow-sm flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <img
+                src="https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&auto=format&fit=crop&q=80"
+                alt="Haryanvi Top Beats"
+                className="w-14 h-14 rounded-xl object-cover shrink-0 shadow-md group-hover:scale-105 transition-transform"
+              />
+              <div className="min-w-0">
+                <span className="text-[9px] font-black uppercase tracking-wider text-amber-500">HOT PLAYLIST</span>
+                <h3 className="font-bold text-sm theme-text-main group-hover:text-amber-500 truncate transition-colors">
+                  Haryanvi Top Beats
+                </h3>
+                <p className="text-xs theme-text-muted truncate">Renuka, Sapna, Dhanda, Gulzaar</p>
+              </div>
+            </div>
+            <div className="p-2.5 rounded-full bg-amber-500 text-dark-950 font-bold shadow-md group-hover:scale-110 transition-transform">
+              <FaPlay className="text-[10px]" />
+            </div>
+          </div>
+
+          {/* Punjabi Playlist Card */}
+          <div
+            onClick={() => navigate('/playlist/pl-punjabi-power')}
+            className="p-3.5 rounded-2xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border theme-border shadow-sm flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <img
+                src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&auto=format&fit=crop&q=80"
+                alt="Punjabi Fire Wave"
+                className="w-14 h-14 rounded-xl object-cover shrink-0 shadow-md group-hover:scale-105 transition-transform"
+              />
+              <div className="min-w-0">
+                <span className="text-[9px] font-black uppercase tracking-wider text-orange-500">TRENDING</span>
+                <h3 className="font-bold text-sm theme-text-main group-hover:text-rose-500 truncate transition-colors">
+                  Punjabi Fire Wave
+                </h3>
+                <p className="text-xs theme-text-muted truncate">Diljit, Karan Aujla, Shubh</p>
+              </div>
+            </div>
+            <div className="p-2.5 rounded-full bg-slate-500/20 theme-text-main group-hover:bg-rose-600 group-hover:text-white shadow-sm transition-all">
+              <FaPlay className="text-[10px]" />
+            </div>
+          </div>
+
+          {/* Bollywood Playlist Card */}
+          <div
+            onClick={() => navigate('/playlist/pl-desi-hits')}
+            className="p-3.5 rounded-2xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border theme-border shadow-sm flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <img
+                src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80"
+                alt="Desi Chill & Bollywood"
+                className="w-14 h-14 rounded-xl object-cover shrink-0 shadow-md group-hover:scale-105 transition-transform"
+              />
+              <div className="min-w-0">
+                <span className="text-[9px] font-black uppercase tracking-wider text-rose-400">ESSENTIAL</span>
+                <h3 className="font-bold text-sm theme-text-main group-hover:text-rose-500 truncate transition-colors">
+                  Desi Chill & Bollywood
+                </h3>
+                <p className="text-xs theme-text-muted truncate">Arijit Singh & Shreya Ghoshal</p>
+              </div>
+            </div>
+            <div className="p-2.5 rounded-full bg-slate-500/20 theme-text-main group-hover:bg-rose-600 group-hover:text-white shadow-sm transition-all">
+              <FaPlay className="text-[10px]" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Haryanvi Desi Hits & Charts ───────────────────────────── */}
+      {haryanviHits.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-500">
+                <FaFire className="text-sm" />
+              </div>
+              <div>
+                <h2 className="text-base md:text-xl font-bold theme-text-main">Haryanvi Power & Charts</h2>
+                <p className="text-[11px] theme-text-muted">High-energy desi bangers, Ragni & viral Haryana chartbusters</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/charts?tab=haryanvi')}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-500 hover:bg-amber-500 hover:text-dark-950 transition-colors"
+              >
+                Haryanvi Charts
+              </button>
+              <button
+                onClick={() => navigate('/playlist/pl-haryanvi-top-hits')}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-500/10 hover:bg-slate-500/20 theme-text-main transition-colors hidden sm:inline-block"
+              >
+                Open Playlist
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {haryanviHits.slice(0, 10).map((song, i) => (
+              <SongRow key={song.videoId || i} song={song} index={i} songs={haryanviHits} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ─── Punjabi Wave Hits ──────────────────────────────────────── */}
       {punjabiHits.length > 0 && (
