@@ -1717,12 +1717,14 @@ async function handleAudioStream(searchParams) {
       return json({ success: false, error: "Decryption failed" }, 500);
     }
 
-    // Upgrade to 320kbps high fidelity audio
-    streamUrl = streamUrl.replace("_96.mp4", "_320.mp4");
+    // Upgrade to 320kbps high fidelity audio with 160kbps fallback
+    const streamUrl320 = streamUrl.replace("_96.mp4", "_320.mp4");
+    const fallbackUrl160 = streamUrl.replace("_320.mp4", "_160.mp4").replace("_96.mp4", "_160.mp4");
 
     return json({
       success: true,
-      streamUrl,
+      streamUrl: streamUrl320,
+      fallbackUrl: fallbackUrl160,
       title: item.song || item.title,
       artist: item.primary_artists || item.singers || artist,
       duration: parseInt(item.duration, 10) || 0,
