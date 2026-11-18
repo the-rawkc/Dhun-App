@@ -281,7 +281,6 @@ const playerSlice = createSlice({
       state.currentIndex = typeof index === 'number' ? index : state.currentIndex;
       state.isPlaying = true;
       state.currentTime = 0;
-      state.playTrigger = Date.now();
 
       const filteredRecent = state.recentTracks.filter((t) => t.videoId !== normalized.videoId);
       state.recentTracks = [normalized, ...filteredRecent].slice(0, 30);

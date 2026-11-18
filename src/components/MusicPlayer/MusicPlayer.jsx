@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   playPause,
@@ -79,6 +79,7 @@ const MusicPlayer = () => {
 
   const [queueOpen, setQueueOpen] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState('idle');
+  const lastSyncedTrackRef = useRef(null);
 
   // Hook up PlayerEngine listeners with autonomous lock-screen track synchronization
   useEffect(() => {
@@ -89,7 +90,10 @@ const MusicPlayer = () => {
       onEnded: () => {}, // Handled autonomously by playerEngine.playNextTrack
       onNext: () => dispatch(nextSong()),
       onPrev: () => dispatch(prevSong()),
-      onTrackChanged: (track, index) => dispatch(syncCurrentTrack({ track, index })),
+      onTrackChanged: (track, index) => {
+        lastSyncedTrackRef.current = track;
+        dispatch(syncCurrentTrack({ track, index }));
+      },
     });
   }, [dispatch]);
 
@@ -102,7 +106,19 @@ const MusicPlayer = () => {
   useEffect(() => {
     if (activeSong) {
       const vId = activeSong.videoId;
-      playerEngine.loadVideo(vId || activeSong, true, activeSong);
+      const key = (vId && isValidVideoId(vId)) ? vId : (activeSong.title || '');
+      const lastSynced = lastSyncedTrackRef.current;
+      const syncedKey = lastSynced
+        ? ((lastSynced.videoId && isValidVideoId(lastSynced.videoId)) ? lastSynced.videoId : (lastSynced.title || ''))
+        : null;
+
+      if (key && syncedKey && key === syncedKey) {
+        // Track was already transitioned and loaded by playerEngine
+        lastSyncedTrackRef.current = null;
+      } else {
+        lastSyncedTrackRef.current = null;
+        playerEngine.loadVideo(vId || activeSong, true, activeSong);
+      }
 
       if (vId && isValidVideoId(vId)) {
         setDownloadStatus(isTrackDownloadedSync(vId) ? 'downloaded' : 'idle');

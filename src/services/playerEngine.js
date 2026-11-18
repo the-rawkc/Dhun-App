@@ -33,6 +33,7 @@ class PlayerEngine {
     this.isCrossfading = false;
     this.crossfadeTimer = null;
     this.crossfadeSeconds = 4;
+    this.crossfadeAttemptedIndex = -1;
     try {
       let savedStyle = localStorage.getItem('tunetide_crossfade_style');
       if (savedStyle) {
@@ -90,6 +91,7 @@ class PlayerEngine {
   }
 
   setCrossfadeSeconds(sec, style = null) {
+    this.crossfadeAttemptedIndex = -1;
     this.crossfadeSeconds = typeof sec === 'number' && !isNaN(sec) ? Math.max(0, Math.min(15, sec)) : 4;
     if (this.crossfadeSeconds === 0 && this.isCrossfading) {
       if (this.crossfadeTimer) {
@@ -234,6 +236,7 @@ class PlayerEngine {
           if (
             this.crossfadeSeconds > 0 &&
             !this.isCrossfading &&
+            this.crossfadeAttemptedIndex !== this.queueIndex &&
             this.shouldBePlaying &&
             !this.isUserPaused &&
             dur &&
@@ -286,10 +289,11 @@ class PlayerEngine {
 
       deck.addEventListener('ended', () => {
         if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
-          if (this.isCrossfading) {
+          if (this.crossfadeTimer !== null) {
             // Next deck is already crossfading / playing
             return;
           }
+          this.isCrossfading = false;
           this.startBackgroundAudioAnchor(true);
           this.playNextTrack(false);
         }
@@ -301,7 +305,11 @@ class PlayerEngine {
         if (!this.isDirectAudio && !this.isOfflinePlayback) return;
         console.warn('Direct native audio stream error, falling back to YouTube:', err);
         if (this.currentVideoId && !this.isOfflinePlayback) {
-          this.fallbackToYouTube(this.currentVideoId, this.shouldBePlaying);
+          this.fallbackToYouTube(this.currentVideoId, this.shouldBePlaying, this.currentTrack);
+        } else {
+          setTimeout(() => {
+            this.playNextTrack(false);
+          }, 600);
         }
       });
     };
@@ -442,6 +450,7 @@ class PlayerEngine {
               } else if (event.data === 0) { // Ended
                 this.shouldBePlaying = false;
                 this.stopTimeTracking();
+                this.startBackgroundAudioAnchor(true);
                 this.playNextTrack(false);
               } else if (event.data === 5 || event.data === 3 || event.data === -1) {
                 // Video Cued (5), Buffering (3), or Unstarted (-1) -> auto-play watchdog
@@ -467,7 +476,7 @@ class PlayerEngine {
               if (event.data === 150 || event.data === 101 || event.data === 100 || event.data === 2) {
                 setTimeout(() => {
                   if (!this.isDirectAudio && !this.isOfflinePlayback) {
-                    this.listeners.next();
+                    this.playNextTrack(false);
                   }
                 }, 400);
               }
@@ -500,8 +509,12 @@ class PlayerEngine {
   }
 
   setQueue(songs = [], currentIndex = 0, shuffle = false, repeatMode = 'off') {
+    const nextIdx = typeof currentIndex === 'number' ? currentIndex : 0;
+    if (this.queueIndex !== nextIdx) {
+      this.crossfadeAttemptedIndex = -1;
+    }
     this.queue = Array.isArray(songs) ? songs : [];
-    this.queueIndex = typeof currentIndex === 'number' ? currentIndex : 0;
+    this.queueIndex = nextIdx;
     this.isShuffle = !!shuffle;
     this.repeatMode = repeatMode || 'off';
 
@@ -547,7 +560,15 @@ class PlayerEngine {
     }
 
     const deck = this.currentDeck;
-    if (!deck || deck.paused || this.currentVolume <= 0) {
+    const isHidden = typeof document !== 'undefined' && document.hidden;
+    if (!deck || deck.paused || this.currentVolume <= 0 || isHidden) {
+      if (deck) {
+        try {
+          deck.pause();
+          deck.currentTime = 0;
+          deck.volume = this.currentVolume ?? 0.8;
+        } catch (e) {}
+      }
       if (onSwitch) onSwitch();
       return;
     }
@@ -578,6 +599,8 @@ class PlayerEngine {
   // Seamless smart crossfade / automix
   async startSmartCrossfade(remainingSec = 4) {
     if (this.isCrossfading || !this.queue || this.queue.length <= 1) return;
+    const startQueueIndex = this.queueIndex;
+    this.crossfadeAttemptedIndex = this.queueIndex;
     this.isCrossfading = true;
 
     let nextIndex = this.queueIndex + 1;
@@ -629,6 +652,12 @@ class PlayerEngine {
           }
         }
       } catch (e) {}
+    }
+
+    // Verify track hasn't changed or advanced while waiting for fetch
+    if (this.queueIndex !== startQueueIndex) {
+      this.isCrossfading = false;
+      return;
     }
 
     if (!streamData?.streamUrl) {
@@ -735,10 +764,11 @@ class PlayerEngine {
 
     if (this.repeatMode === 'one' && !fromLockScreen) {
       this.seekTo(0);
-      if (this.isUserPaused) this.play();
+      this.play();
       return;
     }
 
+    this.crossfadeAttemptedIndex = -1;
     this.pushPlaybackHistory(this.queueIndex);
 
     let nextIndex = this.queueIndex + 1;
@@ -768,11 +798,10 @@ class PlayerEngine {
 
       this.smoothSwitchDeck(() => {
         this.loadVideo(vId || nextTrack, true, nextTrack);
+        if (typeof this.listeners.onTrackChanged === 'function') {
+          this.listeners.onTrackChanged(nextTrack, nextIndex);
+        }
       });
-
-      if (typeof this.listeners.onTrackChanged === 'function') {
-        this.listeners.onTrackChanged(nextTrack, nextIndex);
-      }
 
       this.prefetchNextInQueue();
     }
@@ -815,6 +844,7 @@ class PlayerEngine {
     // 2. Double tap (2 clicks in succession) OR tap within first 2.5s:
     // Go to the previously played song or previous index in queue
     this.lastPrevClickTime = 0;
+    this.crossfadeAttemptedIndex = -1;
 
     let prevIndex = -1;
     // Pop from actual playback history first
@@ -845,11 +875,10 @@ class PlayerEngine {
 
       this.smoothSwitchDeck(() => {
         this.loadVideo(vId || prevTrack, true, prevTrack);
+        if (typeof this.listeners.onTrackChanged === 'function') {
+          this.listeners.onTrackChanged(prevTrack, prevIndex);
+        }
       });
-
-      if (typeof this.listeners.onTrackChanged === 'function') {
-        this.listeners.onTrackChanged(prevTrack, prevIndex);
-      }
 
       this.prefetchNextInQueue();
     }
@@ -954,18 +983,28 @@ class PlayerEngine {
   unlockAudio() {
     if (typeof window === 'undefined') return;
     try {
-      if (this.audioEl) {
-        this.audioEl.volume = this.currentVolume ?? 0.8;
-        this.audioEl.muted = false;
-        // Prime audio element on user gesture to permanently satisfy autoplay requirements
-        if (!this.audioEl.src || this.audioEl.src === window.location.href) {
-          this.audioEl.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-        }
-        const p = this.audioEl.play();
-        if (p && typeof p.catch === 'function') {
-          p.catch(() => {});
-        }
-      }
+      const silentSrc = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      const primeDeck = (deck) => {
+        if (!deck) return;
+        try {
+          deck.volume = this.currentVolume ?? 0.8;
+          deck.muted = false;
+          // Prime audio element on user gesture to permanently satisfy autoplay requirements
+          if (!deck.src || deck.src === window.location.href) {
+            deck.src = silentSrc;
+          }
+          if (deck.paused && (!deck.src || deck.src.startsWith('data:'))) {
+            const p = deck.play();
+            if (p && typeof p.catch === 'function') {
+              p.catch(() => {});
+            }
+          }
+        } catch (e) {}
+      };
+
+      primeDeck(this.deckA);
+      primeDeck(this.deckB);
+      primeDeck(this.bgAnchorEl);
     } catch (e) {}
   }
 
@@ -1041,20 +1080,27 @@ class PlayerEngine {
         }
         return;
       }
-      if (this.isDirectAudio && this.audioEl && this.audioEl.src && !this.audioEl.src.startsWith('data:')) {
+      if (this.isDirectAudio && this.currentDeck && this.currentDeck.src && !this.currentDeck.src.startsWith('data:')) {
         // Already loaded direct audio for this song
         if (autoPlay) {
           this.shouldBePlaying = true;
           this.isUserPaused = false;
-          if (this.audioEl.paused) {
-            this.audioEl.play().catch(() => {});
+          if (this.currentDeck.paused) {
+            this.currentDeck.play().catch(() => {});
           }
+        }
+        return;
+      }
+      if (!this.isDirectAudio && this.ytPlayer && typeof this.ytPlayer.getPlayerState === 'function') {
+        if (autoPlay && this.ytPlayer.getPlayerState() !== 1) {
+          try { this.ytPlayer.playVideo(); } catch (e) {}
         }
         return;
       }
     }
 
     // Changing to a new track: cancel any previous in-flight fetch and active crossfade
+    this.crossfadeAttemptedIndex = -1;
     if (this.crossfadeTimer) {
       clearInterval(this.crossfadeTimer);
       this.crossfadeTimer = null;
