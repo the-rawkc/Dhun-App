@@ -446,10 +446,10 @@ const Home = () => {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => navigate('/charts?tab=haryanvi')}
+                onClick={() => navigate('/charts?tab=haryanvi-50')}
                 className="text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-500 hover:bg-amber-500 hover:text-dark-950 transition-colors"
               >
-                Haryanvi Charts
+                Haryanvi Top 50
               </button>
               <button
                 onClick={() => navigate('/playlist/pl-haryanvi-top-hits')}

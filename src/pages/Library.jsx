@@ -5,6 +5,7 @@ import {
   playSong,
   playTrackNow,
   playPlaylistWithShuffle,
+  shufflePlayTracks,
   createPlaylist,
   loadCloudUserData,
 } from '../redux/features/playerSlice';
@@ -218,7 +219,7 @@ const Library = () => {
                     e.stopPropagation();
                     const trks = Array.isArray(pl.tracks) ? pl.tracks : [];
                     if (trks.length > 0) {
-                      dispatch(playPlaylistWithShuffle({ tracks: trks }));
+                      dispatch(shufflePlayTracks({ tracks: trks }));
                     }
                   }}
                   disabled={!Array.isArray(pl.tracks) || pl.tracks.length === 0}

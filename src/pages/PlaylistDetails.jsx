@@ -5,6 +5,9 @@ import {
   playSong,
   playTrackNow,
   playPlaylistWithShuffle,
+  shufflePlayTracks,
+  setPlaylistTracks,
+  appendQueueTracks,
   deletePlaylist,
   renamePlaylist,
   removeTrackFromPlaylist,
@@ -353,6 +356,67 @@ const PlaylistDetails = () => {
     }, 400);
   };
 
+  // Auto-enrich official regional playlists to 50 songs dynamically
+  useEffect(() => {
+    const OFFICIAL_QUERIES = {
+      'pl-desi-hits': 'top 50 hindi songs latest trending bollywood hits 2026',
+      'pl-punjabi-power': 'top 50 punjabi trending songs latest hits 2026',
+      'pl-haryanvi-top-hits': 'top 50 haryanvi trending songs latest hits 2026',
+    };
+
+    const query = OFFICIAL_QUERIES[playlist?.id];
+    if (!query || tracks.length >= 45) return;
+
+    let mounted = true;
+    const fetchOfficialTracks = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}&filter=songs&language=en&hl=en`);
+        const data = await res.json();
+        if (!mounted || !Array.isArray(data?.results)) return;
+
+        let songList = data.results.map(normalizeSong).filter(Boolean);
+        let nextTok = data.continuationToken;
+        let attempts = 0;
+
+        while (nextTok && songList.length < 50 && attempts < 5) {
+          attempts++;
+          try {
+            const nextRes = await fetch(`${API_BASE}/api/search?continuationToken=${encodeURIComponent(nextTok)}&language=en&hl=en`);
+            const nextData = await nextRes.json();
+            if (!mounted) return;
+            if (Array.isArray(nextData?.results) && nextData.results.length > 0) {
+              const more = nextData.results.map(normalizeSong).filter(Boolean);
+              const seen = new Set(songList.map((s) => s.videoId));
+              more.forEach((s) => {
+                if (s && s.videoId && !seen.has(s.videoId)) {
+                  seen.add(s.videoId);
+                  songList.push(s);
+                }
+              });
+              nextTok = nextData.continuationToken || null;
+            } else {
+              break;
+            }
+          } catch (e) {
+            break;
+          }
+        }
+
+        if (mounted && songList.length > tracks.length) {
+          dispatch(setPlaylistTracks({ playlistId: playlist.id, tracks: songList }));
+          dispatch(appendQueueTracks({ newTracks: songList }));
+        }
+      } catch (e) {
+        console.warn('Failed to auto-enrich official playlist:', e);
+      }
+    };
+
+    fetchOfficialTracks();
+    return () => {
+      mounted = false;
+    };
+  }, [playlist?.id]);
+
   const handlePlayAll = () => {
     if (tracks.length > 0) {
       dispatch(playTrackNow({ song: tracks[0], songs: tracks, index: 0 }));
@@ -361,7 +425,7 @@ const PlaylistDetails = () => {
 
   const handleShufflePlay = () => {
     if (tracks.length > 0) {
-      dispatch(playPlaylistWithShuffle({ tracks }));
+      dispatch(shufflePlayTracks({ tracks }));
     }
   };
 

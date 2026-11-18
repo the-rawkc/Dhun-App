@@ -46,6 +46,30 @@ export const instantHaryanviTracks = [
   { videoId: 'z6sDIc1Zqzs', title: 'Middle Class', artist: 'Gulzaar Chhaniwala', thumbnail: 'https://i.ytimg.com/vi/z6sDIc1Zqzs/hqdefault.jpg', duration: '3:45' },
   { videoId: 'MVF-GCOY2kI', title: '2 Numbari', artist: 'Masoom Sharma', thumbnail: 'https://i.ytimg.com/vi/MVF-GCOY2kI/hqdefault.jpg', duration: '3:12' },
   { videoId: 'kVtkC1I7-uc', title: 'Kothe Upar Kothri', artist: 'Renuka Panwar', thumbnail: 'https://i.ytimg.com/vi/kVtkC1I7-uc/hqdefault.jpg', duration: '3:30' },
+  { videoId: 'xJ8M4Z_n1t8', title: 'Solid Body', artist: 'Raju Punjabi, Sheenam Katholic', thumbnail: 'https://i.ytimg.com/vi/xJ8M4Z_n1t8/hqdefault.jpg', duration: '3:40' },
+  { videoId: '4H5gGfXo3eQ', title: 'Bahu Kale Ki', artist: 'Ajay Hooda, Gajender Phogat', thumbnail: 'https://i.ytimg.com/vi/4H5gGfXo3eQ/hqdefault.jpg', duration: '3:15' },
+];
+
+export const instantDesiTracks = [
+  { videoId: 'BddP6PYo2gs', title: 'Kesariya (From "Brahmastra")', artist: 'Pritam, Arijit Singh', thumbnail: 'https://i.ytimg.com/vi/BddP6PYo2gs/hqdefault.jpg', duration: '4:28' },
+  { videoId: 'ElZfdU54Cp8', title: 'Apna Bana Le (From "Bhediya")', artist: 'Arijit Singh, Sachin-Jigar', thumbnail: 'https://i.ytimg.com/vi/ElZfdU54Cp8/hqdefault.jpg', duration: '4:21' },
+  { videoId: 'RLzC55ai0eo', title: 'Heeriye (feat. Arijit Singh)', artist: 'Jasleen Royal, Arijit Singh', thumbnail: 'https://i.ytimg.com/vi/RLzC55ai0eo/hqdefault.jpg', duration: '3:15' },
+  { videoId: '2qK_q9g5d8k', title: 'Satranga (From "ANIMAL")', artist: 'Arijit Singh, Shreyas Puranik', thumbnail: 'https://i.ytimg.com/vi/2qK_q9g5d8k/hqdefault.jpg', duration: '4:31' },
+  { videoId: 'k4yXQkGLeAA', title: 'O Maahi (From "Dunki")', artist: 'Pritam, Arijit Singh', thumbnail: 'https://i.ytimg.com/vi/k4yXQkGLeAA/hqdefault.jpg', duration: '3:53' },
+  { videoId: 'YxWlaYCA8MU', title: 'Pehle Bhi Main (From "ANIMAL")', artist: 'Vishal Mishra, Raj Shekhar', thumbnail: 'https://i.ytimg.com/vi/YxWlaYCA8MU/hqdefault.jpg', duration: '4:10' },
+  { videoId: 'LK7-_dgAVQE', title: 'Tauba Tauba (From "Bad Newz")', artist: 'Karan Aujla', thumbnail: 'https://i.ytimg.com/vi/LK7-_dgAVQE/hqdefault.jpg', duration: '3:32' },
+  { videoId: 'yJg-Y5byMMw', title: 'Tum Se (From "Teri Baaton Mein")', artist: 'Sachin-Jigar, Raghav Chaitanya', thumbnail: 'https://i.ytimg.com/vi/yJg-Y5byMMw/hqdefault.jpg', duration: '4:24' },
+];
+
+export const instantPunjabiTracks = [
+  { videoId: 'LK7-_dgAVQE', title: 'Tauba Tauba (From "Bad Newz")', artist: 'Karan Aujla', thumbnail: 'https://i.ytimg.com/vi/LK7-_dgAVQE/hqdefault.jpg', duration: '3:32' },
+  { videoId: 'cl0a3i2wFcc', title: 'Lover', artist: 'Diljit Dosanjh', thumbnail: 'https://i.ytimg.com/vi/cl0a3i2wFcc/hqdefault.jpg', duration: '3:05' },
+  { videoId: 'cWMxCE2HTag', title: 'Softly', artist: 'Karan Aujla, Ikky', thumbnail: 'https://i.ytimg.com/vi/cWMxCE2HTag/hqdefault.jpg', duration: '2:36' },
+  { videoId: 'vX2cDW8LUWk', title: '52 Bars', artist: 'Karan Aujla, Ikky', thumbnail: 'https://i.ytimg.com/vi/vX2cDW8LUWk/hqdefault.jpg', duration: '3:45' },
+  { videoId: 'dCmp56tSSmA', title: 'Hass Hass', artist: 'Diljit Dosanjh, Sia', thumbnail: 'https://i.ytimg.com/vi/dCmp56tSSmA/hqdefault.jpg', duration: '2:34' },
+  { videoId: 'Tpu8Pz_pAqw', title: 'Cheques', artist: 'Shubh', thumbnail: 'https://i.ytimg.com/vi/Tpu8Pz_pAqw/hqdefault.jpg', duration: '3:03' },
+  { videoId: 'tms3r96Qn6M', title: 'With You', artist: 'AP Dhillon', thumbnail: 'https://i.ytimg.com/vi/tms3r96Qn6M/hqdefault.jpg', duration: '2:33' },
+  { videoId: 'hBCcW_2pU8U', title: 'Born to Shine', artist: 'Diljit Dosanjh', thumbnail: 'https://i.ytimg.com/vi/hBCcW_2pU8U/hqdefault.jpg', duration: '3:32' },
 ];
 
 const defaultPlaylists = [
@@ -54,7 +78,7 @@ const defaultPlaylists = [
     title: 'Desi Chill & Bollywood',
     description: 'Arijit Singh, Shreya Ghoshal & soulful melodies',
     cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80',
-    tracks: [],
+    tracks: instantDesiTracks,
     createdAt: Date.now(),
   },
   {
@@ -62,7 +86,7 @@ const defaultPlaylists = [
     title: 'Punjabi Fire Wave',
     description: 'High energy beats by Diljit, Karan Aujla, AP Dhillon',
     cover: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&auto=format&fit=crop&q=80',
-    tracks: [],
+    tracks: instantPunjabiTracks,
     createdAt: Date.now(),
   },
   {
@@ -78,13 +102,15 @@ const defaultPlaylists = [
 const loadSavedPlaylists = () => {
   const loaded = loadSaved('tunetide_playlists', defaultPlaylists);
   if (Array.isArray(loaded)) {
-    if (!loaded.some((p) => p.id === 'pl-haryanvi-top-hits')) {
-      const haryanviPl = defaultPlaylists.find((p) => p.id === 'pl-haryanvi-top-hits');
-      if (haryanviPl) {
-        loaded.push(haryanviPl);
-        saveItem('tunetide_playlists', loaded);
+    defaultPlaylists.forEach((defPl) => {
+      const existing = loaded.find((p) => p.id === defPl.id);
+      if (!existing) {
+        loaded.push(defPl);
+      } else if (!Array.isArray(existing.tracks) || existing.tracks.length === 0) {
+        existing.tracks = defPl.tracks;
       }
-    }
+    });
+    saveItem('tunetide_playlists', loaded);
     return loaded;
   }
   return defaultPlaylists;
@@ -208,15 +234,17 @@ const playerSlice = createSlice({
     },
 
     playPlaylistWithShuffle: (state, action) => {
-      const { tracks = [] } = action.payload;
+      const { tracks = [], startIndex } = action.payload || {};
       if (!tracks.length) return;
 
       const normalized = tracks.map(normalizeSong).filter(Boolean);
       state.currentSongs = normalized;
       state.shuffle = true;
-      const randomIdx = Math.floor(Math.random() * normalized.length);
-      state.currentIndex = randomIdx;
-      state.activeSong = normalized[randomIdx];
+      const chosenIdx = (typeof startIndex === 'number' && startIndex >= 0 && startIndex < normalized.length)
+        ? startIndex
+        : Math.floor(Math.random() * normalized.length);
+      state.currentIndex = chosenIdx;
+      state.activeSong = normalized[chosenIdx];
       state.isActive = true;
       state.isPlaying = true;
       state.currentTime = 0;
@@ -476,6 +504,41 @@ const playerSlice = createSlice({
       triggerCloudSync(state);
     },
 
+    setPlaylistTracks: (state, action) => {
+      const { playlistId, tracks = [] } = action.payload || {};
+      if (!playlistId) return;
+      const normalized = tracks.map(normalizeSong).filter(Boolean);
+      state.playlists = state.playlists.map((pl) => {
+        if (pl.id === playlistId) {
+          const firstImg = normalized.length > 0 ? (normalized[0]?.thumbnail || normalized[0]?.cover || normalized[0]?.image) : null;
+          return {
+            ...pl,
+            tracks: normalized,
+            cover: pl.cover || firstImg,
+          };
+        }
+        return pl;
+      });
+      saveItem('tunetide_playlists', state.playlists);
+      triggerCloudSync(state);
+    },
+
+    appendQueueTracks: (state, action) => {
+      const { newTracks = [] } = action.payload || {};
+      if (!Array.isArray(newTracks) || newTracks.length === 0) return;
+      if (!state.currentSongs || state.currentSongs.length === 0) return;
+
+      const existingIds = new Set(state.currentSongs.map((s) => s.videoId).filter(Boolean));
+      const filteredNew = newTracks.map(normalizeSong).filter((s) => s && s.videoId && !existingIds.has(s.videoId));
+
+      if (filteredNew.length > 0) {
+        state.currentSongs = [...state.currentSongs, ...filteredNew];
+        try {
+          playerEngine.setQueue(state.currentSongs, state.currentIndex, state.shuffle, state.repeatMode);
+        } catch (e) {}
+      }
+    },
+
     openAddToPlaylistModal: (state, action) => {
       state.songToAddToPlaylist = normalizeSong(action.payload);
       state.isAddToPlaylistModalOpen = true;
@@ -563,11 +626,37 @@ export const {
   addToQueue,
   clearQueue,
   syncCurrentTrack,
+  setPlaylistTracks,
+  appendQueueTracks,
   setIsEqualizerModalOpen,
   setEqualizerPreset,
   setAudioQuality,
   setCrossfadeStyle,
 } = playerSlice.actions;
+
+// Centralized shuffle play thunk to unlock audio and set full queue across all devices
+export const shufflePlayTracks = ({ tracks = [], startIndex }) => (dispatch, getState) => {
+  if (!Array.isArray(tracks) || !tracks.length) return;
+  const normalized = tracks.map(normalizeSong).filter(Boolean);
+  if (!normalized.length) return;
+
+  const chosenIdx = (typeof startIndex === 'number' && startIndex >= 0 && startIndex < normalized.length)
+    ? startIndex
+    : Math.floor(Math.random() * normalized.length);
+  const startSong = normalized[chosenIdx];
+  const { repeatMode } = getState().player;
+
+  try {
+    playerEngine.unlockAudio();
+    playerEngine.pushPlaybackHistory(playerEngine.queueIndex);
+    playerEngine.setQueue(normalized, chosenIdx, true, repeatMode);
+    playerEngine.loadVideo(startSong.videoId || startSong, true, startSong);
+  } catch (e) {
+    console.warn('playerEngine shufflePlayTracks error:', e);
+  }
+
+  dispatch(playPlaylistWithShuffle({ tracks: normalized, startIndex: chosenIdx }));
+};
 
 // Centralized synchronous action for 100% reliable click-to-play across all devices & browsers
 export const playTrackNow = ({ song, songs = [], index = 0 }) => (dispatch, getState) => {

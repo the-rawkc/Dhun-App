@@ -137,7 +137,7 @@ const Explore = () => {
           <span className="text-[11px] font-semibold text-rose-500">Live Rankings</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {/* Haryanvi Playlist */}
           <div
             onClick={() => navigate('/playlist/pl-haryanvi-top-hits')}
@@ -157,7 +157,7 @@ const Explore = () => {
 
           {/* Haryanvi Charts */}
           <div
-            onClick={() => navigate('/charts?tab=haryanvi')}
+            onClick={() => navigate('/charts?tab=haryanvi-50')}
             className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-orange-600/30 to-red-950/40 border border-orange-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
           >
             <div className="flex items-center justify-between">
@@ -167,7 +167,7 @@ const Explore = () => {
               <FaHeadphonesAlt className="text-orange-500 text-xs" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm text-white">Haryanvi Top 20</h3>
+              <h3 className="font-extrabold text-sm text-white">Haryanvi Top 50</h3>
               <p className="text-[11px] text-white/70">Haryana Official Trending Music</p>
             </div>
           </div>
@@ -189,9 +189,26 @@ const Explore = () => {
             </div>
           </div>
 
-          {/* India Top 50 Chart */}
+          {/* Punjabi Top 50 Chart */}
           <div
-            onClick={() => navigate('/charts')}
+            onClick={() => navigate('/charts?tab=punjabi-50')}
+            className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-purple-600/30 to-indigo-950/40 border border-purple-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between">
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-500 text-white">
+                CHART
+              </span>
+              <FaHeadphonesAlt className="text-purple-400 text-xs" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-white">Punjabi Top 50</h3>
+              <p className="text-[11px] text-white/70">Punjab Pop & Bhangra Bangers</p>
+            </div>
+          </div>
+
+          {/* Hindi Top 50 Chart */}
+          <div
+            onClick={() => navigate('/charts?tab=hindi-50')}
             className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-red-600/30 to-dark-900 border border-red-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
           >
             <div className="flex items-center justify-between">
@@ -201,8 +218,25 @@ const Explore = () => {
               <FaHeadphonesAlt className="text-red-500 text-xs" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm text-white">India Top 50</h3>
-              <p className="text-[11px] text-white/70">Nationwide Official Ranking</p>
+              <h3 className="font-extrabold text-sm text-white">Hindi Top 50</h3>
+              <p className="text-[11px] text-white/70">Trending Hindi & Bollywood Songs</p>
+            </div>
+          </div>
+
+          {/* India Top 100 Chart */}
+          <div
+            onClick={() => navigate('/charts?tab=india-100')}
+            className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-emerald-600/30 to-teal-950/40 border border-emerald-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between">
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500 text-dark-950">
+                CHART
+              </span>
+              <FaHeadphonesAlt className="text-emerald-400 text-xs" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-white">India Top 100</h3>
+              <p className="text-[11px] text-white/70">Top 100 Viral Hits Across India</p>
             </div>
           </div>
         </div>
