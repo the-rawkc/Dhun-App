@@ -12,48 +12,31 @@ import {
   hasPunjabiSignature,
   hasHaryanviSignature,
 } from '../utils/regionalFilter';
-
-const instantHindiChartSeeds = [
-  { videoId: 'BddP6PYo2gs', title: 'Kesariya (From "Brahmastra")', artist: 'Pritam, Arijit Singh', thumbnail: 'https://i.ytimg.com/vi/BddP6PYo2gs/hqdefault.jpg', duration: '4:28' },
-  { videoId: 'ElZfdU54Cp8', title: 'Apna Bana Le (From "Bhediya")', artist: 'Arijit Singh, Sachin-Jigar', thumbnail: 'https://i.ytimg.com/vi/ElZfdU54Cp8/hqdefault.jpg', duration: '4:21' },
-  { videoId: 'RLzC55ai0eo', title: 'Heeriye (feat. Arijit Singh)', artist: 'Jasleen Royal, Arijit Singh', thumbnail: 'https://i.ytimg.com/vi/RLzC55ai0eo/hqdefault.jpg', duration: '3:15' },
-  { videoId: '2qK_q9g5d8k', title: 'Satranga (From "ANIMAL")', artist: 'Arijit Singh, Shreyas Puranik', thumbnail: 'https://i.ytimg.com/vi/2qK_q9g5d8k/hqdefault.jpg', duration: '4:31' },
-  { videoId: 'k4yXQkGLeAA', title: 'O Maahi (From "Dunki")', artist: 'Pritam, Arijit Singh', thumbnail: 'https://i.ytimg.com/vi/k4yXQkGLeAA/hqdefault.jpg', duration: '3:53' },
-  { videoId: 'YxWlaYCA8MU', title: 'Pehle Bhi Main (From "ANIMAL")', artist: 'Vishal Mishra, Raj Shekhar', thumbnail: 'https://i.ytimg.com/vi/YxWlaYCA8MU/hqdefault.jpg', duration: '4:10' },
-  { videoId: 'LK7-_dgAVQE', title: 'Tauba Tauba (From "Bad Newz")', artist: 'Karan Aujla', thumbnail: 'https://i.ytimg.com/vi/LK7-_dgAVQE/hqdefault.jpg', duration: '3:32' },
-  { videoId: 'yJg-Y5byMMw', title: 'Tum Se (From "Teri Baaton Mein")', artist: 'Sachin-Jigar, Raghav Chaitanya', thumbnail: 'https://i.ytimg.com/vi/yJg-Y5byMMw/hqdefault.jpg', duration: '4:24' },
-];
-
-const instantPunjabiChartSeeds = [
-  { videoId: 'LK7-_dgAVQE', title: 'Tauba Tauba (From "Bad Newz")', artist: 'Karan Aujla', thumbnail: 'https://i.ytimg.com/vi/LK7-_dgAVQE/hqdefault.jpg', duration: '3:32' },
-  { videoId: 'cl0a3i2wFcc', title: 'Lover', artist: 'Diljit Dosanjh', thumbnail: 'https://i.ytimg.com/vi/cl0a3i2wFcc/hqdefault.jpg', duration: '3:05' },
-  { videoId: 'cWMxCE2HTag', title: 'Softly', artist: 'Karan Aujla, Ikky', thumbnail: 'https://i.ytimg.com/vi/cWMxCE2HTag/hqdefault.jpg', duration: '2:36' },
-  { videoId: 'vX2cDW8LUWk', title: '52 Bars', artist: 'Karan Aujla, Ikky', thumbnail: 'https://i.ytimg.com/vi/vX2cDW8LUWk/hqdefault.jpg', duration: '3:45' },
-  { videoId: 'dCmp56tSSmA', title: 'Hass Hass', artist: 'Diljit Dosanjh, Sia', thumbnail: 'https://i.ytimg.com/vi/dCmp56tSSmA/hqdefault.jpg', duration: '2:34' },
-  { videoId: 'Tpu8Pz_pAqw', title: 'Cheques', artist: 'Shubh', thumbnail: 'https://i.ytimg.com/vi/Tpu8Pz_pAqw/hqdefault.jpg', duration: '3:03' },
-  { videoId: 'tms3r96Qn6M', title: 'With You', artist: 'AP Dhillon', thumbnail: 'https://i.ytimg.com/vi/tms3r96Qn6M/hqdefault.jpg', duration: '2:33' },
-  { videoId: 'hBCcW_2pU8U', title: 'Born to Shine', artist: 'Diljit Dosanjh', thumbnail: 'https://i.ytimg.com/vi/hBCcW_2pU8U/hqdefault.jpg', duration: '3:32' },
-];
-
-const instantHaryanviChartSeeds = [
-  { videoId: 'CZt-rVn2BJs', title: '52 Gaj Ka Daman', artist: 'Renuka Panwar', thumbnail: 'https://i.ytimg.com/vi/CZt-rVn2BJs/hqdefault.jpg', duration: '3:05' },
-  { videoId: 'cZSrWoBMSrg', title: 'Gypsy (Balam Thanedar)', artist: 'GD Kaur, Pranjal Dahiya', thumbnail: 'https://i.ytimg.com/vi/cZSrWoBMSrg/hqdefault.jpg', duration: '2:52' },
-  { videoId: 'nfs8NYg7yQM', title: 'Chatak Matak', artist: 'Renuka Panwar, Sapna Choudhary', thumbnail: 'https://i.ytimg.com/vi/nfs8NYg7yQM/hqdefault.jpg', duration: '3:21' },
-  { videoId: 'tJGBVigwPlU', title: 'Moto', artist: 'Diler Kharkiya, Ajay Hooda', thumbnail: 'https://i.ytimg.com/vi/tJGBVigwPlU/hqdefault.jpg', duration: '3:18' },
-  { videoId: 'T0H_LWLiOGk', title: 'Up To Date', artist: 'Dhanda Nyoliwala', thumbnail: 'https://i.ytimg.com/vi/T0H_LWLiOGk/hqdefault.jpg', duration: '3:00' },
-  { videoId: 'z6sDIc1Zqzs', title: 'Middle Class', artist: 'Gulzaar Chhaniwala', thumbnail: 'https://i.ytimg.com/vi/z6sDIc1Zqzs/hqdefault.jpg', duration: '3:45' },
-  { videoId: 'MVF-GCOY2kI', title: '2 Numbari', artist: 'Masoom Sharma', thumbnail: 'https://i.ytimg.com/vi/MVF-GCOY2kI/hqdefault.jpg', duration: '3:12' },
-  { videoId: 'kVtkC1I7-uc', title: 'Kothe Upar Kothri', artist: 'Renuka Panwar', thumbnail: 'https://i.ytimg.com/vi/kVtkC1I7-uc/hqdefault.jpg', duration: '3:30' },
-  { videoId: 'xJ8M4Z_n1t8', title: 'Solid Body', artist: 'Raju Punjabi, Sheenam Katholic', thumbnail: 'https://i.ytimg.com/vi/xJ8M4Z_n1t8/hqdefault.jpg', duration: '3:40' },
-  { videoId: '4H5gGfXo3eQ', title: 'Bahu Kale Ki', artist: 'Ajay Hooda, Gajender Phogat', thumbnail: 'https://i.ytimg.com/vi/4H5gGfXo3eQ/hqdefault.jpg', duration: '3:15' },
-];
+import {
+  verifiedIndia10Seeds,
+  verifiedHindiSeeds,
+  verifiedPunjabiSeeds,
+  verifiedHaryanviSeeds,
+  verifiedIndia100Seeds,
+} from '../utils/regionalSeeds';
 
 export const chartTabs = [
+  {
+    id: 'india-10',
+    name: 'India Top 10',
+    subtitle: 'Official Top 10 hottest songs streaming across India today',
+    queries: ['top 10 songs india trending viral music 2026', 'top songs viral india 2026', 'bollywood top trending songs hits'],
+    target: 10,
+  },
   {
     id: 'hindi-50',
     name: 'Hindi Top 50',
     subtitle: 'Top 50 trending Hindi & Bollywood chartbusters',
-    queries: ['top 50 hindi songs latest trending hits 2026', 'bollywood top weekly songs romantic dance hits'],
+    queries: [
+      'top 50 hindi songs latest trending hits 2026',
+      'bollywood top weekly songs romantic dance hits',
+      'latest hindi hit songs arijit pritam shreya',
+    ],
     target: 50,
   },
   {
@@ -89,7 +72,14 @@ export const chartTabs = [
     id: 'india-100',
     name: 'India Top 100',
     subtitle: 'Top 100 songs streaming nationwide across India',
-    queries: ['top 100 indian songs trending viral music 2026', 'top trending music india 2026'],
+    queries: [
+      'top 100 indian songs trending viral music 2026',
+      'top trending music india 2026',
+      'top 50 hindi songs latest hits 2026',
+      'punjabi top trending songs 2026',
+      'top haryanvi songs hits nav haryanvi',
+      'south indian songs viral latest hits',
+    ],
     target: 100,
   },
   {
@@ -104,15 +94,39 @@ export const chartTabs = [
 const findTabByParam = (param) => {
   if (!param) return chartTabs[0];
   const p = param.toLowerCase().trim();
-  const match = chartTabs.find(
-    (t) =>
-      t.id === p ||
-      t.id.includes(p) ||
-      p.includes(t.id) ||
-      t.name.toLowerCase().includes(p) ||
-      p.includes(t.name.toLowerCase())
-  );
-  return match || chartTabs[0];
+
+  // 1. Exact ID match
+  const exactId = chartTabs.find((t) => t.id === p);
+  if (exactId) return exactId;
+
+  // 2. Exact name match
+  const exactName = chartTabs.find((t) => t.name.toLowerCase() === p);
+  if (exactName) return exactName;
+
+  // 3. Explicit numeric shortcuts
+  if (p === '10' || p === 'top-10' || p === 'top 10' || p.includes('top-10') || p.includes('top 10')) {
+    return chartTabs.find((t) => t.id === 'india-10') || chartTabs[0];
+  }
+  if (p === '100' || p === 'top-100' || p === 'top 100' || p.includes('100')) {
+    return chartTabs.find((t) => t.id === 'india-100') || chartTabs[0];
+  }
+  if (p.includes('punjabi')) {
+    return chartTabs.find((t) => t.id === 'punjabi-50') || chartTabs[0];
+  }
+  if (p.includes('haryanvi')) {
+    return chartTabs.find((t) => t.id === 'haryanvi-50') || chartTabs[0];
+  }
+  if (p.includes('bollywood')) {
+    return chartTabs.find((t) => t.id === 'bollywood-50') || chartTabs[0];
+  }
+  if (p.includes('south')) {
+    return chartTabs.find((t) => t.id === 'south-50') || chartTabs[0];
+  }
+  if (p.includes('hindi') || p === '50' || p === 'top-50' || p === 'top 50') {
+    return chartTabs.find((t) => t.id === 'hindi-50') || chartTabs[0];
+  }
+
+  return chartTabs[0];
 };
 
 const filterForTab = (song, tabId) => {
@@ -168,22 +182,26 @@ const Charts = () => {
   };
 
   const getInitialSeeds = (tab) => {
-    if (tab.id.includes('haryanvi')) return instantHaryanviChartSeeds;
-    if (tab.id.includes('punjabi')) return instantPunjabiChartSeeds;
-    return instantHindiChartSeeds;
+    if (tab.target === 10) return verifiedIndia10Seeds.slice(0, 10);
+    if (tab.target === 100) return verifiedIndia100Seeds.slice(0, 100);
+    if (tab.id.includes('haryanvi')) return verifiedHaryanviSeeds.slice(0, 50);
+    if (tab.id.includes('punjabi')) return verifiedPunjabiSeeds.slice(0, 50);
+    return verifiedHindiSeeds.slice(0, 50);
   };
 
   const [tracks, setTracks] = useState(() => {
-    const cached = getCached(`tt_chart_v3_${activeTab.id}`);
-    if (cached && cached.length > 0) return cached;
+    const cached = getCached(`tt_chart_v4_${activeTab.id}`);
+    if (cached && cached.length === activeTab.target) return cached;
     return getInitialSeeds(activeTab);
   });
 
   useEffect(() => {
     let mounted = true;
-    const cacheKey = `tt_chart_v3_${activeTab.id}`;
+    const cacheKey = `tt_chart_v4_${activeTab.id}`;
     const cached = getCached(cacheKey);
-    if (cached && cached.length > 0) {
+    const targetCount = activeTab.target || 50;
+
+    if (cached && cached.length === targetCount) {
       setTracks(cached);
     } else {
       setTracks(getInitialSeeds(activeTab));
@@ -192,7 +210,6 @@ const Charts = () => {
     const loadChartData = async () => {
       setIsLoadingChart(true);
       try {
-        const targetCount = activeTab.target || 50;
         const queries = activeTab.queries || [activeTab.query];
         const collected = [];
         const seen = new Set();
@@ -210,17 +227,19 @@ const Charts = () => {
             const items = (data?.results || []).map(normalizeSong).filter(Boolean);
             lastContinuation = data?.continuationToken || null;
 
-            items.forEach((s) => {
+            for (const s of items) {
               if (s && s.videoId && !seen.has(s.videoId) && filterForTab(s, activeTab.id)) {
                 seen.add(s.videoId);
                 collected.push(s);
+                if (collected.length >= targetCount) break;
               }
-            });
+            }
 
             // Chain continuation if we need more songs to satisfy target
             let continuationAttempts = 0;
             let curToken = lastContinuation;
-            while (curToken && collected.length < targetCount && continuationAttempts < 4) {
+            const maxContinuation = targetCount > 50 ? 8 : 4;
+            while (curToken && collected.length < targetCount && continuationAttempts < maxContinuation) {
               continuationAttempts++;
               try {
                 const nextRes = await fetch(
@@ -229,12 +248,13 @@ const Charts = () => {
                 const nextData = await nextRes.json();
                 if (!mounted) break;
                 const moreSongs = (nextData?.results || []).map(normalizeSong).filter(Boolean);
-                moreSongs.forEach((s) => {
+                for (const s of moreSongs) {
                   if (s && s.videoId && !seen.has(s.videoId) && filterForTab(s, activeTab.id)) {
                     seen.add(s.videoId);
                     collected.push(s);
+                    if (collected.length >= targetCount) break;
                   }
-                });
+                }
                 curToken = nextData?.continuationToken || null;
                 lastContinuation = curToken;
               } catch (e) {
@@ -244,18 +264,34 @@ const Charts = () => {
           } catch (e) {}
         }
 
-        if (mounted && collected.length > 0) {
-          setTracks(collected);
-          setContinuationToken(lastContinuation);
+        // BACKFILL: If network fetch gathered fewer songs than targetCount,
+        // seamlessly fill the remaining slots from verified regional seeds
+        if (collected.length < targetCount) {
+          const seeds = getInitialSeeds(activeTab);
+          for (const s of seeds) {
+            if (s && s.videoId && !seen.has(s.videoId) && filterForTab(s, activeTab.id)) {
+              seen.add(s.videoId);
+              collected.push(s);
+              if (collected.length >= targetCount) break;
+            }
+          }
+        }
+
+        // STRICT ENFORCEMENT: Exactly targetCount items!
+        const finalTracks = collected.slice(0, targetCount);
+
+        if (mounted && finalTracks.length > 0) {
+          setTracks(finalTracks);
+          setContinuationToken(null); // Chart is an exact Top N ranking; never overfill
           try {
             sessionStorage.setItem(
               cacheKey,
-              JSON.stringify({ tracks: collected, timestamp: Date.now() })
+              JSON.stringify({ tracks: finalTracks, timestamp: Date.now() })
             );
           } catch {}
 
-          // If playback is already active from this chart, dynamically expand queue
-          dispatch(appendQueueTracks({ newTracks: collected }));
+          // If playback is already active from this chart, dynamically update queue
+          dispatch(appendQueueTracks({ newTracks: finalTracks }));
         }
       } catch (err) {
         console.warn('Charts load error:', err);
@@ -272,7 +308,11 @@ const Charts = () => {
   }, [activeTab]);
 
   const handleLoadMore = async () => {
-    if (!continuationToken || isLoadingMore) return;
+    // Top charts are fixed-size countdown rankings: do not append beyond target
+    if (!continuationToken || isLoadingMore || tracks.length >= activeTab.target) {
+      setContinuationToken(null);
+      return;
+    }
     setIsLoadingMore(true);
 
     try {
@@ -282,23 +322,21 @@ const Charts = () => {
       const data = await res.json();
 
       if (data?.results?.length) {
-        let addedCount = 0;
         const newSongs = data.results.map(normalizeSong).filter(Boolean);
 
         setTracks((prev) => {
+          const remainingNeeded = activeTab.target - prev.length;
+          if (remainingNeeded <= 0) return prev;
+
           const seen = new Set(prev.map((s) => s.videoId));
           const uniqueNew = newSongs.filter((s) => !seen.has(s.videoId) && filterForTab(s, activeTab.id));
-          addedCount = uniqueNew.length;
-          const updated = [...prev, ...uniqueNew];
-          dispatch(appendQueueTracks({ newTracks: uniqueNew }));
+          const toAdd = uniqueNew.slice(0, remainingNeeded);
+          const updated = [...prev, ...toAdd];
+          dispatch(appendQueueTracks({ newTracks: toAdd }));
           return updated;
         });
 
-        if (addedCount === 0 || !data?.continuationToken) {
-          setContinuationToken(null);
-        } else {
-          setContinuationToken(data.continuationToken);
-        }
+        setContinuationToken(null);
       } else {
         setContinuationToken(null);
       }
@@ -311,7 +349,7 @@ const Charts = () => {
   };
 
   useEffect(() => {
-    if (!sentinelRef.current || !continuationToken || isLoadingMore) return;
+    if (!sentinelRef.current || !continuationToken || isLoadingMore || tracks.length >= activeTab.target) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -324,7 +362,7 @@ const Charts = () => {
 
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [continuationToken, isLoadingMore]);
+  }, [continuationToken, isLoadingMore, tracks.length, activeTab.target]);
 
   const handlePlayAll = () => {
     if (tracks.length > 0) {
@@ -368,7 +406,7 @@ const Charts = () => {
               {activeTab.name}
             </h1>
             <p className="text-[11px] sm:text-xs theme-text-muted mt-0.5">
-              {activeTab.subtitle} • {tracks.length} tracks
+              {activeTab.subtitle} • Official {activeTab.target} Tracks (#1 to #{activeTab.target})
             </p>
           </div>
         </div>

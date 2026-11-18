@@ -266,11 +266,27 @@ const Home = () => {
             </button>
 
             <button
-              onClick={() => navigate('/charts')}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-500/10 hover:bg-slate-500/20 theme-text-main font-semibold text-xs border theme-border transition-all"
+              onClick={() => navigate('/charts?tab=india-10')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-500/10 hover:bg-slate-500/20 theme-text-main font-semibold text-xs border theme-border transition-all"
             >
               <FaFire className="text-rose-500 text-xs" />
-              <span>India Top 50</span>
+              <span>Top 10</span>
+            </button>
+
+            <button
+              onClick={() => navigate('/charts?tab=hindi-50')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-500/10 hover:bg-slate-500/20 theme-text-main font-semibold text-xs border theme-border transition-all"
+            >
+              <FaFire className="text-orange-500 text-xs" />
+              <span>Top 50</span>
+            </button>
+
+            <button
+              onClick={() => navigate('/charts?tab=india-100')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-500/10 hover:bg-slate-500/20 theme-text-main font-semibold text-xs border theme-border transition-all"
+            >
+              <FaFire className="text-emerald-500 text-xs" />
+              <span>Top 100</span>
             </button>
           </div>
         </div>

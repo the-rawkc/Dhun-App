@@ -36,6 +36,11 @@ import {
   hasPunjabiSignature,
   hasHaryanviSignature,
 } from '../utils/regionalFilter';
+import {
+  verifiedHindiSeeds,
+  verifiedPunjabiSeeds,
+  verifiedHaryanviSeeds,
+} from '../utils/regionalSeeds';
 
 /**
  * Intelligent Theme & Category Detector
@@ -339,8 +344,13 @@ const PlaylistDetails = () => {
   useEffect(() => {
     const OFFICIAL_CONFIG = {
       'pl-desi-hits': {
-        queries: ['top 50 hindi songs latest trending bollywood hits 2026', 'bollywood top weekly songs hits'],
+        queries: [
+          'top 50 hindi songs latest trending bollywood hits 2026',
+          'bollywood top weekly songs hits',
+          'latest hindi hit songs arijit pritam shreya',
+        ],
         filterFn: (s) => !isStrictHaryanvi(s),
+        seeds: verifiedHindiSeeds,
       },
       'pl-punjabi-power': {
         queries: [
@@ -349,6 +359,7 @@ const PlaylistDetails = () => {
           'punjabi hits karan aujla diljit shubh ap dhillon sidhu moose wala',
         ],
         filterFn: (s) => isStrictPunjabi(s) && !hasHaryanviSignature(s),
+        seeds: verifiedPunjabiSeeds,
       },
       'pl-haryanvi-top-hits': {
         queries: [
@@ -357,6 +368,7 @@ const PlaylistDetails = () => {
           'top haryanvi songs khasa aala chahar amit saini ajay hooda',
         ],
         filterFn: (s) => isStrictHaryanvi(s) && !hasPunjabiSignature(s),
+        seeds: verifiedHaryanviSeeds,
       },
     };
 
@@ -365,12 +377,15 @@ const PlaylistDetails = () => {
 
     // Purge any cross-contaminated songs already in the playlist
     const currentTracks = Array.isArray(playlist.tracks) ? playlist.tracks : [];
-    const sanitizedCurrent = currentTracks.filter((t) => cfg.filterFn(t));
-    if (sanitizedCurrent.length !== currentTracks.length) {
-      dispatch(setPlaylistTracks({ playlistId: playlist.id, tracks: sanitizedCurrent }));
-    }
+    let sanitizedCurrent = currentTracks.filter((t) => cfg.filterFn(t));
 
-    if (sanitizedCurrent.length >= 45) return;
+    // If already exactly 50 songs, nothing to do
+    if (sanitizedCurrent.length === 50) return;
+
+    if (sanitizedCurrent.length > 50) {
+      dispatch(setPlaylistTracks({ playlistId: playlist.id, tracks: sanitizedCurrent.slice(0, 50) }));
+      return;
+    }
 
     let mounted = true;
     const fetchOfficialTracks = async () => {
@@ -390,27 +405,29 @@ const PlaylistDetails = () => {
             const items = (data?.results || []).map(normalizeSong).filter(Boolean);
             let nextTok = data?.continuationToken || null;
 
-            items.forEach((s) => {
+            for (const s of items) {
               if (s && s.videoId && !seen.has(s.videoId) && cfg.filterFn(s)) {
                 seen.add(s.videoId);
                 collected.push(s);
+                if (collected.length >= targetCount) break;
               }
-            });
+            }
 
             let attempts = 0;
-            while (nextTok && collected.length < targetCount && attempts < 4) {
+            while (nextTok && collected.length < targetCount && attempts < 5) {
               attempts++;
               try {
                 const nextRes = await fetch(`${API_BASE}/api/search?continuationToken=${encodeURIComponent(nextTok)}&language=en&hl=en`);
                 const nextData = await nextRes.json();
                 if (!mounted) break;
                 const more = (nextData?.results || []).map(normalizeSong).filter(Boolean);
-                more.forEach((s) => {
+                for (const s of more) {
                   if (s && s.videoId && !seen.has(s.videoId) && cfg.filterFn(s)) {
                     seen.add(s.videoId);
                     collected.push(s);
+                    if (collected.length >= targetCount) break;
                   }
-                });
+                }
                 nextTok = nextData?.continuationToken || null;
               } catch (e) {
                 break;
@@ -419,9 +436,21 @@ const PlaylistDetails = () => {
           } catch (e) {}
         }
 
-        if (mounted && collected.length > sanitizedCurrent.length) {
-          dispatch(setPlaylistTracks({ playlistId: playlist.id, tracks: collected }));
-          dispatch(appendQueueTracks({ newTracks: collected }));
+        // Backfill from verified seeds to guarantee EXACTLY 50 tracks
+        if (collected.length < targetCount && cfg.seeds) {
+          for (const s of cfg.seeds) {
+            if (s && s.videoId && !seen.has(s.videoId) && cfg.filterFn(s)) {
+              seen.add(s.videoId);
+              collected.push(s);
+              if (collected.length >= targetCount) break;
+            }
+          }
+        }
+
+        const final50 = collected.slice(0, targetCount);
+        if (mounted && final50.length > sanitizedCurrent.length) {
+          dispatch(setPlaylistTracks({ playlistId: playlist.id, tracks: final50 }));
+          dispatch(appendQueueTracks({ newTracks: final50 }));
         }
       } catch (e) {
         console.warn('Failed to auto-enrich official playlist:', e);

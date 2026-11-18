@@ -5,7 +5,7 @@ import { playTrackNow } from '../redux/features/playerSlice';
 import SongCard from '../components/SongCard';
 import SongRow from '../components/SongRow';
 import ArtistCard from '../components/ArtistCard';
-import { FaPlay, FaSearch, FaMusic, FaUser, FaCompactDisc, FaHeart } from 'react-icons/fa';
+import { FaPlay, FaSearch, FaMusic, FaUser, FaCompactDisc, FaHeart, FaFire } from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
 import { API_BASE } from '../services/apiConfig';
 
@@ -231,6 +231,29 @@ const Search = () => {
             </button>
           ))}
         </div>
+
+        {/* Smart Official Chart shortcut banner when user searches top 10 / 50 / 100 */}
+        {decodedTerm && /\b(top\s*10|top\s*50|top\s*100|chart|rankings)\b/i.test(decodedTerm) && (
+          <div
+            onClick={() => {
+              if (/\b(100|top\s*100)\b/i.test(decodedTerm)) navigate('/charts?tab=india-100');
+              else if (/\b(10|top\s*10)\b/i.test(decodedTerm)) navigate('/charts?tab=india-10');
+              else navigate('/charts?tab=hindi-50');
+            }}
+            className="p-3 rounded-2xl bg-gradient-to-r from-rose-900/40 via-red-950/20 to-transparent border border-rose-500/30 flex items-center justify-between cursor-pointer hover:border-rose-500/50 transition-all shadow-sm"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-rose-600 text-white text-xs">
+                <FaFire />
+              </div>
+              <div>
+                <p className="text-xs font-bold theme-text-main">Looking for Official Live Rankings?</p>
+                <p className="text-[10px] theme-text-muted">Explore verified Top 10, Top 50, and Top 100 countdown charts</p>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-rose-500 hover:text-rose-400">Open Chart →</span>
+          </div>
+        )}
       </div>
 
       {loading && (

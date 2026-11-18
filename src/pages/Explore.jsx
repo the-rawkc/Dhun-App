@@ -137,7 +137,24 @@ const Explore = () => {
           <span className="text-[11px] font-semibold text-rose-500">Live Rankings</span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-2.5">
+          {/* India Top 10 Chart */}
+          <div
+            onClick={() => navigate('/charts?tab=india-10')}
+            className="group relative overflow-hidden h-16 sm:h-20 rounded-xl cursor-pointer p-2 sm:p-2.5 bg-gradient-to-br from-rose-600/35 to-amber-950/40 border border-rose-500/40 shadow-sm hover:scale-[1.02] transition-all flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between">
+              <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-rose-600 text-white">
+                TOP 10
+              </span>
+              <FaHeadphonesAlt className="text-rose-400 text-[10px]" />
+            </div>
+            <div>
+              <h3 className="font-bold text-xs text-white truncate leading-tight">India Top 10</h3>
+              <p className="text-[9px] sm:text-[10px] text-white/70 truncate">10 Hottest Tracks</p>
+            </div>
+          </div>
+
           {/* Haryanvi Playlist */}
           <div
             onClick={() => navigate('/playlist/pl-haryanvi-top-hits')}
