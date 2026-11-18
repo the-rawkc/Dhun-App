@@ -7,6 +7,7 @@ import {
   setCrossfadeStyle,
 } from '../redux/features/playerSlice';
 import { audioDSP, PRESETS, FREQUENCIES } from '../services/audioDsp';
+import { playerEngine } from '../services/playerEngine';
 import { FaSlidersH, FaTimes, FaVolumeUp, FaBroadcastTower, FaCheck, FaUndo } from 'react-icons/fa';
 import { HiSparkles } from 'react-icons/hi';
 
@@ -297,7 +298,15 @@ const EqualizerModal = () => {
           </div>
           <select
             value={crossfadeStyle}
-            onChange={(e) => dispatch(setCrossfadeStyle(e.target.value))}
+            onChange={(e) => {
+              const val = e.target.value;
+              const secondsMap = { smart: 4, smooth: 6, long: 8, off: 0 };
+              const sec = secondsMap[val] !== undefined ? secondsMap[val] : 4;
+              try {
+                playerEngine.setCrossfadeSeconds(sec, val);
+              } catch (err) {}
+              dispatch(setCrossfadeStyle(val));
+            }}
             className="px-3 py-1.5 rounded-xl bg-slate-500/10 border theme-border theme-text-main text-xs font-semibold focus:outline-none focus:border-rose-500"
           >
             <option value="smart">Smart (4s - Apple Music)</option>

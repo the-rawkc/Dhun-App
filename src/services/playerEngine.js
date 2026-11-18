@@ -34,7 +34,12 @@ class PlayerEngine {
     this.crossfadeTimer = null;
     this.crossfadeSeconds = 4;
     try {
-      const savedStyle = localStorage.getItem('tunetide_crossfade_style');
+      let savedStyle = localStorage.getItem('tunetide_crossfade_style');
+      if (savedStyle) {
+        try {
+          savedStyle = JSON.parse(savedStyle);
+        } catch (e) {}
+      }
       const secondsMap = { smart: 4, smooth: 6, long: 8, off: 0 };
       this.crossfadeSeconds = secondsMap[savedStyle] !== undefined ? secondsMap[savedStyle] : 4;
     } catch (e) {
@@ -84,8 +89,35 @@ class PlayerEngine {
     if (!this.deckA) this.deckA = el;
   }
 
-  setCrossfadeSeconds(sec) {
+  setCrossfadeSeconds(sec, style = null) {
     this.crossfadeSeconds = typeof sec === 'number' && !isNaN(sec) ? Math.max(0, Math.min(15, sec)) : 4;
+    if (this.crossfadeSeconds === 0 && this.isCrossfading) {
+      if (this.crossfadeTimer) {
+        clearInterval(this.crossfadeTimer);
+        this.crossfadeTimer = null;
+      }
+      this.isCrossfading = false;
+      if (this.nextDeck) {
+        try {
+          this.nextDeck.pause();
+          this.nextDeck.currentTime = 0;
+          this.nextDeck.volume = this.currentVolume ?? 0.8;
+        } catch (e) {}
+      }
+      if (this.currentDeck) {
+        this.currentDeck.volume = this.currentVolume ?? 0.8;
+      }
+    }
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const resolvedStyle = style || (
+          this.crossfadeSeconds === 6 ? 'smooth' :
+          this.crossfadeSeconds === 8 ? 'long' :
+          this.crossfadeSeconds === 0 ? 'off' : 'smart'
+        );
+        localStorage.setItem('tunetide_crossfade_style', JSON.stringify(resolvedStyle));
+      } catch (e) {}
+    }
   }
 
   pushPlaybackHistory(idx) {
@@ -504,7 +536,14 @@ class PlayerEngine {
     if (this.crossfadeTimer) {
       clearInterval(this.crossfadeTimer);
       this.crossfadeTimer = null;
-      this.isCrossfading = false;
+    }
+    this.isCrossfading = false;
+    if (this.nextDeck) {
+      try {
+        this.nextDeck.pause();
+        this.nextDeck.currentTime = 0;
+        this.nextDeck.volume = this.currentVolume ?? 0.8;
+      } catch (e) {}
     }
 
     const deck = this.currentDeck;
@@ -617,6 +656,10 @@ class PlayerEngine {
       return;
     }
 
+    // Immediately handover active deck to incoming track so timeupdate and duration listener attach to incoming song
+    this.currentDeck = incomingDeck;
+    this.nextDeck = outgoingDeck;
+
     // Update active song metadata immediately so UI & lock-screen sync with the incoming song
     this.queueIndex = nextIndex;
     this.currentTrack = nextTrack;
@@ -628,6 +671,16 @@ class PlayerEngine {
     if (typeof this.listeners.onTrackChanged === 'function') {
       this.listeners.onTrackChanged(nextTrack, nextIndex);
     }
+
+    // Immediately dispatch 0 for time and incoming song duration to eliminate any timing jump
+    if (typeof this.listeners.timeUpdate === 'function') {
+      this.listeners.timeUpdate(0);
+    }
+    const incomingDuration = streamData.duration || incomingDeck.duration || (typeof nextTrack?.duration === 'number' ? nextTrack.duration : 0);
+    if (incomingDuration > 0 && typeof this.listeners.durationChange === 'function') {
+      this.listeners.durationChange(incomingDuration);
+    }
+    this.updateMediaSessionPosition(0);
 
     // Run Apple Music equal-power crossfade curve
     const durationMs = Math.max(1000, Math.min(this.crossfadeSeconds * 1000, (remainingSec || 4) * 1000));
@@ -665,9 +718,7 @@ class PlayerEngine {
 
         incomingDeck.volume = targetVolume;
 
-        // Swap active decks
-        this.currentDeck = incomingDeck;
-        this.nextDeck = outgoingDeck;
+        // Active decks were already swapped at crossfade start, so just finish crossfade state
         this.isCrossfading = false;
 
         // Prefetch next track in queue for future seamless transitions
@@ -1003,7 +1054,20 @@ class PlayerEngine {
       }
     }
 
-    // Changing to a new track: cancel any previous in-flight fetch
+    // Changing to a new track: cancel any previous in-flight fetch and active crossfade
+    if (this.crossfadeTimer) {
+      clearInterval(this.crossfadeTimer);
+      this.crossfadeTimer = null;
+    }
+    this.isCrossfading = false;
+    if (this.nextDeck) {
+      try {
+        this.nextDeck.pause();
+        this.nextDeck.currentTime = 0;
+        this.nextDeck.volume = this.currentVolume ?? 0.8;
+      } catch (e) {}
+    }
+
     if (this.activeAbortController) {
       try {
         this.activeAbortController.abort();
@@ -1280,6 +1344,22 @@ class PlayerEngine {
   }
 
   seekTo(seconds) {
+    if (this.crossfadeTimer) {
+      clearInterval(this.crossfadeTimer);
+      this.crossfadeTimer = null;
+    }
+    this.isCrossfading = false;
+    if (this.nextDeck) {
+      try {
+        this.nextDeck.pause();
+        this.nextDeck.currentTime = 0;
+        this.nextDeck.volume = this.currentVolume ?? 0.8;
+      } catch (e) {}
+    }
+    if (this.currentDeck) {
+      this.currentDeck.volume = this.currentVolume ?? 0.8;
+    }
+
     if (this.isDirectAudio || this.isOfflinePlayback) {
       if (this.audioEl) {
         this.audioEl.currentTime = seconds;

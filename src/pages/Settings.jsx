@@ -7,6 +7,7 @@ import {
   setCrossfadeStyle,
 } from '../redux/features/playerSlice';
 import { audioDSP } from '../services/audioDsp';
+import { playerEngine } from '../services/playerEngine';
 import {
   getOfflineStorageUsage,
   clearAllOfflineTracks,
@@ -246,7 +247,15 @@ const Settings = () => {
             </div>
             <select
               value={crossfadeStyle}
-              onChange={(e) => dispatch(setCrossfadeStyle(e.target.value))}
+              onChange={(e) => {
+                const val = e.target.value;
+                const secondsMap = { smart: 4, smooth: 6, long: 8, off: 0 };
+                const sec = secondsMap[val] !== undefined ? secondsMap[val] : 4;
+                try {
+                  playerEngine.setCrossfadeSeconds(sec, val);
+                } catch (err) {}
+                dispatch(setCrossfadeStyle(val));
+              }}
               className="w-full sm:w-auto max-w-full px-3.5 py-2.5 rounded-xl bg-slate-500/10 border theme-border theme-text-main text-xs font-semibold focus:outline-none focus:border-rose-500 truncate"
             >
               <option value="smart">Smart Automix (Apple Music Style - 4s)</option>
