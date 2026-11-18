@@ -629,7 +629,90 @@ class PlayerEngine {
     }
   }
 
-  // Smoothly ramps down the current deck volume over 120ms before switching tracks
+  clearDeckTimers(deck) {
+    if (!deck) return;
+    if (deck._fadeTimer) {
+      clearInterval(deck._fadeTimer);
+      deck._fadeTimer = null;
+    }
+  }
+
+  // Smoothly ramps down and retires a playing deck with an equal-power cosine curve
+  fadeAndRetireDeck(deck, durationMs = 350) {
+    if (!deck) return;
+    this.clearDeckTimers(deck);
+
+    const isHidden = typeof document !== 'undefined' && document.hidden;
+    if (deck.paused || deck.ended || deck.volume <= 0 || isHidden) {
+      try {
+        deck.pause();
+        deck.currentTime = 0;
+        deck.volume = this.currentVolume ?? 0.8;
+      } catch (e) {}
+      return;
+    }
+
+    const startVol = deck.volume;
+    const startTime = performance.now();
+
+    deck._fadeTimer = setInterval(() => {
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(1, elapsed / durationMs);
+
+      // Equal-power fade-out curve: cos(progress * π/2)
+      try {
+        deck.volume = Math.max(0, startVol * Math.cos(progress * 0.5 * Math.PI));
+      } catch (e) {}
+
+      if (progress >= 1) {
+        this.clearDeckTimers(deck);
+        try {
+          deck.pause();
+          deck.currentTime = 0;
+          deck.volume = this.currentVolume ?? 0.8;
+        } catch (e) {}
+      }
+    }, 20);
+  }
+
+  // Smoothly fades in a deck with an equal-power sine curve
+  fadeInDeck(deck, targetVolume = 0.8, durationMs = 350) {
+    if (!deck) return;
+    this.clearDeckTimers(deck);
+
+    const isHidden = typeof document !== 'undefined' && document.hidden;
+    if (isHidden) {
+      try {
+        deck.volume = targetVolume;
+      } catch (e) {}
+      return;
+    }
+
+    const startTime = performance.now();
+    try {
+      deck.volume = 0;
+    } catch (e) {}
+
+    deck._fadeTimer = setInterval(() => {
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(1, elapsed / durationMs);
+
+      // Equal-power fade-in curve: sin(progress * π/2)
+      const currentVol = Math.sin(progress * 0.5 * Math.PI) * targetVolume;
+      try {
+        deck.volume = Math.max(0, Math.min(1, currentVol));
+      } catch (e) {}
+
+      if (progress >= 1) {
+        this.clearDeckTimers(deck);
+        try {
+          deck.volume = targetVolume;
+        } catch (e) {}
+      }
+    }, 20);
+  }
+
+  // Smoothly ramps down the current deck volume before switching tracks
   smoothSwitchDeck(onSwitch) {
     if (this.crossfadeTimer) {
       clearInterval(this.crossfadeTimer);
@@ -638,49 +721,14 @@ class PlayerEngine {
     this.isCrossfading = false;
     this.isSwitchingTrack = true;
 
-    if (this.nextDeck) {
-      try {
-        this.nextDeck.pause();
-        this.nextDeck.currentTime = 0;
-        this.nextDeck.volume = this.currentVolume ?? 0.8;
-      } catch (e) {}
-    }
-
     const deck = this.currentDeck;
-    const isHidden = typeof document !== 'undefined' && document.hidden;
-    if (!deck || deck.paused || deck.ended || this.currentVolume <= 0 || isHidden) {
-      if (deck) {
-        try {
-          deck.pause();
-          deck.currentTime = 0;
-          deck.volume = this.currentVolume ?? 0.8;
-        } catch (e) {}
-      }
-      if (onSwitch) onSwitch();
-      return;
+    const transitionDuration = this.crossfadeSeconds === 0 ? 200 : (this.crossfadeSeconds >= 6 ? 500 : 350);
+
+    if (deck && !deck.paused && deck.currentTime > 0) {
+      this.fadeAndRetireDeck(deck, transitionDuration);
     }
 
-    const startVol = deck.volume;
-    const startTime = performance.now();
-    const durationMs = 120;
-
-    const timer = setInterval(() => {
-      const elapsed = performance.now() - startTime;
-      const progress = Math.min(1, elapsed / durationMs);
-      try {
-        deck.volume = Math.max(0, startVol * (1 - progress));
-      } catch (e) {}
-
-      if (progress >= 1) {
-        clearInterval(timer);
-        try {
-          deck.pause();
-          deck.currentTime = 0;
-          deck.volume = this.currentVolume ?? 0.8;
-        } catch (e) {}
-        if (onSwitch) onSwitch();
-      }
-    }, 20);
+    if (onSwitch) onSwitch();
   }
 
   // Seamless smart crossfade / automix
@@ -1190,12 +1238,22 @@ class PlayerEngine {
       this.crossfadeTimer = null;
     }
     this.isCrossfading = false;
-    if (this.nextDeck) {
+
+    const transitionDuration = this.crossfadeSeconds === 0 ? 200 : (this.crossfadeSeconds >= 6 ? 500 : 350);
+    const outgoingDeck = this.currentDeck || this.deckA;
+
+    // Smoothly fade-out previous audio so it never abruptly pops or cuts off
+    if (outgoingDeck && !outgoingDeck.paused && outgoingDeck.currentTime > 0) {
+      this.fadeAndRetireDeck(outgoingDeck, transitionDuration);
+    } else if (outgoingDeck) {
       try {
-        this.nextDeck.pause();
-        this.nextDeck.currentTime = 0;
-        this.nextDeck.volume = this.currentVolume ?? 0.8;
+        outgoingDeck.pause();
+        outgoingDeck.currentTime = 0;
       } catch (e) {}
+    }
+
+    if (this.ytPlayer && typeof this.ytPlayer.getPlayerState === 'function' && this.ytPlayer.getPlayerState() === 1) {
+      try { this.ytPlayer.pauseVideo(); } catch (e) {}
     }
 
     if (this.activeAbortController) {
@@ -1209,11 +1267,6 @@ class PlayerEngine {
     this.currentVideoId = cleanVideoId;
     this.currentTrack = trackMeta;
     this.updateMediaMetadata(trackMeta);
-
-    // Pause previous audio immediately so previous song does not bleed into next song
-    if (this.audioEl && !this.audioEl.paused) {
-      try { this.audioEl.pause(); } catch (e) {}
-    }
 
     if (autoPlay) {
       this.shouldBePlaying = true;
@@ -1235,12 +1288,25 @@ class PlayerEngine {
           if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
             try { this.ytPlayer.pauseVideo(); } catch (e) {}
           }
+          const outgoing = this.currentDeck || this.deckA;
+          const incomingDeck = (outgoing === this.deckA) ? this.deckB : this.deckA;
+
+          if (outgoing && outgoing !== incomingDeck) {
+            this.fadeAndRetireDeck(outgoing, transitionDuration);
+          }
+
+          this.currentDeck = incomingDeck;
+          this.nextDeck = outgoing;
+          this.offlineAudioEl = incomingDeck;
+
           const objUrl = URL.createObjectURL(offlineRecord.audioBlob);
-          this.audioEl.src = objUrl;
-          this.audioEl.volume = this.currentVolume ?? 0.8;
-          this.audioEl.muted = false;
+          incomingDeck.src = objUrl;
+          incomingDeck.volume = 0;
+          incomingDeck.muted = false;
           if (autoPlay) {
-            this.audioEl.play().catch(() => {});
+            incomingDeck.play().then(() => {
+              this.fadeInDeck(incomingDeck, this.currentVolume ?? 0.8, transitionDuration);
+            }).catch(() => {});
           }
           return;
         }
@@ -1259,27 +1325,31 @@ class PlayerEngine {
       }
 
       // Alternate decks cleanly to prevent any audio element collision
-      const outgoingDeck = this.currentDeck || this.deckA;
-      const incomingDeck = (outgoingDeck === this.deckA) ? this.deckB : this.deckA;
+      const outgoing = this.currentDeck || this.deckA;
+      const incomingDeck = (outgoing === this.deckA) ? this.deckB : this.deckA;
 
-      if (outgoingDeck && outgoingDeck !== incomingDeck) {
-        try {
-          outgoingDeck.pause();
-          outgoingDeck.currentTime = 0;
-        } catch (e) {}
+      if (outgoing && outgoing !== incomingDeck) {
+        if (!outgoing.paused && outgoing.currentTime > 0) {
+          this.fadeAndRetireDeck(outgoing, transitionDuration);
+        } else {
+          try {
+            outgoing.pause();
+            outgoing.currentTime = 0;
+          } catch (e) {}
+        }
       }
 
       this.currentDeck = incomingDeck;
-      this.nextDeck = outgoingDeck;
+      this.nextDeck = outgoing;
       this.offlineAudioEl = incomingDeck;
 
       incomingDeck.src = data.streamUrl;
       incomingDeck.muted = false;
+      incomingDeck.volume = 0; // Start at 0 volume for smooth equal-power crossfade
       this.activeAbortController = null;
 
       if (autoPlay && this.shouldBePlaying && !this.isUserPaused) {
         const targetVol = this.currentVolume ?? 0.8;
-        incomingDeck.volume = targetVol;
 
         const onPlaybackStarted = () => {
           this.isSwitchingTrack = false;
@@ -1287,6 +1357,8 @@ class PlayerEngine {
           this.listeners.stateChange(true);
           this.updateMediaSessionState('playing');
           this.requestWakeLock();
+          // Silky smooth equal-power fade in
+          this.fadeInDeck(incomingDeck, targetVol, transitionDuration);
         };
 
         const playPromise = incomingDeck.play();
@@ -1464,6 +1536,9 @@ class PlayerEngine {
     this.updateMediaSessionState('paused');
     this.releaseWakeLock();
 
+    this.clearDeckTimers(this.deckA);
+    this.clearDeckTimers(this.deckB);
+
     if (this.isCrossfading && this.crossfadeTimer) {
       clearInterval(this.crossfadeTimer);
       this.crossfadeTimer = null;
@@ -1496,6 +1571,8 @@ class PlayerEngine {
       this.crossfadeTimer = null;
     }
     this.isCrossfading = false;
+    this.clearDeckTimers(this.deckA);
+    this.clearDeckTimers(this.deckB);
     if (this.nextDeck) {
       try {
         this.nextDeck.pause();
@@ -1533,7 +1610,7 @@ class PlayerEngine {
   setVolume(fraction) {
     const vol = Math.max(0, Math.min(1, typeof fraction === 'number' && !isNaN(fraction) ? fraction : 0.8));
     this.currentVolume = vol;
-    if (this.currentDeck && !this.isCrossfading) {
+    if (this.currentDeck && !this.isCrossfading && !this.currentDeck._fadeTimer) {
       this.currentDeck.volume = vol;
     }
     if (this.deckA) this.deckA.muted = (vol === 0);
