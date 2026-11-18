@@ -6,6 +6,12 @@ import SongRow from '../components/SongRow';
 import { FaFire, FaPlay, FaRandom, FaSyncAlt } from 'react-icons/fa';
 import { normalizeSong } from '../utils/normalizeSong';
 import { API_BASE } from '../services/apiConfig';
+import {
+  isStrictHaryanvi,
+  isStrictPunjabi,
+  hasPunjabiSignature,
+  hasHaryanviSignature,
+} from '../utils/regionalFilter';
 
 const instantHindiChartSeeds = [
   { videoId: 'BddP6PYo2gs', title: 'Kesariya (From "Brahmastra")', artist: 'Pritam, Arijit Singh', thumbnail: 'https://i.ytimg.com/vi/BddP6PYo2gs/hqdefault.jpg', duration: '4:28' },
@@ -47,42 +53,50 @@ export const chartTabs = [
     id: 'hindi-50',
     name: 'Hindi Top 50',
     subtitle: 'Top 50 trending Hindi & Bollywood chartbusters',
-    query: 'top 50 hindi songs latest trending hits 2026',
+    queries: ['top 50 hindi songs latest trending hits 2026', 'bollywood top weekly songs romantic dance hits'],
     target: 50,
   },
   {
     id: 'punjabi-50',
     name: 'Punjabi Top 50',
     subtitle: 'Top 50 Punjabi hits, pop & high-energy bhangra',
-    query: 'top 50 punjabi trending songs latest hits 2026',
+    queries: [
+      'top 50 punjabi trending songs latest hits 2026',
+      'top punjabi songs latest hits speed records geet mp3',
+      'punjabi hits karan aujla diljit shubh ap dhillon sidhu moose wala',
+    ],
     target: 50,
   },
   {
     id: 'haryanvi-50',
     name: 'Haryanvi Top 50',
     subtitle: 'Top 50 Haryanvi desi bangers & viral songs',
-    query: 'top 50 haryanvi trending songs latest hits 2026',
+    queries: [
+      'top haryanvi songs hits nav haryanvi desi records',
+      'haryanvi songs new latest hits sapna renuka gulzaar dhanda masoom',
+      'top haryanvi songs khasa aala chahar amit saini ajay hooda',
+    ],
     target: 50,
   },
   {
     id: 'bollywood-50',
     name: 'Bollywood Top 50',
     subtitle: 'Top 50 Bollywood romantic & party anthems',
-    query: 'top 50 bollywood songs romantic dance latest hits',
+    queries: ['top 50 bollywood songs romantic dance latest hits', 'bollywood hit songs arijit pritam shreya'],
     target: 50,
   },
   {
     id: 'india-100',
     name: 'India Top 100',
     subtitle: 'Top 100 songs streaming nationwide across India',
-    query: 'top 100 indian songs trending viral music 2026',
+    queries: ['top 100 indian songs trending viral music 2026', 'top trending music india 2026'],
     target: 100,
   },
   {
     id: 'south-50',
     name: 'South Top 50',
     subtitle: 'Top 50 South Indian songs (Tamil, Telugu, Malayalam)',
-    query: 'top 50 south indian songs tamil telugu latest hits 2026',
+    queries: ['top 50 south indian songs tamil telugu latest hits 2026'],
     target: 50,
   },
 ];
@@ -99,6 +113,21 @@ const findTabByParam = (param) => {
       p.includes(t.name.toLowerCase())
   );
   return match || chartTabs[0];
+};
+
+const filterForTab = (song, tabId) => {
+  if (!song) return false;
+  if (tabId.includes('haryanvi')) {
+    return isStrictHaryanvi(song) && !hasPunjabiSignature(song);
+  }
+  if (tabId.includes('punjabi')) {
+    return isStrictPunjabi(song) && !hasHaryanviSignature(song);
+  }
+  if (tabId.includes('hindi') || tabId.includes('bollywood')) {
+    const isPureRegional = (isStrictHaryanvi(song) || isStrictPunjabi(song)) && !song.title?.toLowerCase().includes('from');
+    return !isPureRegional;
+  }
+  return true;
 };
 
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour TTL for fresh chart rankings
@@ -145,14 +174,14 @@ const Charts = () => {
   };
 
   const [tracks, setTracks] = useState(() => {
-    const cached = getCached(`tt_chart_v2_${activeTab.id}`);
+    const cached = getCached(`tt_chart_v3_${activeTab.id}`);
     if (cached && cached.length > 0) return cached;
     return getInitialSeeds(activeTab);
   });
 
   useEffect(() => {
     let mounted = true;
-    const cacheKey = `tt_chart_v2_${activeTab.id}`;
+    const cacheKey = `tt_chart_v3_${activeTab.id}`;
     const cached = getCached(cacheKey);
     if (cached && cached.length > 0) {
       setTracks(cached);
@@ -163,61 +192,70 @@ const Charts = () => {
     const loadChartData = async () => {
       setIsLoadingChart(true);
       try {
-        const res = await fetch(
-          `${API_BASE}/api/search?q=${encodeURIComponent(activeTab.query)}&filter=songs&language=en&hl=en`
-        );
-        const data = await res.json();
-        if (!mounted) return;
-
-        let songList = [];
-        let nextTok = data?.continuationToken || null;
-
-        if (data?.results?.length > 0) {
-          songList = data.results.map(normalizeSong).filter(Boolean);
-        }
-
         const targetCount = activeTab.target || 50;
+        const queries = activeTab.queries || [activeTab.query];
+        const collected = [];
+        const seen = new Set();
+        let lastContinuation = null;
 
-        // Auto-fetch continuation batches eagerly in background until targetCount is met
-        let continuationAttempts = 0;
-        while (nextTok && songList.length < targetCount && continuationAttempts < 6) {
-          continuationAttempts++;
+        for (const q of queries) {
+          if (collected.length >= targetCount || !mounted) break;
           try {
-            const nextRes = await fetch(
-              `${API_BASE}/api/search?continuationToken=${encodeURIComponent(nextTok)}&language=en&hl=en`
+            const res = await fetch(
+              `${API_BASE}/api/search?q=${encodeURIComponent(q)}&filter=songs&language=en&hl=en`
             );
-            const nextData = await nextRes.json();
-            if (!mounted) return;
-            if (nextData?.results?.length > 0) {
-              const moreSongs = nextData.results.map(normalizeSong).filter(Boolean);
-              const seen = new Set(songList.map((s) => s.videoId));
-              moreSongs.forEach((s) => {
-                if (s && s.videoId && !seen.has(s.videoId)) {
-                  seen.add(s.videoId);
-                  songList.push(s);
-                }
-              });
-              nextTok = nextData.continuationToken || null;
-            } else {
-              break;
+            const data = await res.json();
+            if (!mounted) break;
+
+            const items = (data?.results || []).map(normalizeSong).filter(Boolean);
+            lastContinuation = data?.continuationToken || null;
+
+            items.forEach((s) => {
+              if (s && s.videoId && !seen.has(s.videoId) && filterForTab(s, activeTab.id)) {
+                seen.add(s.videoId);
+                collected.push(s);
+              }
+            });
+
+            // Chain continuation if we need more songs to satisfy target
+            let continuationAttempts = 0;
+            let curToken = lastContinuation;
+            while (curToken && collected.length < targetCount && continuationAttempts < 4) {
+              continuationAttempts++;
+              try {
+                const nextRes = await fetch(
+                  `${API_BASE}/api/search?continuationToken=${encodeURIComponent(curToken)}&language=en&hl=en`
+                );
+                const nextData = await nextRes.json();
+                if (!mounted) break;
+                const moreSongs = (nextData?.results || []).map(normalizeSong).filter(Boolean);
+                moreSongs.forEach((s) => {
+                  if (s && s.videoId && !seen.has(s.videoId) && filterForTab(s, activeTab.id)) {
+                    seen.add(s.videoId);
+                    collected.push(s);
+                  }
+                });
+                curToken = nextData?.continuationToken || null;
+                lastContinuation = curToken;
+              } catch (e) {
+                break;
+              }
             }
-          } catch (e) {
-            break;
-          }
+          } catch (e) {}
         }
 
-        if (mounted && songList.length > 0) {
-          setTracks(songList);
-          setContinuationToken(nextTok);
+        if (mounted && collected.length > 0) {
+          setTracks(collected);
+          setContinuationToken(lastContinuation);
           try {
             sessionStorage.setItem(
               cacheKey,
-              JSON.stringify({ tracks: songList, timestamp: Date.now() })
+              JSON.stringify({ tracks: collected, timestamp: Date.now() })
             );
           } catch {}
 
           // If playback is already active from this chart, dynamically expand queue
-          dispatch(appendQueueTracks({ newTracks: songList }));
+          dispatch(appendQueueTracks({ newTracks: collected }));
         }
       } catch (err) {
         console.warn('Charts load error:', err);
@@ -249,7 +287,7 @@ const Charts = () => {
 
         setTracks((prev) => {
           const seen = new Set(prev.map((s) => s.videoId));
-          const uniqueNew = newSongs.filter((s) => !seen.has(s.videoId));
+          const uniqueNew = newSongs.filter((s) => !seen.has(s.videoId) && filterForTab(s, activeTab.id));
           addedCount = uniqueNew.length;
           const updated = [...prev, ...uniqueNew];
           dispatch(appendQueueTracks({ newTracks: uniqueNew }));

@@ -2,6 +2,12 @@ import { createSlice } from '@reduxjs/toolkit';
 import { normalizeSong, isSameSong } from '../../utils/normalizeSong';
 import { syncToCloudDatabase } from '../../services/authService';
 import { playerEngine } from '../../services/playerEngine';
+import {
+  isStrictHaryanvi,
+  isStrictPunjabi,
+  hasPunjabiSignature,
+  hasHaryanviSignature,
+} from '../../utils/regionalFilter';
 
 const loadSaved = (key, fallback) => {
   try {
@@ -110,6 +116,28 @@ const loadSavedPlaylists = () => {
         existing.tracks = defPl.tracks;
       }
     });
+
+    // Cleanse regional playlists from cross-contamination
+    const haryanviPl = loaded.find((p) => p.id === 'pl-haryanvi-top-hits');
+    if (haryanviPl && Array.isArray(haryanviPl.tracks)) {
+      haryanviPl.tracks = haryanviPl.tracks.filter(
+        (t) => isStrictHaryanvi(t) && !hasPunjabiSignature(t)
+      );
+      if (haryanviPl.tracks.length === 0) {
+        haryanviPl.tracks = instantHaryanviTracks;
+      }
+    }
+
+    const punjabiPl = loaded.find((p) => p.id === 'pl-punjabi-power');
+    if (punjabiPl && Array.isArray(punjabiPl.tracks)) {
+      punjabiPl.tracks = punjabiPl.tracks.filter(
+        (t) => isStrictPunjabi(t) && !hasHaryanviSignature(t)
+      );
+      if (punjabiPl.tracks.length === 0) {
+        punjabiPl.tracks = instantPunjabiTracks;
+      }
+    }
+
     saveItem('tunetide_playlists', loaded);
     return loaded;
   }

@@ -30,6 +30,12 @@ import {
 } from 'react-icons/fa';
 import { normalizeSong, isSameSong } from '../utils/normalizeSong';
 import { API_BASE } from '../services/apiConfig';
+import {
+  isStrictHaryanvi,
+  isStrictPunjabi,
+  hasPunjabiSignature,
+  hasHaryanviSignature,
+} from '../utils/regionalFilter';
 
 /**
  * Intelligent Theme & Category Detector
@@ -41,46 +47,19 @@ export const detectSongTheme = (track) => {
 
   const str = `${track.title || ''} ${track.artist || ''} ${track.subtitle || ''}`.toLowerCase();
 
-  // 1. Punjabi Hits & Beats
-  if (
-    str.includes('punjabi') ||
-    str.includes('diljit') ||
-    str.includes('aujla') ||
-    str.includes('dhillon') ||
-    str.includes('shubh') ||
-    str.includes('moose wala') ||
-    str.includes('karan aujla') ||
-    str.includes('b praak') ||
-    str.includes('sidhu') ||
-    str.includes('jatt') ||
-    str.includes('gabru') ||
-    str.includes('yaari') ||
-    str.includes('guru randhawa') ||
-    str.includes('harrdy sandhu')
-  ) {
+  // 1. Haryanvi Desi Hits
+  if (isStrictHaryanvi(track) && !hasPunjabiSignature(track)) {
     return {
-      name: 'Punjabi Hits & Beats',
-      query: 'top trending punjabi songs latest beats',
+      name: 'Haryanvi Desi Hits',
+      query: 'top haryanvi songs latest desi hits nav haryanvi',
     };
   }
 
-  // 2. Haryanvi Desi Hits
-  if (
-    str.includes('haryanvi') ||
-    str.includes('sapna') ||
-    str.includes('renuka') ||
-    str.includes('panwar') ||
-    str.includes('gulzaar') ||
-    str.includes('chhaniwala') ||
-    str.includes('dhanda') ||
-    str.includes('masoom sharma') ||
-    str.includes('raju punjabi') ||
-    str.includes('daman') ||
-    str.includes('desi records')
-  ) {
+  // 2. Punjabi Hits & Beats
+  if (isStrictPunjabi(track) && !hasHaryanviSignature(track)) {
     return {
-      name: 'Haryanvi Desi Hits',
-      query: 'top haryanvi songs latest desi hits',
+      name: 'Punjabi Hits & Beats',
+      query: 'top trending punjabi songs latest beats speed records',
     };
   }
 
@@ -356,55 +335,93 @@ const PlaylistDetails = () => {
     }, 400);
   };
 
-  // Auto-enrich official regional playlists to 50 songs dynamically
+  // Auto-enrich official regional playlists to 50 songs dynamically with strict regional validation
   useEffect(() => {
-    const OFFICIAL_QUERIES = {
-      'pl-desi-hits': 'top 50 hindi songs latest trending bollywood hits 2026',
-      'pl-punjabi-power': 'top 50 punjabi trending songs latest hits 2026',
-      'pl-haryanvi-top-hits': 'top 50 haryanvi trending songs latest hits 2026',
+    const OFFICIAL_CONFIG = {
+      'pl-desi-hits': {
+        queries: ['top 50 hindi songs latest trending bollywood hits 2026', 'bollywood top weekly songs hits'],
+        filterFn: (s) => !isStrictHaryanvi(s),
+      },
+      'pl-punjabi-power': {
+        queries: [
+          'top 50 punjabi trending songs latest hits 2026',
+          'top punjabi songs latest hits speed records geet mp3',
+          'punjabi hits karan aujla diljit shubh ap dhillon sidhu moose wala',
+        ],
+        filterFn: (s) => isStrictPunjabi(s) && !hasHaryanviSignature(s),
+      },
+      'pl-haryanvi-top-hits': {
+        queries: [
+          'top haryanvi songs hits nav haryanvi desi records',
+          'haryanvi songs new latest hits sapna renuka gulzaar dhanda masoom',
+          'top haryanvi songs khasa aala chahar amit saini ajay hooda',
+        ],
+        filterFn: (s) => isStrictHaryanvi(s) && !hasPunjabiSignature(s),
+      },
     };
 
-    const query = OFFICIAL_QUERIES[playlist?.id];
-    if (!query || tracks.length >= 45) return;
+    const cfg = OFFICIAL_CONFIG[playlist?.id];
+    if (!cfg) return;
+
+    // Purge any cross-contaminated songs already in the playlist
+    const currentTracks = Array.isArray(playlist.tracks) ? playlist.tracks : [];
+    const sanitizedCurrent = currentTracks.filter((t) => cfg.filterFn(t));
+    if (sanitizedCurrent.length !== currentTracks.length) {
+      dispatch(setPlaylistTracks({ playlistId: playlist.id, tracks: sanitizedCurrent }));
+    }
+
+    if (sanitizedCurrent.length >= 45) return;
 
     let mounted = true;
     const fetchOfficialTracks = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}&filter=songs&language=en&hl=en`);
-        const data = await res.json();
-        if (!mounted || !Array.isArray(data?.results)) return;
+        const targetCount = 50;
+        const collected = [...sanitizedCurrent];
+        const seen = new Set(collected.map((s) => s.videoId));
 
-        let songList = data.results.map(normalizeSong).filter(Boolean);
-        let nextTok = data.continuationToken;
-        let attempts = 0;
+        for (const query of cfg.queries) {
+          if (collected.length >= targetCount || !mounted) break;
 
-        while (nextTok && songList.length < 50 && attempts < 5) {
-          attempts++;
           try {
-            const nextRes = await fetch(`${API_BASE}/api/search?continuationToken=${encodeURIComponent(nextTok)}&language=en&hl=en`);
-            const nextData = await nextRes.json();
-            if (!mounted) return;
-            if (Array.isArray(nextData?.results) && nextData.results.length > 0) {
-              const more = nextData.results.map(normalizeSong).filter(Boolean);
-              const seen = new Set(songList.map((s) => s.videoId));
-              more.forEach((s) => {
-                if (s && s.videoId && !seen.has(s.videoId)) {
-                  seen.add(s.videoId);
-                  songList.push(s);
-                }
-              });
-              nextTok = nextData.continuationToken || null;
-            } else {
-              break;
+            const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}&filter=songs&language=en&hl=en`);
+            const data = await res.json();
+            if (!mounted) break;
+
+            const items = (data?.results || []).map(normalizeSong).filter(Boolean);
+            let nextTok = data?.continuationToken || null;
+
+            items.forEach((s) => {
+              if (s && s.videoId && !seen.has(s.videoId) && cfg.filterFn(s)) {
+                seen.add(s.videoId);
+                collected.push(s);
+              }
+            });
+
+            let attempts = 0;
+            while (nextTok && collected.length < targetCount && attempts < 4) {
+              attempts++;
+              try {
+                const nextRes = await fetch(`${API_BASE}/api/search?continuationToken=${encodeURIComponent(nextTok)}&language=en&hl=en`);
+                const nextData = await nextRes.json();
+                if (!mounted) break;
+                const more = (nextData?.results || []).map(normalizeSong).filter(Boolean);
+                more.forEach((s) => {
+                  if (s && s.videoId && !seen.has(s.videoId) && cfg.filterFn(s)) {
+                    seen.add(s.videoId);
+                    collected.push(s);
+                  }
+                });
+                nextTok = nextData?.continuationToken || null;
+              } catch (e) {
+                break;
+              }
             }
-          } catch (e) {
-            break;
-          }
+          } catch (e) {}
         }
 
-        if (mounted && songList.length > tracks.length) {
-          dispatch(setPlaylistTracks({ playlistId: playlist.id, tracks: songList }));
-          dispatch(appendQueueTracks({ newTracks: songList }));
+        if (mounted && collected.length > sanitizedCurrent.length) {
+          dispatch(setPlaylistTracks({ playlistId: playlist.id, tracks: collected }));
+          dispatch(appendQueueTracks({ newTracks: collected }));
         }
       } catch (e) {
         console.warn('Failed to auto-enrich official playlist:', e);

@@ -10,6 +10,12 @@ import { FaPlay, FaFire, FaMusic } from 'react-icons/fa';
 import { HiSparkles } from 'react-icons/hi';
 import { normalizeSong } from '../utils/normalizeSong';
 import { API_BASE } from '../services/apiConfig';
+import {
+  isStrictHaryanvi,
+  isStrictPunjabi,
+  hasPunjabiSignature,
+  hasHaryanviSignature,
+} from '../utils/regionalFilter';
 
 // Instant seed Indian tracks for 0ms initial render
 const instantTrendingSeeds = [
@@ -180,9 +186,9 @@ const Home = () => {
     }
   };
 
-  const [trendingIndia, setTrendingIndia] = useState(() => getCached('tt_trending', instantTrendingSeeds));
-  const [punjabiHits, setPunjabiHits] = useState(() => getCached('tt_punjabi', instantPunjabiSeeds));
-  const [haryanviHits, setHaryanviHits] = useState(() => getCached('tt_haryanvi', instantHaryanviSeeds));
+  const [trendingIndia, setTrendingIndia] = useState(() => getCached('tt_trending_v3', instantTrendingSeeds));
+  const [punjabiHits, setPunjabiHits] = useState(() => getCached('tt_punjabi_v3', instantPunjabiSeeds));
+  const [haryanviHits, setHaryanviHits] = useState(() => getCached('tt_haryanvi_v3', instantHaryanviSeeds));
 
   useEffect(() => {
     let mounted = true;
@@ -192,10 +198,10 @@ const Home = () => {
       fetch(`${API_BASE}/api/search?q=trending+hindi+bollywood+songs+india&filter=songs&language=en&hl=en`)
         .then((r) => r.json())
         .catch(() => null),
-      fetch(`${API_BASE}/api/search?q=punjabi+top+trending+songs&filter=songs&language=en&hl=en`)
+      fetch(`${API_BASE}/api/search?q=punjabi+top+trending+songs+karan+aujla+diljit&filter=songs&language=en&hl=en`)
         .then((r) => r.json())
         .catch(() => null),
-      fetch(`${API_BASE}/api/search?q=top+haryanvi+songs+latest+trending+hits&filter=songs&language=en&hl=en`)
+      fetch(`${API_BASE}/api/search?q=top+haryanvi+songs+hits+nav+haryanvi+desi+records&filter=songs&language=en&hl=en`)
         .then((r) => r.json())
         .catch(() => null),
     ]).then(([trendData, punjabiData, haryanviData]) => {
@@ -204,19 +210,23 @@ const Home = () => {
       if (trendData?.results?.length > 0) {
         const norm = trendData.results.map(normalizeSong).filter(Boolean);
         setTrendingIndia(norm);
-        try { sessionStorage.setItem('tt_trending', JSON.stringify(norm)); } catch {}
+        try { sessionStorage.setItem('tt_trending_v3', JSON.stringify(norm)); } catch {}
       }
 
       if (punjabiData?.results?.length > 0) {
         const norm = punjabiData.results.map(normalizeSong).filter(Boolean);
-        setPunjabiHits(norm);
-        try { sessionStorage.setItem('tt_punjabi', JSON.stringify(norm)); } catch {}
+        const filtered = norm.filter((s) => isStrictPunjabi(s) && !hasHaryanviSignature(s));
+        const finalPunjabi = filtered.length >= 4 ? filtered : instantPunjabiSeeds;
+        setPunjabiHits(finalPunjabi);
+        try { sessionStorage.setItem('tt_punjabi_v3', JSON.stringify(finalPunjabi)); } catch {}
       }
 
       if (haryanviData?.results?.length > 0) {
         const norm = haryanviData.results.map(normalizeSong).filter(Boolean);
-        setHaryanviHits(norm);
-        try { sessionStorage.setItem('tt_haryanvi', JSON.stringify(norm)); } catch {}
+        const filtered = norm.filter((s) => isStrictHaryanvi(s) && !hasPunjabiSignature(s));
+        const finalHaryanvi = filtered.length >= 4 ? filtered : instantHaryanviSeeds;
+        setHaryanviHits(finalHaryanvi);
+        try { sessionStorage.setItem('tt_haryanvi_v3', JSON.stringify(finalHaryanvi)); } catch {}
       }
     });
 
