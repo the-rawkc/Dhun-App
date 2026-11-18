@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setIsEqualizerModalOpen, setEqualizerPreset, setAudioQuality } from '../redux/features/playerSlice';
+import {
+  setIsEqualizerModalOpen,
+  setEqualizerPreset,
+  setAudioQuality,
+  setCrossfadeStyle,
+} from '../redux/features/playerSlice';
 import { audioDSP, PRESETS, FREQUENCIES } from '../services/audioDsp';
 import { FaSlidersH, FaTimes, FaVolumeUp, FaBroadcastTower, FaCheck, FaUndo } from 'react-icons/fa';
 import { HiSparkles } from 'react-icons/hi';
 
 const EqualizerModal = () => {
   const dispatch = useDispatch();
-  const { isEqualizerModalOpen, audioQuality, isPlaying } = useSelector((state) => state.player);
+  const { isEqualizerModalOpen, audioQuality, isPlaying, crossfadeStyle = 'smart' } = useSelector((state) => state.player);
 
   const [activePreset, setActivePreset] = useState('studio');
   const [bandGains, setBandGains] = useState([3.5, 1.5, 0.5, 2.0, 3.5]);
@@ -277,6 +282,29 @@ const EqualizerModal = () => {
               />
             </div>
           </div>
+        </div>
+
+        {/* Apple Music Smart Automix / Crossfade */}
+        <div className="p-4 rounded-2xl bg-slate-500/5 border theme-border flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold theme-text-main">Apple Music Automix (Crossfade)</span>
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-500 text-white">
+                SMART BLEND
+              </span>
+            </div>
+            <p className="text-[10px] theme-text-muted mt-0.5">Smoothly blends tracks before the outro without clashing vocals</p>
+          </div>
+          <select
+            value={crossfadeStyle}
+            onChange={(e) => dispatch(setCrossfadeStyle(e.target.value))}
+            className="px-3 py-1.5 rounded-xl bg-slate-500/10 border theme-border theme-text-main text-xs font-semibold focus:outline-none focus:border-rose-500"
+          >
+            <option value="smart">Smart (4s - Apple Music)</option>
+            <option value="smooth">Smooth (6s)</option>
+            <option value="long">Extended (8s)</option>
+            <option value="off">Off (Standard)</option>
+          </select>
         </div>
 
         {/* Live Audio Indicator & Done button */}

@@ -14,7 +14,12 @@ class PlayerEngine {
     this.currentTrackKey = null;
     this.isOfflinePlayback = false;
     this.isDirectAudio = false;
-    this.audioEl = null;
+
+    // Dual-deck audio architecture for Apple Music style gapless crossfade & automix
+    this.deckA = null;
+    this.deckB = null;
+    this.currentDeck = null;
+    this.nextDeck = null;
     this.offlineAudioEl = null;
     this.bgAnchorEl = null;
     this.wakeLock = null;
@@ -23,6 +28,22 @@ class PlayerEngine {
     this.activeAbortController = null;
     this.currentVolume = 0.8;
     this.streamCache = new Map();
+
+    // Apple Music Smart Automix transition settings
+    this.isCrossfading = false;
+    this.crossfadeTimer = null;
+    this.crossfadeSeconds = 4;
+    try {
+      const savedStyle = localStorage.getItem('tunetide_crossfade_style');
+      const secondsMap = { smart: 4, smooth: 6, long: 8, off: 0 };
+      this.crossfadeSeconds = secondsMap[savedStyle] !== undefined ? secondsMap[savedStyle] : 4;
+    } catch (e) {
+      this.crossfadeSeconds = 4;
+    }
+
+    // Playback history stack for accurate double-tap Prev & shuffle back-navigation
+    this.playbackHistory = [];
+    this.lastPrevClickTime = 0;
 
     // Autonomous playlist queue for uninterrupted background & lock-screen playback
     this.queue = [];
@@ -52,6 +73,30 @@ class PlayerEngine {
     this.initYouTube();
     this.initMediaSession();
     this.initVisibilityListener();
+  }
+
+  // Unified accessor: any legacy or external code referencing this.audioEl receives the active deck
+  get audioEl() {
+    return this.currentDeck || this.deckA;
+  }
+  set audioEl(el) {
+    this.currentDeck = el;
+    if (!this.deckA) this.deckA = el;
+  }
+
+  setCrossfadeSeconds(sec) {
+    this.crossfadeSeconds = typeof sec === 'number' && !isNaN(sec) ? Math.max(0, Math.min(15, sec)) : 4;
+  }
+
+  pushPlaybackHistory(idx) {
+    if (typeof idx !== 'number' || idx < 0) return;
+    if (this.playbackHistory.length > 0 && this.playbackHistory[this.playbackHistory.length - 1] === idx) {
+      return;
+    }
+    this.playbackHistory.push(idx);
+    if (this.playbackHistory.length > 50) {
+      this.playbackHistory.shift();
+    }
   }
 
   startBackgroundAudioAnchor(force = false) {
@@ -105,14 +150,12 @@ class PlayerEngine {
 
   initDirectAudio() {
     if (typeof window === 'undefined') return;
-    this.audioEl = document.getElementById('dhun-native-player') || new Audio();
-    this.audioEl.preload = 'auto';
-    this.audioEl.volume = this.currentVolume;
-    this.audioEl.muted = false;
-    this.audioEl.setAttribute('playsinline', 'true');
-    this.audioEl.setAttribute('webkit-playsinline', 'true');
-    this.audioEl.id = 'dhun-native-player';
-    this.offlineAudioEl = this.audioEl; // Backwards-compatibility alias
+
+    this.deckA = document.getElementById('dhun-native-player') || new Audio();
+    this.deckB = document.getElementById('dhun-native-player-secondary') || new Audio();
+    this.currentDeck = this.deckA;
+    this.nextDeck = this.deckB;
+    this.offlineAudioEl = this.deckA; // Backwards-compatibility alias
 
     let anchor = document.getElementById('dhun-anchor-player');
     if (anchor) {
@@ -123,7 +166,7 @@ class PlayerEngine {
       this.bgAnchorEl.setAttribute('playsinline', 'true');
     }
 
-    // Ensure audio element is mounted into DOM container so mobile OS never suspends it
+    // Ensure audio elements are mounted into DOM container so mobile OS never suspends them
     try {
       let container = document.getElementById('yt-audio-container');
       if (!container) {
@@ -133,71 +176,106 @@ class PlayerEngine {
         document.body.appendChild(container);
       }
       if (!document.getElementById('dhun-native-player')) {
-        container.appendChild(this.audioEl);
+        container.appendChild(this.deckA);
+      }
+      if (!document.getElementById('dhun-native-player-secondary')) {
+        container.appendChild(this.deckB);
       }
     } catch (e) {}
 
-    this.audioEl.addEventListener('timeupdate', () => {
-      if (this.isDirectAudio || this.isOfflinePlayback) {
-        const cur = this.audioEl.currentTime;
-        this.listeners.timeUpdate(cur);
-        this.updateMediaSessionPosition(cur);
-      }
-    });
+    const setupDeck = (deck, deckId) => {
+      deck.id = deckId;
+      deck.preload = 'auto';
+      deck.volume = this.currentVolume;
+      deck.muted = false;
+      deck.setAttribute('playsinline', 'true');
+      deck.setAttribute('webkit-playsinline', 'true');
 
-    this.audioEl.addEventListener('loadedmetadata', () => {
-      if (this.isDirectAudio || this.isOfflinePlayback) {
-        if (this.audioEl.duration && !isNaN(this.audioEl.duration)) {
-          this.listeners.durationChange(this.audioEl.duration);
+      deck.addEventListener('timeupdate', () => {
+        if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
+          const cur = deck.currentTime;
+          this.listeners.timeUpdate(cur);
+          this.updateMediaSessionPosition(cur);
+
+          // Apple Music Smart Automix trigger: starts next track gently during the outro
+          const dur = deck.duration;
+          if (
+            this.crossfadeSeconds > 0 &&
+            !this.isCrossfading &&
+            this.shouldBePlaying &&
+            !this.isUserPaused &&
+            dur &&
+            !isNaN(dur) &&
+            dur > 15 &&
+            (dur - cur) <= this.crossfadeSeconds &&
+            (dur - cur) > 0.4
+          ) {
+            this.startSmartCrossfade(dur - cur);
+          }
         }
-      }
-    });
+      });
 
-    this.audioEl.addEventListener('durationchange', () => {
-      if (this.isDirectAudio || this.isOfflinePlayback) {
-        if (this.audioEl.duration && !isNaN(this.audioEl.duration)) {
-          this.listeners.durationChange(this.audioEl.duration);
+      deck.addEventListener('loadedmetadata', () => {
+        if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
+          if (deck.duration && !isNaN(deck.duration)) {
+            this.listeners.durationChange(deck.duration);
+          }
         }
-      }
-    });
+      });
 
-    this.audioEl.addEventListener('play', () => {
-      if (this.isDirectAudio || this.isOfflinePlayback) {
-        this.shouldBePlaying = true;
-        this.isUserPaused = false;
-        this.stopBackgroundAudioAnchor();
-        this.listeners.stateChange(true);
-        this.updateMediaSessionState('playing');
-        this.requestWakeLock();
-      }
-    });
-
-    this.audioEl.addEventListener('pause', () => {
-      if (this.isDirectAudio || this.isOfflinePlayback) {
-        if (this.isUserPaused) {
-          this.listeners.stateChange(false);
-          this.updateMediaSessionState('paused');
-          this.releaseWakeLock();
+      deck.addEventListener('durationchange', () => {
+        if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
+          if (deck.duration && !isNaN(deck.duration)) {
+            this.listeners.durationChange(deck.duration);
+          }
         }
-      }
-    });
+      });
 
-    this.audioEl.addEventListener('ended', () => {
-      if (this.isDirectAudio || this.isOfflinePlayback) {
-        // Keep audio context alive seamlessly across track handoff
-        this.startBackgroundAudioAnchor(true);
-        this.playNextTrack(false);
-      }
-    });
+      deck.addEventListener('play', () => {
+        if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
+          this.shouldBePlaying = true;
+          this.isUserPaused = false;
+          this.stopBackgroundAudioAnchor();
+          this.listeners.stateChange(true);
+          this.updateMediaSessionState('playing');
+          this.requestWakeLock();
+        }
+      });
 
-    this.audioEl.addEventListener('error', (err) => {
-      if (!this.audioEl?.src || this.audioEl.src.startsWith('data:') || this.audioEl.src === window.location.href) return;
-      if (!this.isDirectAudio && !this.isOfflinePlayback) return;
-      console.warn('Direct native audio stream error, falling back to YouTube:', err);
-      if (this.currentVideoId && !this.isOfflinePlayback) {
-        this.fallbackToYouTube(this.currentVideoId, this.shouldBePlaying);
-      }
-    });
+      deck.addEventListener('pause', () => {
+        if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
+          if (this.isUserPaused) {
+            this.listeners.stateChange(false);
+            this.updateMediaSessionState('paused');
+            this.releaseWakeLock();
+          }
+        }
+      });
+
+      deck.addEventListener('ended', () => {
+        if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
+          if (this.isCrossfading) {
+            // Next deck is already crossfading / playing
+            return;
+          }
+          this.startBackgroundAudioAnchor(true);
+          this.playNextTrack(false);
+        }
+      });
+
+      deck.addEventListener('error', (err) => {
+        if (!deck?.src || deck.src.startsWith('data:') || deck.src === window.location.href) return;
+        if (deck !== this.currentDeck) return;
+        if (!this.isDirectAudio && !this.isOfflinePlayback) return;
+        console.warn('Direct native audio stream error, falling back to YouTube:', err);
+        if (this.currentVideoId && !this.isOfflinePlayback) {
+          this.fallbackToYouTube(this.currentVideoId, this.shouldBePlaying);
+        }
+      });
+    };
+
+    setupDeck(this.deckA, 'dhun-native-player');
+    setupDeck(this.deckB, 'dhun-native-player-secondary');
   }
 
   initOfflineAudio() {
@@ -421,6 +499,183 @@ class PlayerEngine {
     }
   }
 
+  // Smoothly ramps down the current deck volume over 120ms before switching tracks
+  smoothSwitchDeck(onSwitch) {
+    if (this.crossfadeTimer) {
+      clearInterval(this.crossfadeTimer);
+      this.crossfadeTimer = null;
+      this.isCrossfading = false;
+    }
+
+    const deck = this.currentDeck;
+    if (!deck || deck.paused || this.currentVolume <= 0) {
+      if (onSwitch) onSwitch();
+      return;
+    }
+
+    const startVol = deck.volume;
+    const startTime = performance.now();
+    const durationMs = 120;
+
+    const timer = setInterval(() => {
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(1, elapsed / durationMs);
+      try {
+        deck.volume = Math.max(0, startVol * (1 - progress));
+      } catch (e) {}
+
+      if (progress >= 1) {
+        clearInterval(timer);
+        try {
+          deck.pause();
+          deck.currentTime = 0;
+          deck.volume = this.currentVolume ?? 0.8;
+        } catch (e) {}
+        if (onSwitch) onSwitch();
+      }
+    }, 20);
+  }
+
+  // Apple Music style seamless smart crossfade / automix
+  async startSmartCrossfade(remainingSec = 4) {
+    if (this.isCrossfading || !this.queue || this.queue.length <= 1) return;
+    this.isCrossfading = true;
+
+    let nextIndex = this.queueIndex + 1;
+    if (this.repeatMode === 'one') {
+      nextIndex = this.queueIndex;
+    } else if (this.isShuffle) {
+      if (this.queue.length > 1) {
+        let randomIdx = this.queueIndex;
+        let attempts = 0;
+        while (randomIdx === this.queueIndex && attempts < 20) {
+          randomIdx = Math.floor(Math.random() * this.queue.length);
+          attempts++;
+        }
+        nextIndex = randomIdx;
+      } else {
+        nextIndex = 0;
+      }
+    } else if (nextIndex >= this.queue.length) {
+      nextIndex = 0;
+    }
+
+    const nextTrack = this.queue[nextIndex];
+    if (!nextTrack) {
+      this.isCrossfading = false;
+      return;
+    }
+
+    const cleanVideoId = typeof nextTrack === 'object' ? (nextTrack?.videoId || nextTrack?.id) : String(nextTrack || '').trim();
+    const title = nextTrack?.title || nextTrack?.name || '';
+    const artist = nextTrack?.artist || nextTrack?.artists || nextTrack?.subtitle || '';
+    const cacheKey = (cleanVideoId && cleanVideoId.length > 5 && !cleanVideoId.startsWith('tr_'))
+      ? cleanVideoId
+      : (title ? `${title}::${artist}`.toLowerCase().trim() : cleanVideoId);
+
+    // Look up cached stream or fetch in background
+    let streamData = this.streamCache.get(cacheKey) || (cleanVideoId ? this.streamCache.get(cleanVideoId) : null) || (title ? this.streamCache.get(title.toLowerCase().trim()) : null);
+
+    if (!streamData?.streamUrl && title) {
+      try {
+        const query = `${title} ${artist}`.trim();
+        const res = await fetch(
+          `${API_BASE}/api/audio-stream?query=${encodeURIComponent(query)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`
+        );
+        if (res.ok) {
+          const d = await res.json();
+          if (d.success && d.streamUrl) {
+            streamData = d;
+            this.streamCache.set(cacheKey, d);
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (!streamData?.streamUrl) {
+      // Direct stream not ready; let current track finish naturally to avoid playback interruption
+      this.isCrossfading = false;
+      return;
+    }
+
+    const outgoingDeck = this.currentDeck;
+    const incomingDeck = this.nextDeck;
+
+    // Track playback history for accurate double-tap Prev navigation
+    this.pushPlaybackHistory(this.queueIndex);
+
+    // Prime incoming deck with silent volume
+    incomingDeck.src = streamData.streamUrl;
+    incomingDeck.volume = 0;
+    incomingDeck.currentTime = 0;
+
+    try {
+      await incomingDeck.play();
+    } catch (err) {
+      console.warn('Smart crossfade incoming deck play failed:', err);
+      this.isCrossfading = false;
+      return;
+    }
+
+    // Update active song metadata immediately so UI & lock-screen sync with the incoming song
+    this.queueIndex = nextIndex;
+    this.currentTrack = nextTrack;
+    this.currentTrackKey = cacheKey;
+    this.currentVideoId = cleanVideoId;
+    this.updateMediaMetadata(nextTrack);
+    this.updateMediaSessionState('playing');
+
+    if (typeof this.listeners.onTrackChanged === 'function') {
+      this.listeners.onTrackChanged(nextTrack, nextIndex);
+    }
+
+    // Run Apple Music equal-power crossfade curve
+    const durationMs = Math.max(1000, Math.min(this.crossfadeSeconds * 1000, (remainingSec || 4) * 1000));
+    const startTime = performance.now();
+    const targetVolume = this.currentVolume ?? 0.8;
+
+    if (this.crossfadeTimer) {
+      clearInterval(this.crossfadeTimer);
+      this.crossfadeTimer = null;
+    }
+
+    this.crossfadeTimer = setInterval(() => {
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(1, elapsed / durationMs);
+
+      // Equal-power crossfade curve: cos(t * π/2) and sin(t * π/2)
+      // Maintains constant RMS acoustic energy throughout transition with zero drop
+      const outVol = Math.cos(progress * 0.5 * Math.PI) * targetVolume;
+      const inVol = Math.sin(progress * 0.5 * Math.PI) * targetVolume;
+
+      try {
+        outgoingDeck.volume = Math.max(0, Math.min(1, outVol));
+        incomingDeck.volume = Math.max(0, Math.min(1, inVol));
+      } catch (e) {}
+
+      if (progress >= 1) {
+        clearInterval(this.crossfadeTimer);
+        this.crossfadeTimer = null;
+
+        try {
+          outgoingDeck.pause();
+          outgoingDeck.currentTime = 0;
+          outgoingDeck.volume = targetVolume;
+        } catch (e) {}
+
+        incomingDeck.volume = targetVolume;
+
+        // Swap active decks
+        this.currentDeck = incomingDeck;
+        this.nextDeck = outgoingDeck;
+        this.isCrossfading = false;
+
+        // Prefetch next track in queue for future seamless transitions
+        this.prefetchNextInQueue();
+      }
+    }, 40);
+  }
+
   playNextTrack(fromLockScreen = false) {
     if (!this.queue || this.queue.length === 0) {
       if (this.listeners.next) this.listeners.next();
@@ -428,13 +683,12 @@ class PlayerEngine {
     }
 
     if (this.repeatMode === 'one' && !fromLockScreen) {
-      if (this.audioEl) {
-        this.audioEl.currentTime = 0;
-        this.audioEl.play().catch(() => {});
-        this.updateMediaSessionState('playing');
-        return;
-      }
+      this.seekTo(0);
+      if (this.isUserPaused) this.play();
+      return;
     }
+
+    this.pushPlaybackHistory(this.queueIndex);
 
     let nextIndex = this.queueIndex + 1;
     if (this.isShuffle) {
@@ -461,7 +715,9 @@ class PlayerEngine {
       this.updateMediaMetadata(nextTrack);
       this.updateMediaSessionState('playing');
 
-      this.loadVideo(vId || nextTrack, true, nextTrack);
+      this.smoothSwitchDeck(() => {
+        this.loadVideo(vId || nextTrack, true, nextTrack);
+      });
 
       if (typeof this.listeners.onTrackChanged === 'function') {
         this.listeners.onTrackChanged(nextTrack, nextIndex);
@@ -477,26 +733,55 @@ class PlayerEngine {
       return;
     }
 
-    if (this.getCurrentTime() > 3) {
+    const now = Date.now();
+    const curTime = this.getCurrentTime();
+    const isDoubleTap = (now - this.lastPrevClickTime) < 2500;
+
+    // 1. If song has played for more than 2.5s and this is the first tap,
+    // RESTART the current song from beginning (Apple Music & Spotify standard)
+    if (curTime > 2.5 && !isDoubleTap) {
+      this.lastPrevClickTime = now;
       this.seekTo(0);
+      if (this.isUserPaused) {
+        this.play();
+      } else {
+        // Smooth gentle volume dip and restore
+        const deck = this.currentDeck;
+        if (deck) {
+          const vol = this.currentVolume ?? 0.8;
+          deck.volume = vol * 0.3;
+          setTimeout(() => {
+            if (deck) deck.volume = vol;
+          }, 100);
+        }
+      }
+      if (typeof this.listeners.timeUpdate === 'function') {
+        this.listeners.timeUpdate(0);
+      }
       return;
     }
 
-    let prevIndex = this.queueIndex - 1;
-    if (this.isShuffle) {
-      if (this.queue.length > 1) {
-        let randomIdx = this.queueIndex;
-        let attempts = 0;
-        while (randomIdx === this.queueIndex && attempts < 20) {
-          randomIdx = Math.floor(Math.random() * this.queue.length);
-          attempts++;
-        }
-        prevIndex = randomIdx;
-      } else {
-        prevIndex = 0;
+    // 2. Double tap (2 clicks in succession) OR tap within first 2.5s:
+    // Go to the previously played song or previous index in queue
+    this.lastPrevClickTime = 0;
+
+    let prevIndex = -1;
+    // Pop from actual playback history first
+    while (this.playbackHistory.length > 0) {
+      const cand = this.playbackHistory.pop();
+      if (cand !== this.queueIndex && cand >= 0 && cand < this.queue.length) {
+        prevIndex = cand;
+        break;
       }
-    } else if (prevIndex < 0) {
-      prevIndex = this.queue.length - 1;
+    }
+
+    // If no history, navigate linearly backwards
+    if (prevIndex < 0) {
+      if (this.queueIndex > 0) {
+        prevIndex = this.queueIndex - 1;
+      } else {
+        prevIndex = this.queue.length - 1;
+      }
     }
 
     this.queueIndex = prevIndex;
@@ -507,7 +792,9 @@ class PlayerEngine {
       this.updateMediaMetadata(prevTrack);
       this.updateMediaSessionState('playing');
 
-      this.loadVideo(vId || prevTrack, true, prevTrack);
+      this.smoothSwitchDeck(() => {
+        this.loadVideo(vId || prevTrack, true, prevTrack);
+      });
 
       if (typeof this.listeners.onTrackChanged === 'function') {
         this.listeners.onTrackChanged(prevTrack, prevIndex);
@@ -770,35 +1057,49 @@ class PlayerEngine {
 
     this.isOfflinePlayback = false;
 
-    // Helper to start playback on this.audioEl with instant retry
+    // Helper to start playback on active deck with smooth fade-in
     const applyDirectStream = (data) => {
       this.isDirectAudio = true;
       if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
         try { this.ytPlayer.pauseVideo(); } catch (e) {}
       }
-      this.audioEl.src = data.streamUrl;
-      this.audioEl.volume = this.currentVolume ?? 0.8;
-      this.audioEl.muted = false;
+      const deck = this.currentDeck || this.deckA;
+      deck.src = data.streamUrl;
+      deck.muted = false;
       this.activeAbortController = null;
 
       if (autoPlay && this.shouldBePlaying && !this.isUserPaused) {
-        const playPromise = this.audioEl.play();
+        const targetVol = this.currentVolume ?? 0.8;
+        deck.volume = 0; // Gentle fade-in from 0 to eliminate audio clicks
+        const playPromise = deck.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
             this.stopBackgroundAudioAnchor();
+            // Smooth 120ms fade-in ramp
+            const startT = performance.now();
+            const rampTimer = setInterval(() => {
+              const el = performance.now() - startT;
+              const p = Math.min(1, el / 120);
+              try { deck.volume = Math.max(0, Math.min(1, p * targetVol)); } catch (e) {}
+              if (p >= 1) {
+                clearInterval(rampTimer);
+                deck.volume = targetVol;
+              }
+            }, 20);
           }).catch((err) => {
             console.warn('Initial play pending, waiting for canplay event:', err);
             const onCanPlay = () => {
-              this.audioEl.removeEventListener('canplay', onCanPlay);
+              deck.removeEventListener('canplay', onCanPlay);
               if (this.shouldBePlaying && !this.isUserPaused) {
-                this.audioEl.play().then(() => {
+                deck.play().then(() => {
                   this.stopBackgroundAudioAnchor();
+                  deck.volume = targetVol;
                 }).catch(() => {
                   if (cleanVideoId) this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
                 });
               }
             };
-            this.audioEl.addEventListener('canplay', onCanPlay, { once: true });
+            deck.addEventListener('canplay', onCanPlay, { once: true });
           });
         }
       }
@@ -952,9 +1253,18 @@ class PlayerEngine {
     this.updateMediaSessionState('paused');
     this.releaseWakeLock();
 
+    if (this.isCrossfading && this.crossfadeTimer) {
+      clearInterval(this.crossfadeTimer);
+      this.crossfadeTimer = null;
+      this.isCrossfading = false;
+    }
+
     if (this.isDirectAudio || this.isOfflinePlayback) {
-      if (this.audioEl) {
-        this.audioEl.pause();
+      if (this.deckA) {
+        try { this.deckA.pause(); } catch (e) {}
+      }
+      if (this.deckB) {
+        try { this.deckB.pause(); } catch (e) {}
       }
     } else if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
       try {
@@ -996,10 +1306,11 @@ class PlayerEngine {
   setVolume(fraction) {
     const vol = Math.max(0, Math.min(1, typeof fraction === 'number' && !isNaN(fraction) ? fraction : 0.8));
     this.currentVolume = vol;
-    if (this.audioEl) {
-      this.audioEl.volume = vol;
-      this.audioEl.muted = (vol === 0);
+    if (this.currentDeck && !this.isCrossfading) {
+      this.currentDeck.volume = vol;
     }
+    if (this.deckA) this.deckA.muted = (vol === 0);
+    if (this.deckB) this.deckB.muted = (vol === 0);
     if (this.ytPlayer) {
       try {
         if (vol === 0) {

@@ -83,6 +83,7 @@ const initialState = {
   isEqualizerModalOpen: false,
   equalizerPreset: loadSaved('tunetide_eq_preset', 'studio'),
   audioQuality: loadSaved('tunetide_audio_bitrate', '320'),
+  crossfadeStyle: loadSaved('tunetide_crossfade_style', 'smart'),
   playTrigger: 0,
 };
 
@@ -485,6 +486,17 @@ const playerSlice = createSlice({
       state.audioQuality = action.payload;
       saveItem('tunetide_audio_bitrate', action.payload);
     },
+
+    setCrossfadeStyle: (state, action) => {
+      const style = action.payload;
+      state.crossfadeStyle = style;
+      saveItem('tunetide_crossfade_style', style);
+      const secondsMap = { smart: 4, smooth: 6, long: 8, off: 0 };
+      const sec = secondsMap[style] !== undefined ? secondsMap[style] : 4;
+      try {
+        playerEngine.setCrossfadeSeconds(sec);
+      } catch (e) {}
+    },
   },
 });
 
@@ -521,6 +533,7 @@ export const {
   setIsEqualizerModalOpen,
   setEqualizerPreset,
   setAudioQuality,
+  setCrossfadeStyle,
 } = playerSlice.actions;
 
 // Centralized synchronous action for 100% reliable click-to-play across all devices & browsers
@@ -534,6 +547,7 @@ export const playTrackNow = ({ song, songs = [], index = 0 }) => (dispatch, getS
 
   try {
     playerEngine.unlockAudio();
+    playerEngine.pushPlaybackHistory(playerEngine.queueIndex);
     playerEngine.setQueue(currentSongsList, index, shuffle, repeatMode);
     playerEngine.loadVideo(normalized.videoId || normalized, true, normalized);
   } catch (e) {

@@ -5,6 +5,7 @@ import {
   toggleFavoriteArtist,
   setIsEqualizerModalOpen,
   setAudioQuality as setAudioQualityRedux,
+  setCrossfadeStyle,
 } from '../redux/features/playerSlice';
 import { audioDSP } from '../services/audioDsp';
 import {
@@ -25,7 +26,7 @@ import {
 
 const Settings = () => {
   const dispatch = useDispatch();
-  const { themeMode, favoriteArtists } = useSelector((state) => state.player);
+  const { themeMode, favoriteArtists, crossfadeStyle = 'smart' } = useSelector((state) => state.player);
 
   // Storage State
   const [storageUsage, setStorageUsage] = useState({ count: 0, megabytes: '0.0' });
@@ -226,6 +227,29 @@ const Settings = () => {
               <option value="320">Very High (Best Quality - Like Spotify Pro)</option>
               <option value="256">High Quality (Balanced)</option>
               <option value="128">Normal Quality (Saves Mobile Data)</option>
+            </select>
+          </div>
+
+          {/* Song Transition Style (Apple Music Automix) */}
+          <div className="flex items-center justify-between pt-3 border-t theme-border">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold theme-text-main">Song Transition Style</span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-500 text-white">
+                  Apple Music Automix
+                </span>
+              </div>
+              <p className="text-xs theme-text-muted">Next song starts gently before the last song ends without audio gaps or overlapping lyrics</p>
+            </div>
+            <select
+              value={crossfadeStyle}
+              onChange={(e) => dispatch(setCrossfadeStyle(e.target.value))}
+              className="px-3.5 py-2 rounded-xl bg-slate-500/10 border theme-border theme-text-main text-xs font-semibold focus:outline-none focus:border-rose-500"
+            >
+              <option value="smart">Smart Automix (Apple Music Style - 4s)</option>
+              <option value="smooth">Smooth Crossfade (6s)</option>
+              <option value="long">Extended Blend (8s)</option>
+              <option value="off">Off (Standard Gapless)</option>
             </select>
           </div>
 
