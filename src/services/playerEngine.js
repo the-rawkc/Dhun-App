@@ -158,7 +158,7 @@ class PlayerEngine {
     });
 
     this.audioEl.addEventListener('error', (err) => {
-      if (!this.audioEl?.src || this.audioEl.src === window.location.href) return;
+      if (!this.audioEl?.src || this.audioEl.src.startsWith('data:') || this.audioEl.src === window.location.href) return;
       if (!this.isDirectAudio && !this.isOfflinePlayback) return;
       console.warn('Direct native audio stream error, falling back to YouTube:', err);
       if (this.currentVideoId && !this.isOfflinePlayback) {
@@ -319,11 +319,14 @@ class PlayerEngine {
               }
             },
             onError: (event) => {
+              if (this.isDirectAudio || this.isOfflinePlayback) return;
               console.warn('YouTube Player Event Error:', event.data);
               // Video restricted on mobile / embedding disabled (101, 150) or invalid (2, 100) -> auto advance
               if (event.data === 150 || event.data === 101 || event.data === 100 || event.data === 2) {
                 setTimeout(() => {
-                  this.listeners.next();
+                  if (!this.isDirectAudio && !this.isOfflinePlayback) {
+                    this.listeners.next();
+                  }
                 }, 400);
               }
             },
@@ -455,6 +458,14 @@ class PlayerEngine {
       if (this.audioEl) {
         this.audioEl.volume = this.currentVolume ?? 0.8;
         this.audioEl.muted = false;
+        // Prime audio element on user gesture to permanently satisfy autoplay requirements
+        if (!this.audioEl.src || this.audioEl.src === window.location.href) {
+          this.audioEl.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+        }
+        const p = this.audioEl.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {});
+        }
       }
     } catch (e) {}
   }
@@ -462,22 +473,7 @@ class PlayerEngine {
   async loadVideo(videoId, autoPlay = true, trackMeta = null) {
     if (!videoId && !trackMeta) return;
 
-    if (this.activeAbortController) {
-      try {
-        this.activeAbortController.abort();
-      } catch (e) {}
-      this.activeAbortController = null;
-    }
-
-    // Pause and reset previous audio element cleanly without triggering empty-src MediaErrors
-    if (this.audioEl) {
-      try {
-        this.audioEl.pause();
-        this.audioEl.currentTime = 0;
-      } catch (e) {}
-    }
-
-    let cleanVideoId = typeof videoId === 'object' ? (videoId.videoId || videoId.id) : String(videoId || '').trim();
+    let cleanVideoId = typeof videoId === 'object' ? (videoId?.videoId || videoId?.id) : String(videoId || '').trim();
     const title = trackMeta?.title || trackMeta?.name || '';
     const artist = trackMeta?.artist || trackMeta?.artists || trackMeta?.subtitle || '';
 
@@ -494,6 +490,44 @@ class PlayerEngine {
     }
 
     if (!cleanVideoId) return;
+
+    // GUARD: If this song is ALREADY loading or already loaded with direct audio, avoid duplicate abort/reset
+    if (this.currentVideoId === cleanVideoId) {
+      if (this.activeAbortController) {
+        // Fetch is actively in flight for this exact song; keep waiting for it
+        if (autoPlay) {
+          this.shouldBePlaying = true;
+          this.isUserPaused = false;
+        }
+        return;
+      }
+      if (this.isDirectAudio && this.audioEl && this.audioEl.src && !this.audioEl.src.startsWith('data:')) {
+        // Already loaded direct audio for this song
+        if (autoPlay) {
+          this.shouldBePlaying = true;
+          this.isUserPaused = false;
+          if (this.audioEl.paused) {
+            this.audioEl.play().catch(() => {});
+          }
+        }
+        return;
+      }
+    }
+
+    if (this.activeAbortController) {
+      try {
+        this.activeAbortController.abort();
+      } catch (e) {}
+      this.activeAbortController = null;
+    }
+
+    // Pause previous audio cleanly without triggering empty-src errors
+    if (this.audioEl) {
+      try {
+        this.audioEl.pause();
+        this.audioEl.currentTime = 0;
+      } catch (e) {}
+    }
 
     this.currentVideoId = cleanVideoId;
     this.currentTrack = trackMeta;
@@ -532,11 +566,11 @@ class PlayerEngine {
 
     this.isOfflinePlayback = false;
 
-    // 2. Direct native HTML5 320kbps audio stream with quick 1.2s timeout for instant smooth handoff
+    // 2. Direct native HTML5 320kbps audio stream with generous 8s timeout for rock-solid stability
     if (title) {
       const abortCtrl = new AbortController();
       this.activeAbortController = abortCtrl;
-      const timeoutId = setTimeout(() => abortCtrl.abort(), 1200);
+      const timeoutId = setTimeout(() => abortCtrl.abort(), 8000);
 
       try {
         const query = `${title} ${artist}`.trim();
@@ -546,14 +580,18 @@ class PlayerEngine {
         );
         clearTimeout(timeoutId);
 
+        if (this.currentVideoId !== cleanVideoId) return;
+
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.streamUrl && this.currentVideoId === cleanVideoId) {
             const dataTitle = (data.title || '').toLowerCase().trim();
             const reqTitle = title.toLowerCase().trim();
-            const isMatch = !dataTitle || dataTitle.includes(reqTitle) || reqTitle.includes(dataTitle);
+            const cleanD = dataTitle.replace(/[^a-z0-9]/g, '');
+            const cleanR = reqTitle.replace(/[^a-z0-9]/g, '');
+            const isMatch = !cleanD || !cleanR || cleanD.includes(cleanR) || cleanR.includes(cleanD);
             if (!isMatch) {
-              console.warn('Direct stream title mismatch, falling back to authentic YouTube video:', data.title, 'vs', title);
+              console.warn('Direct stream title mismatch, falling back to YouTube:', data.title, 'vs', title);
               this.fallbackToYouTube(cleanVideoId, autoPlay);
               return;
             }
@@ -566,6 +604,7 @@ class PlayerEngine {
             this.audioEl.src = data.streamUrl;
             this.audioEl.volume = this.currentVolume ?? 0.8;
             this.audioEl.muted = false;
+            this.activeAbortController = null;
             if (autoPlay && this.shouldBePlaying && !this.isUserPaused) {
               const p = this.audioEl.play();
               if (p && typeof p.catch === 'function') {
@@ -583,10 +622,13 @@ class PlayerEngine {
         if (this.currentVideoId !== cleanVideoId) return;
         console.warn('Direct stream fetch failed/timed out, falling back to YouTube:', err);
       }
+      this.activeAbortController = null;
     }
 
     // 3. Fallback to YouTube embed
-    this.fallbackToYouTube(cleanVideoId, autoPlay);
+    if (this.currentVideoId === cleanVideoId) {
+      this.fallbackToYouTube(cleanVideoId, autoPlay);
+    }
   }
 
   fallbackToYouTube(cleanVideoId, autoPlay = true) {
@@ -628,7 +670,8 @@ class PlayerEngine {
     this.updateMediaSessionState('playing');
     this.requestWakeLock();
 
-    if (this.isDirectAudio || this.isOfflinePlayback) {
+    if (this.isDirectAudio || this.isOfflinePlayback || (this.audioEl && this.audioEl.src && !this.audioEl.src.startsWith('data:'))) {
+      this.isDirectAudio = true;
       this.stopBackgroundAudioAnchor();
       if (this.audioEl) {
         this.audioEl.muted = false;

@@ -209,9 +209,11 @@ export const normalizeSong = (song, fallbackArtist = '') => {
 
   const thumbnail = getHighResArtwork(rawThumbnail, videoId);
 
+  const finalVideoId = videoId || (title ? `tr_${title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 16)}` : '');
+
   return {
-    videoId,
-    id: videoId || song.browseId || String(Math.random()),
+    videoId: finalVideoId,
+    id: finalVideoId || song.browseId || String(Math.random()),
     title,
     name: title,
     artist: finalArtist,

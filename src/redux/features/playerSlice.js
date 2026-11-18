@@ -486,11 +486,11 @@ export const {
 export const playTrackNow = ({ song, songs = [], index = 0 }) => (dispatch) => {
   if (!song) return;
   const normalized = normalizeSong(song);
-  if (!normalized || !normalized.videoId) return;
+  if (!normalized || (!normalized.videoId && !normalized.title)) return;
 
   try {
     playerEngine.unlockAudio();
-    playerEngine.loadVideo(normalized.videoId, true, normalized);
+    playerEngine.loadVideo(normalized.videoId || normalized, true, normalized);
   } catch (e) {
     console.warn('playerEngine loadVideo failed in playTrackNow:', e);
   }
