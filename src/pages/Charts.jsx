@@ -345,51 +345,51 @@ const Charts = () => {
   };
 
   return (
-    <div className="flex flex-col gap-8 pb-28 select-none animate-fade-in">
-      {/* Hero Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 p-6 md:p-8 rounded-3xl bg-gradient-to-r from-rose-900/40 via-red-950/20 to-transparent border border-rose-500/20">
-        <div className="flex items-center gap-5">
-          <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-gradient-to-tr from-rose-600 to-red-700 flex items-center justify-center text-white shadow-xl shadow-rose-600/30">
-            <FaFire className="text-4xl" />
+    <div className="flex flex-col gap-4 sm:gap-6 pb-28 select-none animate-fade-in">
+      {/* Hero Header - Sleek & Compact */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 p-3.5 sm:p-5 rounded-2xl bg-gradient-to-r from-rose-900/40 via-red-950/20 to-transparent border border-rose-500/20 shadow-md">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-tr from-rose-600 to-red-700 flex items-center justify-center text-white shadow-md shadow-rose-600/30 shrink-0">
+            <FaFire className="text-2xl sm:text-3xl" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-widest text-rose-500">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500">
                 Official Live Rankings
               </span>
               {isLoadingChart && (
-                <span className="flex items-center gap-1 text-[11px] text-rose-400 font-semibold animate-pulse">
-                  <FaSyncAlt className="text-[10px] animate-spin" />
+                <span className="flex items-center gap-1 text-[10px] text-rose-400 font-semibold animate-pulse">
+                  <FaSyncAlt className="text-[9px] animate-spin" />
                   Updating...
                 </span>
               )}
             </div>
-            <h1 className="text-3xl md:text-5xl font-extrabold theme-text-main mt-1">
+            <h1 className="text-xl sm:text-2xl font-extrabold theme-text-main mt-0.5">
               {activeTab.name}
             </h1>
-            <p className="text-xs md:text-sm theme-text-muted mt-2">
-              {activeTab.subtitle} • {tracks.length} tracks loaded
+            <p className="text-[11px] sm:text-xs theme-text-muted mt-0.5">
+              {activeTab.subtitle} • {tracks.length} tracks
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={handlePlayAll}
             disabled={tracks.length === 0}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2.5 px-6 py-3 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-lg shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
           >
-            <FaPlay className="text-xs" />
+            <FaPlay className="text-[10px]" />
             <span>Play All</span>
           </button>
 
           <button
             onClick={handleShufflePlay}
             disabled={tracks.length === 0}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2.5 px-6 py-3 rounded-full bg-slate-500/15 hover:bg-slate-500/25 theme-text-main font-bold text-sm border theme-border hover:scale-105 active:scale-95 transition-all disabled:opacity-40 shadow-md"
-            title="Shuffle play all 50+ songs immediately"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-slate-500/15 hover:bg-slate-500/25 theme-text-main font-bold text-xs border theme-border hover:scale-105 active:scale-95 transition-all disabled:opacity-40 shadow-sm"
+            title="Shuffle play all tracks immediately"
           >
-            <FaRandom className="text-xs text-rose-500" />
+            <FaRandom className="text-[10px] text-rose-500" />
             <span>Shuffle Play</span>
           </button>
         </div>

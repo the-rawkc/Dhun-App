@@ -366,76 +366,76 @@ const Home = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {/* Haryanvi Playlist Card */}
           <div
             onClick={() => navigate('/playlist/pl-haryanvi-top-hits')}
-            className="p-3.5 rounded-2xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border border-amber-500/30 shadow-sm flex items-center justify-between"
+            className="p-2 rounded-xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border border-amber-500/30 shadow-sm flex items-center justify-between"
           >
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
               <img
                 src="https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&auto=format&fit=crop&q=80"
                 alt="Haryanvi Top Beats"
-                className="w-14 h-14 rounded-xl object-cover shrink-0 shadow-md group-hover:scale-105 transition-transform"
+                className="w-9 h-9 rounded-lg object-cover shrink-0 shadow-sm group-hover:scale-105 transition-transform"
               />
               <div className="min-w-0">
-                <span className="text-[9px] font-black uppercase tracking-wider text-amber-500">HOT PLAYLIST</span>
-                <h3 className="font-bold text-sm theme-text-main group-hover:text-amber-500 truncate transition-colors">
+                <span className="text-[8px] font-black uppercase tracking-wider text-amber-500">HOT PLAYLIST</span>
+                <h3 className="font-bold text-xs theme-text-main group-hover:text-amber-500 truncate transition-colors">
                   Haryanvi Top Beats
                 </h3>
-                <p className="text-xs theme-text-muted truncate">Renuka, Sapna, Dhanda, Gulzaar</p>
+                <p className="text-[10px] theme-text-muted truncate">Renuka, Sapna, Dhanda</p>
               </div>
             </div>
-            <div className="p-2.5 rounded-full bg-amber-500 text-dark-950 font-bold shadow-md group-hover:scale-110 transition-transform">
-              <FaPlay className="text-[10px]" />
+            <div className="p-1.5 rounded-full bg-amber-500 text-dark-950 font-bold shadow-sm group-hover:scale-110 transition-transform">
+              <FaPlay className="text-[8px]" />
             </div>
           </div>
 
           {/* Punjabi Playlist Card */}
           <div
             onClick={() => navigate('/playlist/pl-punjabi-power')}
-            className="p-3.5 rounded-2xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border theme-border shadow-sm flex items-center justify-between"
+            className="p-2 rounded-xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border theme-border shadow-sm flex items-center justify-between"
           >
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
               <img
                 src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&auto=format&fit=crop&q=80"
                 alt="Punjabi Fire Wave"
-                className="w-14 h-14 rounded-xl object-cover shrink-0 shadow-md group-hover:scale-105 transition-transform"
+                className="w-9 h-9 rounded-lg object-cover shrink-0 shadow-sm group-hover:scale-105 transition-transform"
               />
               <div className="min-w-0">
-                <span className="text-[9px] font-black uppercase tracking-wider text-orange-500">TRENDING</span>
-                <h3 className="font-bold text-sm theme-text-main group-hover:text-rose-500 truncate transition-colors">
+                <span className="text-[8px] font-black uppercase tracking-wider text-orange-500">TRENDING</span>
+                <h3 className="font-bold text-xs theme-text-main group-hover:text-rose-500 truncate transition-colors">
                   Punjabi Fire Wave
                 </h3>
-                <p className="text-xs theme-text-muted truncate">Diljit, Karan Aujla, Shubh</p>
+                <p className="text-[10px] theme-text-muted truncate">Diljit, Aujla, Shubh</p>
               </div>
             </div>
-            <div className="p-2.5 rounded-full bg-slate-500/20 theme-text-main group-hover:bg-rose-600 group-hover:text-white shadow-sm transition-all">
-              <FaPlay className="text-[10px]" />
+            <div className="p-1.5 rounded-full bg-slate-500/20 theme-text-main group-hover:bg-rose-600 group-hover:text-white shadow-sm transition-all">
+              <FaPlay className="text-[8px]" />
             </div>
           </div>
 
           {/* Bollywood Playlist Card */}
           <div
             onClick={() => navigate('/playlist/pl-desi-hits')}
-            className="p-3.5 rounded-2xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border theme-border shadow-sm flex items-center justify-between"
+            className="p-2 rounded-xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border theme-border shadow-sm flex items-center justify-between"
           >
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
               <img
                 src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80"
                 alt="Desi Chill & Bollywood"
-                className="w-14 h-14 rounded-xl object-cover shrink-0 shadow-md group-hover:scale-105 transition-transform"
+                className="w-9 h-9 rounded-lg object-cover shrink-0 shadow-sm group-hover:scale-105 transition-transform"
               />
               <div className="min-w-0">
-                <span className="text-[9px] font-black uppercase tracking-wider text-rose-400">ESSENTIAL</span>
-                <h3 className="font-bold text-sm theme-text-main group-hover:text-rose-500 truncate transition-colors">
+                <span className="text-[8px] font-black uppercase tracking-wider text-rose-400">ESSENTIAL</span>
+                <h3 className="font-bold text-xs theme-text-main group-hover:text-rose-500 truncate transition-colors">
                   Desi Chill & Bollywood
                 </h3>
-                <p className="text-xs theme-text-muted truncate">Arijit Singh & Shreya Ghoshal</p>
+                <p className="text-[10px] theme-text-muted truncate">Arijit & Shreya</p>
               </div>
             </div>
-            <div className="p-2.5 rounded-full bg-slate-500/20 theme-text-main group-hover:bg-rose-600 group-hover:text-white shadow-sm transition-all">
-              <FaPlay className="text-[10px]" />
+            <div className="p-1.5 rounded-full bg-slate-500/20 theme-text-main group-hover:bg-rose-600 group-hover:text-white shadow-sm transition-all">
+              <FaPlay className="text-[8px]" />
             </div>
           </div>
         </div>

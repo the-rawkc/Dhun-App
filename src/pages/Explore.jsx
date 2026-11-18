@@ -137,106 +137,106 @@ const Explore = () => {
           <span className="text-[11px] font-semibold text-rose-500">Live Rankings</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5">
           {/* Haryanvi Playlist */}
           <div
             onClick={() => navigate('/playlist/pl-haryanvi-top-hits')}
-            className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-amber-600/30 to-yellow-950/40 border border-amber-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
+            className="group relative overflow-hidden h-16 sm:h-20 rounded-xl cursor-pointer p-2 sm:p-2.5 bg-gradient-to-br from-amber-600/30 to-yellow-950/40 border border-amber-500/30 shadow-sm hover:scale-[1.02] transition-all flex flex-col justify-between"
           >
             <div className="flex items-center justify-between">
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500 text-dark-950">
+              <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-amber-500 text-dark-950">
                 PLAYLIST
               </span>
-              <FaMusic className="text-amber-500 text-xs" />
+              <FaMusic className="text-amber-500 text-[10px]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm text-white">Haryanvi Top Beats</h3>
-              <p className="text-[11px] text-white/70">Renuka, Sapna, Dhanda & Gulzaar</p>
+              <h3 className="font-bold text-xs text-white truncate leading-tight">Haryanvi Top Beats</h3>
+              <p className="text-[9px] sm:text-[10px] text-white/70 truncate">Renuka, Sapna, Dhanda</p>
             </div>
           </div>
 
           {/* Haryanvi Charts */}
           <div
             onClick={() => navigate('/charts?tab=haryanvi-50')}
-            className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-orange-600/30 to-red-950/40 border border-orange-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
+            className="group relative overflow-hidden h-16 sm:h-20 rounded-xl cursor-pointer p-2 sm:p-2.5 bg-gradient-to-br from-orange-600/30 to-red-950/40 border border-orange-500/30 shadow-sm hover:scale-[1.02] transition-all flex flex-col justify-between"
           >
             <div className="flex items-center justify-between">
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-orange-500 text-white">
+              <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-orange-500 text-white">
                 CHART
               </span>
-              <FaHeadphonesAlt className="text-orange-500 text-xs" />
+              <FaHeadphonesAlt className="text-orange-500 text-[10px]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm text-white">Haryanvi Top 50</h3>
-              <p className="text-[11px] text-white/70">Haryana Official Trending Music</p>
+              <h3 className="font-bold text-xs text-white truncate leading-tight">Haryanvi Top 50</h3>
+              <p className="text-[9px] sm:text-[10px] text-white/70 truncate">Official Haryana Hits</p>
             </div>
           </div>
 
           {/* Punjabi Playlist */}
           <div
             onClick={() => navigate('/playlist/pl-punjabi-power')}
-            className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-rose-600/30 to-pink-950/40 border border-rose-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
+            className="group relative overflow-hidden h-16 sm:h-20 rounded-xl cursor-pointer p-2 sm:p-2.5 bg-gradient-to-br from-rose-600/30 to-pink-950/40 border border-rose-500/30 shadow-sm hover:scale-[1.02] transition-all flex flex-col justify-between"
           >
             <div className="flex items-center justify-between">
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-500 text-white">
+              <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-rose-500 text-white">
                 PLAYLIST
               </span>
-              <FaMusic className="text-rose-500 text-xs" />
+              <FaMusic className="text-rose-500 text-[10px]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm text-white">Punjabi Fire Wave</h3>
-              <p className="text-[11px] text-white/70">Diljit, Karan Aujla, Shubh</p>
+              <h3 className="font-bold text-xs text-white truncate leading-tight">Punjabi Fire Wave</h3>
+              <p className="text-[9px] sm:text-[10px] text-white/70 truncate">Diljit, Aujla, Shubh</p>
             </div>
           </div>
 
           {/* Punjabi Top 50 Chart */}
           <div
             onClick={() => navigate('/charts?tab=punjabi-50')}
-            className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-purple-600/30 to-indigo-950/40 border border-purple-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
+            className="group relative overflow-hidden h-16 sm:h-20 rounded-xl cursor-pointer p-2 sm:p-2.5 bg-gradient-to-br from-purple-600/30 to-indigo-950/40 border border-purple-500/30 shadow-sm hover:scale-[1.02] transition-all flex flex-col justify-between"
           >
             <div className="flex items-center justify-between">
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-500 text-white">
+              <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-purple-500 text-white">
                 CHART
               </span>
-              <FaHeadphonesAlt className="text-purple-400 text-xs" />
+              <FaHeadphonesAlt className="text-purple-400 text-[10px]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm text-white">Punjabi Top 50</h3>
-              <p className="text-[11px] text-white/70">Punjab Pop & Bhangra Bangers</p>
+              <h3 className="font-bold text-xs text-white truncate leading-tight">Punjabi Top 50</h3>
+              <p className="text-[9px] sm:text-[10px] text-white/70 truncate">Pop & Bhangra Bangers</p>
             </div>
           </div>
 
           {/* Hindi Top 50 Chart */}
           <div
             onClick={() => navigate('/charts?tab=hindi-50')}
-            className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-red-600/30 to-dark-900 border border-red-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
+            className="group relative overflow-hidden h-16 sm:h-20 rounded-xl cursor-pointer p-2 sm:p-2.5 bg-gradient-to-br from-red-600/30 to-dark-900 border border-red-500/30 shadow-sm hover:scale-[1.02] transition-all flex flex-col justify-between"
           >
             <div className="flex items-center justify-between">
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-red-600 text-white">
+              <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-red-600 text-white">
                 CHART
               </span>
-              <FaHeadphonesAlt className="text-red-500 text-xs" />
+              <FaHeadphonesAlt className="text-red-500 text-[10px]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm text-white">Hindi Top 50</h3>
-              <p className="text-[11px] text-white/70">Trending Hindi & Bollywood Songs</p>
+              <h3 className="font-bold text-xs text-white truncate leading-tight">Hindi Top 50</h3>
+              <p className="text-[9px] sm:text-[10px] text-white/70 truncate">Trending Bollywood</p>
             </div>
           </div>
 
           {/* India Top 100 Chart */}
           <div
             onClick={() => navigate('/charts?tab=india-100')}
-            className="group relative overflow-hidden h-28 rounded-2xl cursor-pointer p-4 bg-gradient-to-br from-emerald-600/30 to-teal-950/40 border border-emerald-500/30 shadow-md hover:scale-[1.02] transition-all flex flex-col justify-between"
+            className="group relative overflow-hidden h-16 sm:h-20 rounded-xl cursor-pointer p-2 sm:p-2.5 bg-gradient-to-br from-emerald-600/30 to-teal-950/40 border border-emerald-500/30 shadow-sm hover:scale-[1.02] transition-all flex flex-col justify-between"
           >
             <div className="flex items-center justify-between">
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500 text-dark-950">
+              <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-emerald-500 text-dark-950">
                 CHART
               </span>
-              <FaHeadphonesAlt className="text-emerald-400 text-xs" />
+              <FaHeadphonesAlt className="text-emerald-400 text-[10px]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm text-white">India Top 100</h3>
-              <p className="text-[11px] text-white/70">Top 100 Viral Hits Across India</p>
+              <h3 className="font-bold text-xs text-white truncate leading-tight">India Top 100</h3>
+              <p className="text-[9px] sm:text-[10px] text-white/70 truncate">Top 100 Viral Hits</p>
             </div>
           </div>
         </div>

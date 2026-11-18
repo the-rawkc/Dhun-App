@@ -462,10 +462,10 @@ const PlaylistDetails = () => {
     'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80';
 
   return (
-    <div className="flex flex-col gap-8 pb-24 select-none animate-fade-in">
-      {/* Playlist Hero */}
-      <div className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 md:p-8 rounded-3xl bg-gradient-to-r from-rose-600/20 via-rose-500/10 to-transparent border theme-border">
-        <div className="w-40 h-40 md:w-52 md:h-52 rounded-2xl overflow-hidden bg-dark-950 shadow-2xl shrink-0 border theme-border">
+    <div className="flex flex-col gap-4 sm:gap-6 pb-24 select-none animate-fade-in">
+      {/* Playlist Hero - Compact & Half Size */}
+      <div className="flex flex-col sm:flex-row items-center sm:items-end gap-3.5 p-3.5 sm:p-5 rounded-2xl bg-gradient-to-r from-rose-600/20 via-rose-500/10 to-transparent border theme-border shadow-md">
+        <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-dark-950 shadow-xl shrink-0 border theme-border">
           <img
             src={playlistCover}
             alt={playlist.title}
@@ -473,12 +473,12 @@ const PlaylistDetails = () => {
           />
         </div>
 
-        <div className="flex-1 text-center md:text-left">
-          <span className="text-xs font-bold uppercase tracking-widest text-rose-500">
+        <div className="flex-1 text-center sm:text-left min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-rose-500">
             Playlist
           </span>
           {isEditingTitle ? (
-            <form onSubmit={handleSaveTitle} className="flex items-center gap-2 mt-1 justify-center md:justify-start">
+            <form onSubmit={handleSaveTitle} className="flex items-center gap-2 mt-0.5 justify-center sm:justify-start">
               <input
                 type="text"
                 autoFocus
@@ -487,12 +487,12 @@ const PlaylistDetails = () => {
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') handleCancelEdit();
                 }}
-                className="px-3 py-1.5 rounded-xl bg-slate-500/20 border border-rose-500 text-lg md:text-2xl font-extrabold theme-text-main focus:outline-none w-full max-w-sm"
+                className="px-3 py-1.5 rounded-xl bg-slate-500/20 border border-rose-500 text-lg sm:text-xl font-extrabold theme-text-main focus:outline-none w-full max-w-sm"
                 placeholder="Playlist name..."
               />
               <button
                 type="submit"
-                className="p-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-md"
+                className="p-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-md"
                 title="Save name"
               >
                 <FaCheck />
@@ -500,24 +500,24 @@ const PlaylistDetails = () => {
               <button
                 type="button"
                 onClick={handleCancelEdit}
-                className="p-2.5 rounded-xl bg-slate-500/20 hover:bg-slate-500/30 theme-text-main text-xs transition-all"
+                className="p-2 rounded-xl bg-slate-500/20 hover:bg-slate-500/30 theme-text-main text-xs transition-all"
                 title="Cancel"
               >
                 <FaTimes />
               </button>
             </form>
           ) : (
-            <div className="flex items-center justify-center md:justify-start gap-2.5 mt-1 group">
+            <div className="flex items-center justify-center sm:justify-start gap-2 mt-0.5 group">
               <h1
                 onClick={() => setIsEditingTitle(true)}
-                className="text-2xl md:text-4xl font-extrabold theme-text-main hover:text-rose-500 cursor-pointer transition-colors"
+                className="text-xl sm:text-2xl font-extrabold theme-text-main hover:text-rose-500 cursor-pointer transition-colors truncate"
                 title="Click to rename playlist"
               >
                 {playlist.title}
               </h1>
               <button
                 onClick={() => setIsEditingTitle(true)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-500/10 opacity-70 group-hover:opacity-100 transition-all text-xs"
+                className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-500/10 opacity-70 group-hover:opacity-100 transition-all text-xs"
                 title="Click to rename playlist"
               >
                 <FaEdit />
@@ -525,20 +525,20 @@ const PlaylistDetails = () => {
             </div>
           )}
           {playlist.description && (
-            <p className="text-xs md:text-sm theme-text-muted mt-1">{playlist.description}</p>
+            <p className="text-[11px] sm:text-xs theme-text-muted mt-0.5 truncate max-w-xl">{playlist.description}</p>
           )}
-          <p className="text-xs theme-text-muted mt-2 font-medium">
+          <p className="text-[11px] theme-text-muted mt-1 font-medium">
             {tracks.length} {tracks.length === 1 ? 'song' : 'songs'}
           </p>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center md:justify-start gap-3">
+          <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2">
             {/* Play All */}
             <button
               onClick={handlePlayAll}
               disabled={tracks.length === 0}
-              className="flex items-center gap-2.5 px-6 py-3 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-lg shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
             >
-              <FaPlay className="text-xs" />
+              <FaPlay className="text-[10px]" />
               <span>Play</span>
             </button>
 
@@ -546,9 +546,9 @@ const PlaylistDetails = () => {
             <button
               onClick={handleShufflePlay}
               disabled={tracks.length === 0}
-              className="flex items-center gap-2.5 px-6 py-3 rounded-full bg-slate-500/15 hover:bg-slate-500/25 border theme-border theme-text-main font-bold text-sm hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-500/15 hover:bg-slate-500/25 border theme-border theme-text-main font-bold text-xs hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
             >
-              <FaRandom className="text-xs text-rose-500" />
+              <FaRandom className="text-[10px] text-rose-500" />
               <span>Shuffle Play</span>
             </button>
 
@@ -557,11 +557,11 @@ const PlaylistDetails = () => {
               <button
                 type="button"
                 onClick={() => setShowMenu((prev) => !prev)}
-                className="p-3 rounded-full bg-slate-500/10 hover:bg-slate-500/25 text-slate-300 hover:text-white transition-all shadow-sm"
+                className="p-2 rounded-full bg-slate-500/10 hover:bg-slate-500/25 text-slate-300 hover:text-white transition-all shadow-sm"
                 title="Playlist Options"
                 aria-label="Playlist Options"
               >
-                <FaEllipsisV className="text-sm" />
+                <FaEllipsisV className="text-xs" />
               </button>
 
               {showMenu && (
