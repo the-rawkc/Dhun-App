@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   nextSong,
   prevSong,
+  playNextTrackNow,
+  playPrevTrackNow,
   togglePlayPauseNow,
   toggleRepeat,
   toggleShuffle,
@@ -361,8 +363,7 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         {/* Previous */}
         <button
           onClick={() => {
-            playerEngine.unlockAudio();
-            dispatch(prevSong());
+            dispatch(playPrevTrackNow());
           }}
           className="p-3 text-white hover:text-rose-400 transition-transform active:scale-90"
         >
@@ -384,8 +385,7 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
         {/* Next */}
         <button
           onClick={() => {
-            playerEngine.unlockAudio();
-            dispatch(nextSong());
+            dispatch(playNextTrackNow());
           }}
           className="p-3 text-white hover:text-rose-400 transition-transform active:scale-90"
         >

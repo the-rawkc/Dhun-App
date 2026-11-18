@@ -22,6 +22,13 @@ class PlayerEngine {
     this.activeAbortController = null;
     this.currentVolume = 0.8;
     this.streamCache = new Map();
+
+    // Autonomous playlist queue for uninterrupted background & lock-screen playback
+    this.queue = [];
+    this.queueIndex = 0;
+    this.isShuffle = false;
+    this.repeatMode = 'off';
+
     try {
       const saved = localStorage.getItem('tunetide_volume');
       if (saved !== null) {
@@ -37,6 +44,7 @@ class PlayerEngine {
       durationChange: () => {},
       next: () => {},
       prev: () => {},
+      onTrackChanged: () => {},
     };
 
     this.initDirectAudio();
@@ -96,7 +104,7 @@ class PlayerEngine {
 
   initDirectAudio() {
     if (typeof window === 'undefined') return;
-    this.audioEl = new Audio();
+    this.audioEl = document.getElementById('dhun-native-player') || new Audio();
     this.audioEl.preload = 'auto';
     this.audioEl.volume = this.currentVolume;
     this.audioEl.muted = false;
@@ -104,6 +112,15 @@ class PlayerEngine {
     this.audioEl.setAttribute('webkit-playsinline', 'true');
     this.audioEl.id = 'dhun-native-player';
     this.offlineAudioEl = this.audioEl; // Backwards-compatibility alias
+
+    let anchor = document.getElementById('dhun-anchor-player');
+    if (anchor) {
+      this.bgAnchorEl = anchor;
+      this.bgAnchorEl.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      this.bgAnchorEl.loop = true;
+      this.bgAnchorEl.volume = 0.01;
+      this.bgAnchorEl.setAttribute('playsinline', 'true');
+    }
 
     // Ensure audio element is mounted into DOM container so mobile OS never suspends it
     try {
@@ -168,8 +185,7 @@ class PlayerEngine {
       if (this.isDirectAudio || this.isOfflinePlayback) {
         // Keep audio context alive seamlessly across track handoff
         this.startBackgroundAudioAnchor(true);
-        this.listeners.ended();
-        this.updateMediaSessionState('none');
+        this.playNextTrack(false);
       }
     });
 
@@ -315,8 +331,7 @@ class PlayerEngine {
               } else if (event.data === 0) { // Ended
                 this.shouldBePlaying = false;
                 this.stopTimeTracking();
-                this.listeners.ended();
-                this.updateMediaSessionState('none');
+                this.playNextTrack(false);
               } else if (event.data === 5 || event.data === 3 || event.data === -1) {
                 // Video Cued (5), Buffering (3), or Unstarted (-1) -> auto-play watchdog
                 if (this.shouldBePlaying && !this.isUserPaused) {
@@ -363,13 +378,144 @@ class PlayerEngine {
     }
   }
 
-  setListeners({ onTimeUpdate, onStateChange, onEnded, onDurationChange, onNext, onPrev }) {
+  setListeners({ onTimeUpdate, onStateChange, onEnded, onDurationChange, onNext, onPrev, onTrackChanged }) {
     if (onTimeUpdate) this.listeners.timeUpdate = onTimeUpdate;
     if (onStateChange) this.listeners.stateChange = onStateChange;
     if (onEnded) this.listeners.ended = onEnded;
     if (onDurationChange) this.listeners.durationChange = onDurationChange;
     if (onNext) this.listeners.next = onNext;
     if (onPrev) this.listeners.prev = onPrev;
+    if (onTrackChanged) this.listeners.onTrackChanged = onTrackChanged;
+  }
+
+  setQueue(songs = [], currentIndex = 0, shuffle = false, repeatMode = 'off') {
+    this.queue = Array.isArray(songs) ? songs : [];
+    this.queueIndex = typeof currentIndex === 'number' ? currentIndex : 0;
+    this.isShuffle = !!shuffle;
+    this.repeatMode = repeatMode || 'off';
+
+    // Pre-fetch next track in background so lock screen handoff is 0ms
+    this.prefetchNextInQueue();
+  }
+
+  prefetchNextInQueue() {
+    if (!this.queue || this.queue.length <= 1) return;
+    let nextIdx = this.queueIndex + 1;
+    if (this.isShuffle) {
+      if (this.queue.length > 1) {
+        let randomIdx = this.queueIndex;
+        let attempts = 0;
+        while (randomIdx === this.queueIndex && attempts < 20) {
+          randomIdx = Math.floor(Math.random() * this.queue.length);
+          attempts++;
+        }
+        nextIdx = randomIdx;
+      }
+    } else if (nextIdx >= this.queue.length) {
+      nextIdx = 0;
+    }
+    const upcomingTrack = this.queue[nextIdx];
+    if (upcomingTrack) {
+      this.prefetchTrack(upcomingTrack);
+    }
+  }
+
+  playNextTrack(fromLockScreen = false) {
+    if (!this.queue || this.queue.length === 0) {
+      if (this.listeners.next) this.listeners.next();
+      return;
+    }
+
+    if (this.repeatMode === 'one' && !fromLockScreen) {
+      if (this.audioEl) {
+        this.audioEl.currentTime = 0;
+        this.audioEl.play().catch(() => {});
+        this.updateMediaSessionState('playing');
+        return;
+      }
+    }
+
+    let nextIndex = this.queueIndex + 1;
+    if (this.isShuffle) {
+      if (this.queue.length > 1) {
+        let randomIdx = this.queueIndex;
+        let attempts = 0;
+        while (randomIdx === this.queueIndex && attempts < 20) {
+          randomIdx = Math.floor(Math.random() * this.queue.length);
+          attempts++;
+        }
+        nextIndex = randomIdx;
+      } else {
+        nextIndex = 0;
+      }
+    } else if (nextIndex >= this.queue.length) {
+      nextIndex = 0;
+    }
+
+    this.queueIndex = nextIndex;
+    const nextTrack = this.queue[nextIndex];
+    if (nextTrack) {
+      const vId = nextTrack.videoId || nextTrack.id;
+      this.currentVideoId = typeof vId === 'string' ? vId : '';
+      this.currentTrack = nextTrack;
+      this.updateMediaMetadata(nextTrack);
+      this.updateMediaSessionState('playing');
+
+      this.loadVideo(vId || nextTrack, true, nextTrack);
+
+      if (typeof this.listeners.onTrackChanged === 'function') {
+        this.listeners.onTrackChanged(nextTrack, nextIndex);
+      }
+
+      this.prefetchNextInQueue();
+    }
+  }
+
+  playPreviousTrack() {
+    if (!this.queue || this.queue.length === 0) {
+      if (this.listeners.prev) this.listeners.prev();
+      return;
+    }
+
+    if (this.getCurrentTime() > 3) {
+      this.seekTo(0);
+      return;
+    }
+
+    let prevIndex = this.queueIndex - 1;
+    if (this.isShuffle) {
+      if (this.queue.length > 1) {
+        let randomIdx = this.queueIndex;
+        let attempts = 0;
+        while (randomIdx === this.queueIndex && attempts < 20) {
+          randomIdx = Math.floor(Math.random() * this.queue.length);
+          attempts++;
+        }
+        prevIndex = randomIdx;
+      } else {
+        prevIndex = 0;
+      }
+    } else if (prevIndex < 0) {
+      prevIndex = this.queue.length - 1;
+    }
+
+    this.queueIndex = prevIndex;
+    const prevTrack = this.queue[prevIndex];
+    if (prevTrack) {
+      const vId = prevTrack.videoId || prevTrack.id;
+      this.currentVideoId = typeof vId === 'string' ? vId : '';
+      this.currentTrack = prevTrack;
+      this.updateMediaMetadata(prevTrack);
+      this.updateMediaSessionState('playing');
+
+      this.loadVideo(vId || prevTrack, true, prevTrack);
+
+      if (typeof this.listeners.onTrackChanged === 'function') {
+        this.listeners.onTrackChanged(prevTrack, prevIndex);
+      }
+
+      this.prefetchNextInQueue();
+    }
   }
 
   initMediaSession() {
@@ -397,8 +543,8 @@ class PlayerEngine {
         this.listeners.stateChange(false);
         this.pause();
       });
-      navigator.mediaSession.setActionHandler('previoustrack', () => this.listeners.prev());
-      navigator.mediaSession.setActionHandler('nexttrack', () => this.listeners.next());
+      navigator.mediaSession.setActionHandler('previoustrack', () => this.playPreviousTrack());
+      navigator.mediaSession.setActionHandler('nexttrack', () => this.playNextTrack(true));
       navigator.mediaSession.setActionHandler('seekto', (details) => {
         if (details.seekTime !== undefined) {
           this.seekTo(details.seekTime);

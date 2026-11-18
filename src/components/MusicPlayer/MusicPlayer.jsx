@@ -5,6 +5,9 @@ import {
   togglePlayPauseNow,
   nextSong,
   prevSong,
+  playNextTrackNow,
+  playPrevTrackNow,
+  syncCurrentTrack,
   setCurrentTime,
   setDuration,
   setVolume,
@@ -77,17 +80,23 @@ const MusicPlayer = () => {
   const [queueOpen, setQueueOpen] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState('idle');
 
-  // Hook up PlayerEngine listeners
+  // Hook up PlayerEngine listeners with autonomous lock-screen track synchronization
   useEffect(() => {
     playerEngine.setListeners({
       onTimeUpdate: (time) => dispatch(setCurrentTime(time)),
       onDurationChange: (dur) => dispatch(setDuration(dur)),
       onStateChange: (playing) => dispatch(playPause(playing)),
-      onEnded: () => dispatch(nextSong()),
-      onNext: () => dispatch(nextSong()),
-      onPrev: () => dispatch(prevSong()),
+      onEnded: () => {}, // Handled autonomously by playerEngine.playNextTrack
+      onNext: () => dispatch(playNextTrackNow()),
+      onPrev: () => dispatch(playPrevTrackNow()),
+      onTrackChanged: (track, index) => dispatch(syncCurrentTrack({ track, index })),
     });
   }, [dispatch]);
+
+  // Keep PlayerEngine queue in sync so lock-screen & background transitions are 100% autonomous
+  useEffect(() => {
+    playerEngine.setQueue(currentSongs, currentIndex, shuffle, repeatMode);
+  }, [currentSongs, currentIndex, shuffle, repeatMode]);
 
   // Load new song when activeSong changes or is re-triggered
   useEffect(() => {
@@ -107,22 +116,6 @@ const MusicPlayer = () => {
       }
     }
   }, [activeSong?.videoId, activeSong?.title, playTrigger]);
-
-  // Pre-fetch next track in background for 0ms instant transition in simple and shuffle modes
-  useEffect(() => {
-    if (currentSongs && currentSongs.length > 1) {
-      let nextIdx = currentIndex + 1;
-      if (shuffle) {
-        nextIdx = (currentIndex + 1) % currentSongs.length;
-      } else if (nextIdx >= currentSongs.length) {
-        nextIdx = 0;
-      }
-      const nextTrack = currentSongs[nextIdx];
-      if (nextTrack) {
-        playerEngine.prefetchTrack(nextTrack);
-      }
-    }
-  }, [currentIndex, currentSongs, shuffle]);
 
   // Sync volume & mute to engine
   useEffect(() => {
@@ -246,8 +239,7 @@ const MusicPlayer = () => {
             {/* Prev */}
             <button
               onClick={() => {
-                playerEngine.unlockAudio();
-                dispatch(prevSong());
+                dispatch(playPrevTrackNow());
               }}
               className="theme-text-main hover:text-rose-600 transition-transform active:scale-90"
               title="Previous"
@@ -271,8 +263,7 @@ const MusicPlayer = () => {
             {/* Next */}
             <button
               onClick={() => {
-                playerEngine.unlockAudio();
-                dispatch(nextSong());
+                dispatch(playNextTrackNow());
               }}
               className="theme-text-main hover:text-rose-600 transition-transform active:scale-90"
               title="Next"

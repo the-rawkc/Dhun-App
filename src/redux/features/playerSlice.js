@@ -237,6 +237,22 @@ const playerSlice = createSlice({
       }
     },
 
+    syncCurrentTrack: (state, action) => {
+      const { track, index } = action.payload || {};
+      if (!track) return;
+      const normalized = normalizeSong(track);
+      if (!normalized) return;
+      state.activeSong = normalized;
+      state.currentIndex = typeof index === 'number' ? index : state.currentIndex;
+      state.isPlaying = true;
+      state.currentTime = 0;
+      state.playTrigger = Date.now();
+
+      const filteredRecent = state.recentTracks.filter((t) => t.videoId !== normalized.videoId);
+      state.recentTracks = [normalized, ...filteredRecent].slice(0, 30);
+      saveItem('tunetide_recent', state.recentTracks);
+    },
+
     prevSong: (state) => {
       if (!state.currentSongs.length) return;
 
@@ -501,25 +517,41 @@ export const {
   setOfflineTracks,
   addToQueue,
   clearQueue,
+  syncCurrentTrack,
   setIsEqualizerModalOpen,
   setEqualizerPreset,
   setAudioQuality,
 } = playerSlice.actions;
 
 // Centralized synchronous action for 100% reliable click-to-play across all devices & browsers
-export const playTrackNow = ({ song, songs = [], index = 0 }) => (dispatch) => {
+export const playTrackNow = ({ song, songs = [], index = 0 }) => (dispatch, getState) => {
   if (!song) return;
   const normalized = normalizeSong(song);
   if (!normalized || (!normalized.videoId && !normalized.title)) return;
 
+  const currentSongsList = Array.isArray(songs) && songs.length > 0 ? songs : [normalized];
+  const { shuffle, repeatMode } = getState().player;
+
   try {
     playerEngine.unlockAudio();
+    playerEngine.setQueue(currentSongsList, index, shuffle, repeatMode);
     playerEngine.loadVideo(normalized.videoId || normalized, true, normalized);
   } catch (e) {
     console.warn('playerEngine loadVideo failed in playTrackNow:', e);
   }
 
-  dispatch(playSong({ song: normalized, songs, index }));
+  dispatch(playSong({ song: normalized, songs: currentSongsList, index }));
+};
+
+// Autonomous next/prev track actions that execute instantly on both lock-screen and in-app
+export const playNextTrackNow = () => (dispatch) => {
+  playerEngine.unlockAudio();
+  playerEngine.playNextTrack(true);
+};
+
+export const playPrevTrackNow = () => (dispatch) => {
+  playerEngine.unlockAudio();
+  playerEngine.playPreviousTrack();
 };
 
 // Centralized play/pause action for 100% reliable audio engine & UI state synchronization
