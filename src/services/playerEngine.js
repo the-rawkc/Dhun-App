@@ -34,6 +34,7 @@ class PlayerEngine {
     this.crossfadeTimer = null;
     this.crossfadeSeconds = 4;
     this.crossfadeAttemptedIndex = -1;
+    this.isSwitchingTrack = false;
     this.playbackWatchdogTimer = null;
     try {
       let savedStyle = localStorage.getItem('tunetide_crossfade_style');
@@ -329,6 +330,11 @@ class PlayerEngine {
             return;
           }
 
+          // If track ended naturally, or if engine is intentionally switching tracks / crossfading:
+          if (deck.ended || this.isSwitchingTrack || this.isCrossfading) {
+            return;
+          }
+
           // If paused unexpectedly by OS, Chrome, screen lock or audio focus interruption:
           if (this.shouldBePlaying) {
             this.startBackgroundAudioAnchor();
@@ -340,17 +346,6 @@ class PlayerEngine {
                 p.catch(() => {});
               }
             } catch (e) {}
-
-            setTimeout(() => {
-              if (this.shouldBePlaying && !this.isUserPaused && deck === this.currentDeck && deck.paused) {
-                try {
-                  const p = deck.play();
-                  if (p && typeof p.catch === 'function') {
-                    p.catch(() => {});
-                  }
-                } catch (e) {}
-              }
-            }, 300);
           }
         }
       });
@@ -641,6 +636,8 @@ class PlayerEngine {
       this.crossfadeTimer = null;
     }
     this.isCrossfading = false;
+    this.isSwitchingTrack = true;
+
     if (this.nextDeck) {
       try {
         this.nextDeck.pause();
@@ -651,7 +648,7 @@ class PlayerEngine {
 
     const deck = this.currentDeck;
     const isHidden = typeof document !== 'undefined' && document.hidden;
-    if (!deck || deck.paused || this.currentVolume <= 0 || isHidden) {
+    if (!deck || deck.paused || deck.ended || this.currentVolume <= 0 || isHidden) {
       if (deck) {
         try {
           deck.pause();
@@ -757,7 +754,7 @@ class PlayerEngine {
     }
 
     const outgoingDeck = this.currentDeck;
-    const incomingDeck = this.nextDeck;
+    const incomingDeck = (outgoingDeck === this.deckA) ? this.deckB : this.deckA;
 
     // Track playback history for accurate double-tap Prev navigation
     this.pushPlaybackHistory(this.queueIndex);
@@ -772,6 +769,7 @@ class PlayerEngine {
     } catch (err) {
       console.warn('Smart crossfade incoming deck play failed:', err);
       this.isCrossfading = false;
+      this.isSwitchingTrack = false;
       return;
     }
 
@@ -839,6 +837,7 @@ class PlayerEngine {
 
         // Active decks were already swapped at crossfade start, so just finish crossfade state
         this.isCrossfading = false;
+        this.isSwitchingTrack = false;
 
         // Prefetch next track in queue for future seamless transitions
         this.prefetchNextInQueue();
@@ -859,6 +858,7 @@ class PlayerEngine {
     }
 
     this.crossfadeAttemptedIndex = -1;
+    this.isSwitchingTrack = true;
     this.pushPlaybackHistory(this.queueIndex);
 
     let nextIndex = this.queueIndex + 1;
@@ -935,6 +935,7 @@ class PlayerEngine {
     // Go to the previously played song or previous index in queue
     this.lastPrevClickTime = 0;
     this.crossfadeAttemptedIndex = -1;
+    this.isSwitchingTrack = true;
 
     let prevIndex = -1;
     // Pop from actual playback history first
@@ -1119,16 +1120,9 @@ class PlayerEngine {
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.streamUrl) {
-          const dataTitle = (data.title || '').toLowerCase().trim();
-          const reqTitle = title.toLowerCase().trim();
-          const cleanD = dataTitle.replace(/[^a-z0-9]/g, '');
-          const cleanR = reqTitle.replace(/[^a-z0-9]/g, '');
-          const isMatch = !cleanD || !cleanR || cleanD.includes(cleanR) || cleanR.includes(cleanD);
-          if (isMatch) {
-            this.streamCache.set(cacheKey, data);
-            if (cleanVideoId) this.streamCache.set(cleanVideoId, data);
-            if (title) this.streamCache.set(title.toLowerCase().trim(), data);
-          }
+          this.streamCache.set(cacheKey, data);
+          if (cleanVideoId) this.streamCache.set(cleanVideoId, data);
+          if (title) this.streamCache.set(title.toLowerCase().trim(), data);
         }
       }
     } catch (e) {}
@@ -1257,51 +1251,79 @@ class PlayerEngine {
 
     this.isOfflinePlayback = false;
 
-    // Helper to start playback on active deck with smooth fade-in
+    // Helper to start playback on active deck with alternating decks
     const applyDirectStream = (data) => {
       this.isDirectAudio = true;
       if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
         try { this.ytPlayer.pauseVideo(); } catch (e) {}
       }
-      const deck = this.currentDeck || this.deckA;
-      deck.src = data.streamUrl;
-      deck.muted = false;
+
+      // Alternate decks cleanly to prevent any audio element collision
+      const outgoingDeck = this.currentDeck || this.deckA;
+      const incomingDeck = (outgoingDeck === this.deckA) ? this.deckB : this.deckA;
+
+      if (outgoingDeck && outgoingDeck !== incomingDeck) {
+        try {
+          outgoingDeck.pause();
+          outgoingDeck.currentTime = 0;
+        } catch (e) {}
+      }
+
+      this.currentDeck = incomingDeck;
+      this.nextDeck = outgoingDeck;
+      this.offlineAudioEl = incomingDeck;
+
+      incomingDeck.src = data.streamUrl;
+      incomingDeck.muted = false;
       this.activeAbortController = null;
 
       if (autoPlay && this.shouldBePlaying && !this.isUserPaused) {
         const targetVol = this.currentVolume ?? 0.8;
-        deck.volume = 0; // Gentle fade-in from 0 to eliminate audio clicks
-        const playPromise = deck.play();
+        incomingDeck.volume = targetVol;
+
+        const onPlaybackStarted = () => {
+          this.isSwitchingTrack = false;
+          this.stopBackgroundAudioAnchor();
+          this.listeners.stateChange(true);
+          this.updateMediaSessionState('playing');
+          this.requestWakeLock();
+        };
+
+        const playPromise = incomingDeck.play();
         if (playPromise !== undefined) {
-          playPromise.then(() => {
-            this.stopBackgroundAudioAnchor();
-            // Smooth 120ms fade-in ramp
-            const startT = performance.now();
-            const rampTimer = setInterval(() => {
-              const el = performance.now() - startT;
-              const p = Math.min(1, el / 120);
-              try { deck.volume = Math.max(0, Math.min(1, p * targetVol)); } catch (e) {}
-              if (p >= 1) {
-                clearInterval(rampTimer);
-                deck.volume = targetVol;
-              }
-            }, 20);
-          }).catch((err) => {
-            console.warn('Initial play pending, waiting for canplay event:', err);
-            const onCanPlay = () => {
-              deck.removeEventListener('canplay', onCanPlay);
+          playPromise.then(onPlaybackStarted).catch((err) => {
+            console.warn('Direct stream initial play rejected, waiting for buffer:', err);
+            let hasPlayed = false;
+            const tryPlay = () => {
+              if (hasPlayed) return;
+              hasPlayed = true;
+              incomingDeck.removeEventListener('canplay', tryPlay);
+              incomingDeck.removeEventListener('loadeddata', tryPlay);
               if (this.shouldBePlaying && !this.isUserPaused) {
-                deck.play().then(() => {
-                  this.stopBackgroundAudioAnchor();
-                  deck.volume = targetVol;
-                }).catch(() => {
-                  if (cleanVideoId) this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
+                incomingDeck.play().then(onPlaybackStarted).catch((err2) => {
+                  console.warn('Buffered play failed, trying fallback stream:', err2);
+                  if (data.fallbackUrl && incomingDeck.src !== data.fallbackUrl) {
+                    incomingDeck.src = data.fallbackUrl;
+                    incomingDeck.play().then(onPlaybackStarted).catch(() => {
+                      if (cleanVideoId) this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
+                      else this.playNextTrack(false);
+                    });
+                  } else if (cleanVideoId) {
+                    this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
+                  } else {
+                    this.playNextTrack(false);
+                  }
                 });
               }
             };
-            deck.addEventListener('canplay', onCanPlay, { once: true });
+
+            incomingDeck.addEventListener('canplay', tryPlay, { once: true });
+            incomingDeck.addEventListener('loadeddata', tryPlay, { once: true });
+            setTimeout(tryPlay, 500);
           });
         }
+      } else {
+        this.isSwitchingTrack = false;
       }
     };
 
@@ -1331,17 +1353,6 @@ class PlayerEngine {
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.streamUrl && this.currentTrackKey === cacheKey) {
-            const dataTitle = (data.title || '').toLowerCase().trim();
-            const reqTitle = title.toLowerCase().trim();
-            const cleanD = dataTitle.replace(/[^a-z0-9]/g, '');
-            const cleanR = reqTitle.replace(/[^a-z0-9]/g, '');
-            const isMatch = !cleanD || !cleanR || cleanD.includes(cleanR) || cleanR.includes(cleanD);
-            if (!isMatch) {
-              console.warn('Direct stream title mismatch, falling back to YouTube:', data.title, 'vs', title);
-              if (cleanVideoId) this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
-              return;
-            }
-
             this.streamCache.set(cacheKey, data);
             if (cleanVideoId) this.streamCache.set(cleanVideoId, data);
             if (title) this.streamCache.set(title.toLowerCase().trim(), data);
@@ -1577,7 +1588,7 @@ class PlayerEngine {
     let stuckCount = 0;
 
     this.playbackWatchdogTimer = setInterval(() => {
-      if (!this.shouldBePlaying || this.isUserPaused || this.isCrossfading) {
+      if (!this.shouldBePlaying || this.isUserPaused || this.isCrossfading || this.isSwitchingTrack) {
         lastTime = -1;
         stuckCount = 0;
         return;
@@ -1588,7 +1599,7 @@ class PlayerEngine {
         if (!deck) return;
 
         // 1. If unexpectedly paused by OS / browser during playback
-        if (deck.paused && deck.src && !deck.src.startsWith('data:')) {
+        if (deck.paused && !deck.ended && deck.src && !deck.src.startsWith('data:')) {
           this.startBackgroundAudioAnchor();
           deck.play().catch(() => {});
           return;
@@ -1596,7 +1607,7 @@ class PlayerEngine {
 
         // 2. Buffer underrun watchdog: check if audio position is frozen in place for ~3-4s
         const cur = deck.currentTime;
-        if (!deck.paused && deck.duration && deck.duration > 0 && cur > 0 && cur < deck.duration - 1) {
+        if (!deck.paused && !deck.ended && deck.duration && isFinite(deck.duration) && deck.duration > 0 && cur > 0 && cur < deck.duration - 1) {
           if (Math.abs(cur - lastTime) < 0.05) {
             stuckCount++;
             if (stuckCount >= 3) {
