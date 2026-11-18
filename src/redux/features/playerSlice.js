@@ -83,6 +83,7 @@ const initialState = {
   isEqualizerModalOpen: false,
   equalizerPreset: loadSaved('tunetide_eq_preset', 'studio'),
   audioQuality: loadSaved('tunetide_audio_bitrate', '320'),
+  playTrigger: 0,
 };
 
 const playerSlice = createSlice({
@@ -154,10 +155,12 @@ const playerSlice = createSlice({
       state.isActive = true;
       state.isPlaying = true;
       state.currentTime = 0;
+      state.playTrigger = Date.now();
 
       if (Array.isArray(songs) && songs.length > 0) {
         state.currentSongs = songs.map(normalizeSong).filter(Boolean);
-        state.currentIndex = typeof index === 'number' ? index : state.currentSongs.findIndex((s) => s.videoId === normalized.videoId);
+        const foundIdx = state.currentSongs.findIndex((s) => s.videoId === normalized.videoId);
+        state.currentIndex = foundIdx >= 0 ? foundIdx : (typeof index === 'number' ? index : 0);
         if (state.currentIndex < 0) state.currentIndex = 0;
       } else if (!state.currentSongs.some((s) => s.videoId === normalized.videoId)) {
         state.currentSongs = [normalized, ...state.currentSongs];
@@ -182,6 +185,7 @@ const playerSlice = createSlice({
       state.isActive = true;
       state.isPlaying = true;
       state.currentTime = 0;
+      state.playTrigger = Date.now();
     },
 
     playPause: (state, action) => {
@@ -198,25 +202,33 @@ const playerSlice = createSlice({
       if (state.repeatMode === 'one') {
         state.currentTime = 0;
         state.isPlaying = true;
+        state.playTrigger = Date.now();
         return;
       }
 
       let nextIndex = state.currentIndex + 1;
       if (state.shuffle) {
-        nextIndex = Math.floor(Math.random() * state.currentSongs.length);
-      } else if (nextIndex >= state.currentSongs.length) {
-        if (state.repeatMode === 'all') {
-          nextIndex = 0;
+        if (state.currentSongs.length > 1) {
+          let randomIdx = state.currentIndex;
+          let attempts = 0;
+          while (randomIdx === state.currentIndex && attempts < 20) {
+            randomIdx = Math.floor(Math.random() * state.currentSongs.length);
+            attempts++;
+          }
+          nextIndex = randomIdx;
         } else {
-          state.isPlaying = false;
-          return;
+          nextIndex = 0;
         }
+      } else if (nextIndex >= state.currentSongs.length) {
+        // In simple mode, smoothly loop back to start of current list for continuous uninterrupted playback
+        nextIndex = 0;
       }
 
       state.currentIndex = nextIndex;
       state.activeSong = state.currentSongs[nextIndex];
       state.currentTime = 0;
       state.isPlaying = true;
+      state.playTrigger = Date.now();
 
       if (state.activeSong) {
         const filteredRecent = state.recentTracks.filter((t) => t.videoId !== state.activeSong.videoId);
@@ -230,12 +242,23 @@ const playerSlice = createSlice({
 
       if (state.currentTime > 3) {
         state.currentTime = 0;
+        state.playTrigger = Date.now();
         return;
       }
 
       let prevIndex = state.currentIndex - 1;
       if (state.shuffle) {
-        prevIndex = Math.floor(Math.random() * state.currentSongs.length);
+        if (state.currentSongs.length > 1) {
+          let randomIdx = state.currentIndex;
+          let attempts = 0;
+          while (randomIdx === state.currentIndex && attempts < 20) {
+            randomIdx = Math.floor(Math.random() * state.currentSongs.length);
+            attempts++;
+          }
+          prevIndex = randomIdx;
+        } else {
+          prevIndex = 0;
+        }
       } else if (prevIndex < 0) {
         prevIndex = state.currentSongs.length - 1;
       }
@@ -244,6 +267,7 @@ const playerSlice = createSlice({
       state.activeSong = state.currentSongs[prevIndex];
       state.currentTime = 0;
       state.isPlaying = true;
+      state.playTrigger = Date.now();
     },
 
     setCurrentTime: (state, action) => {

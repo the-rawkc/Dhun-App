@@ -21,6 +21,7 @@ class PlayerEngine {
     this.isUserPaused = false;
     this.activeAbortController = null;
     this.currentVolume = 0.8;
+    this.streamCache = new Map();
     try {
       const saved = localStorage.getItem('tunetide_volume');
       if (saved !== null) {
@@ -44,12 +45,7 @@ class PlayerEngine {
     this.initVisibilityListener();
   }
 
-  startBackgroundAudioAnchor() {
-    // Only use background anchor for YouTube fallback, NEVER when playing direct native audio!
-    if (this.isDirectAudio || this.isOfflinePlayback) {
-      this.stopBackgroundAudioAnchor();
-      return;
-    }
+  startBackgroundAudioAnchor(force = false) {
     if (typeof window === 'undefined') return;
     try {
       if (!this.bgAnchorEl) {
@@ -58,6 +54,7 @@ class PlayerEngine {
         this.bgAnchorEl.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
         this.bgAnchorEl.loop = true;
         this.bgAnchorEl.volume = 0.01;
+        this.bgAnchorEl.setAttribute('playsinline', 'true');
       }
       const p = this.bgAnchorEl.play();
       if (p && typeof p.catch === 'function') {
@@ -68,7 +65,7 @@ class PlayerEngine {
 
   stopBackgroundAudioAnchor() {
     try {
-      if (this.bgAnchorEl) {
+      if (this.bgAnchorEl && !this.bgAnchorEl.paused) {
         this.bgAnchorEl.pause();
       }
     } catch (e) {}
@@ -103,7 +100,24 @@ class PlayerEngine {
     this.audioEl.preload = 'auto';
     this.audioEl.volume = this.currentVolume;
     this.audioEl.muted = false;
+    this.audioEl.setAttribute('playsinline', 'true');
+    this.audioEl.setAttribute('webkit-playsinline', 'true');
+    this.audioEl.id = 'dhun-native-player';
     this.offlineAudioEl = this.audioEl; // Backwards-compatibility alias
+
+    // Ensure audio element is mounted into DOM container so mobile OS never suspends it
+    try {
+      let container = document.getElementById('yt-audio-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'yt-audio-container';
+        container.style.cssText = 'position:fixed;bottom:0;right:0;width:1px;height:1px;opacity:0.01;pointer-events:none;z-index:0;overflow:hidden;border:none;';
+        document.body.appendChild(container);
+      }
+      if (!document.getElementById('dhun-native-player')) {
+        container.appendChild(this.audioEl);
+      }
+    } catch (e) {}
 
     this.audioEl.addEventListener('timeupdate', () => {
       if (this.isDirectAudio || this.isOfflinePlayback) {
@@ -133,6 +147,7 @@ class PlayerEngine {
       if (this.isDirectAudio || this.isOfflinePlayback) {
         this.shouldBePlaying = true;
         this.isUserPaused = false;
+        this.stopBackgroundAudioAnchor();
         this.listeners.stateChange(true);
         this.updateMediaSessionState('playing');
         this.requestWakeLock();
@@ -151,7 +166,8 @@ class PlayerEngine {
 
     this.audioEl.addEventListener('ended', () => {
       if (this.isDirectAudio || this.isOfflinePlayback) {
-        this.shouldBePlaying = false;
+        // Keep audio context alive seamlessly across track handoff
+        this.startBackgroundAudioAnchor(true);
         this.listeners.ended();
         this.updateMediaSessionState('none');
       }
@@ -470,6 +486,31 @@ class PlayerEngine {
     } catch (e) {}
   }
 
+  async prefetchTrack(trackMeta) {
+    if (!trackMeta) return;
+    const cleanVideoId = typeof trackMeta === 'object' ? (trackMeta?.videoId || trackMeta?.id) : String(trackMeta || '').trim();
+    const title = trackMeta?.title || trackMeta?.name || '';
+    const artist = trackMeta?.artist || trackMeta?.artists || trackMeta?.subtitle || '';
+    if (!cleanVideoId && !title) return;
+
+    const cacheKey = cleanVideoId || title.toLowerCase().trim();
+    if (this.streamCache.has(cacheKey)) return;
+
+    try {
+      const query = `${title} ${artist}`.trim();
+      const res = await fetch(
+        `${API_BASE}/api/audio-stream?query=${encodeURIComponent(query)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.streamUrl) {
+          this.streamCache.set(cacheKey, data);
+          if (cleanVideoId) this.streamCache.set(cleanVideoId, data);
+        }
+      }
+    } catch (e) {}
+  }
+
   async loadVideo(videoId, autoPlay = true, trackMeta = null) {
     if (!videoId && !trackMeta) return;
 
@@ -489,10 +530,12 @@ class PlayerEngine {
       } catch (e) {}
     }
 
-    if (!cleanVideoId) return;
+    if (!cleanVideoId && !title) return;
+
+    const cacheKey = cleanVideoId || title.toLowerCase().trim();
 
     // GUARD: If this song is ALREADY loading or already loaded with direct audio, avoid duplicate abort/reset
-    if (this.currentVideoId === cleanVideoId) {
+    if (this.currentVideoId === cleanVideoId && cleanVideoId) {
       if (this.activeAbortController) {
         // Fetch is actively in flight for this exact song; keep waiting for it
         if (autoPlay) {
@@ -507,6 +550,7 @@ class PlayerEngine {
           this.shouldBePlaying = true;
           this.isUserPaused = false;
           if (this.audioEl.paused) {
+            this.audioEl.currentTime = 0;
             this.audioEl.play().catch(() => {});
           }
         }
@@ -519,14 +563,6 @@ class PlayerEngine {
         this.activeAbortController.abort();
       } catch (e) {}
       this.activeAbortController = null;
-    }
-
-    // Pause previous audio cleanly without triggering empty-src errors
-    if (this.audioEl) {
-      try {
-        this.audioEl.pause();
-        this.audioEl.currentTime = 0;
-      } catch (e) {}
     }
 
     this.currentVideoId = cleanVideoId;
@@ -543,22 +579,24 @@ class PlayerEngine {
 
     // 1. Check if track is available offline first
     try {
-      const offlineRecord = await getOfflineTrack(cleanVideoId);
-      if (offlineRecord?.audioBlob && offlineRecord.audioBlob.size > 100) {
-        this.isOfflinePlayback = true;
-        this.isDirectAudio = true;
-        this.stopBackgroundAudioAnchor();
-        if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
-          try { this.ytPlayer.pauseVideo(); } catch (e) {}
+      if (cleanVideoId) {
+        const offlineRecord = await getOfflineTrack(cleanVideoId);
+        if (offlineRecord?.audioBlob && offlineRecord.audioBlob.size > 100) {
+          this.isOfflinePlayback = true;
+          this.isDirectAudio = true;
+          this.stopBackgroundAudioAnchor();
+          if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
+            try { this.ytPlayer.pauseVideo(); } catch (e) {}
+          }
+          const objUrl = URL.createObjectURL(offlineRecord.audioBlob);
+          this.audioEl.src = objUrl;
+          this.audioEl.volume = this.currentVolume ?? 0.8;
+          this.audioEl.muted = false;
+          if (autoPlay) {
+            this.audioEl.play().catch(() => {});
+          }
+          return;
         }
-        const objUrl = URL.createObjectURL(offlineRecord.audioBlob);
-        this.audioEl.src = objUrl;
-        this.audioEl.volume = this.currentVolume ?? 0.8;
-        this.audioEl.muted = false;
-        if (autoPlay) {
-          this.audioEl.play().catch(() => {});
-        }
-        return;
       }
     } catch (e) {
       console.warn('Offline check error:', e);
@@ -566,7 +604,50 @@ class PlayerEngine {
 
     this.isOfflinePlayback = false;
 
-    // 2. Direct native HTML5 320kbps audio stream with generous 8s timeout for rock-solid stability
+    // Helper to start playback on this.audioEl with instant retry
+    const applyDirectStream = (data) => {
+      this.isDirectAudio = true;
+      if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
+        try { this.ytPlayer.pauseVideo(); } catch (e) {}
+      }
+      this.audioEl.src = data.streamUrl;
+      this.audioEl.volume = this.currentVolume ?? 0.8;
+      this.audioEl.muted = false;
+      this.activeAbortController = null;
+
+      if (autoPlay && this.shouldBePlaying && !this.isUserPaused) {
+        const playPromise = this.audioEl.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            this.stopBackgroundAudioAnchor();
+          }).catch((err) => {
+            console.warn('Initial play pending, waiting for canplay event:', err);
+            const onCanPlay = () => {
+              this.audioEl.removeEventListener('canplay', onCanPlay);
+              if (this.shouldBePlaying && !this.isUserPaused) {
+                this.audioEl.play().then(() => {
+                  this.stopBackgroundAudioAnchor();
+                }).catch(() => {
+                  if (cleanVideoId) this.fallbackToYouTube(cleanVideoId, autoPlay);
+                });
+              }
+            };
+            this.audioEl.addEventListener('canplay', onCanPlay, { once: true });
+          });
+        }
+      }
+    };
+
+    // 2. Check in-memory pre-fetched cache first (INSTANT 0ms playback!)
+    if (this.streamCache.has(cacheKey)) {
+      const cached = this.streamCache.get(cacheKey);
+      if (cached?.streamUrl) {
+        applyDirectStream(cached);
+        return;
+      }
+    }
+
+    // 3. Direct native HTML5 320kbps audio stream fetch
     if (title) {
       const abortCtrl = new AbortController();
       this.activeAbortController = abortCtrl;
@@ -592,28 +673,13 @@ class PlayerEngine {
             const isMatch = !cleanD || !cleanR || cleanD.includes(cleanR) || cleanR.includes(cleanD);
             if (!isMatch) {
               console.warn('Direct stream title mismatch, falling back to YouTube:', data.title, 'vs', title);
-              this.fallbackToYouTube(cleanVideoId, autoPlay);
+              if (cleanVideoId) this.fallbackToYouTube(cleanVideoId, autoPlay);
               return;
             }
 
-            this.isDirectAudio = true;
-            this.stopBackgroundAudioAnchor();
-            if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
-              try { this.ytPlayer.pauseVideo(); } catch (e) {}
-            }
-            this.audioEl.src = data.streamUrl;
-            this.audioEl.volume = this.currentVolume ?? 0.8;
-            this.audioEl.muted = false;
-            this.activeAbortController = null;
-            if (autoPlay && this.shouldBePlaying && !this.isUserPaused) {
-              const p = this.audioEl.play();
-              if (p && typeof p.catch === 'function') {
-                p.catch((err) => {
-                  console.warn('Direct native audio play rejected, falling back to YouTube:', err);
-                  this.fallbackToYouTube(cleanVideoId, autoPlay);
-                });
-              }
-            }
+            this.streamCache.set(cacheKey, data);
+            if (cleanVideoId) this.streamCache.set(cleanVideoId, data);
+            applyDirectStream(data);
             return;
           }
         }
@@ -625,8 +691,8 @@ class PlayerEngine {
       this.activeAbortController = null;
     }
 
-    // 3. Fallback to YouTube embed
-    if (this.currentVideoId === cleanVideoId) {
+    // 4. Fallback to YouTube embed if direct audio not found
+    if (this.currentVideoId === cleanVideoId && cleanVideoId) {
       this.fallbackToYouTube(cleanVideoId, autoPlay);
     }
   }

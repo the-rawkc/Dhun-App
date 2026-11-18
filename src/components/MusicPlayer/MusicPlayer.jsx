@@ -60,6 +60,8 @@ const MusicPlayer = () => {
   };
   const {
     activeSong,
+    currentSongs,
+    currentIndex,
     isPlaying,
     currentTime,
     duration,
@@ -67,6 +69,7 @@ const MusicPlayer = () => {
     isMuted,
     repeatMode,
     shuffle,
+    playTrigger,
     favorites,
     showLyrics,
   } = useSelector((state) => state.player);
@@ -86,7 +89,7 @@ const MusicPlayer = () => {
     });
   }, [dispatch]);
 
-  // Load new song when activeSong changes
+  // Load new song when activeSong changes or is re-triggered
   useEffect(() => {
     if (activeSong) {
       const vId = activeSong.videoId;
@@ -103,7 +106,23 @@ const MusicPlayer = () => {
         setDownloadStatus('idle');
       }
     }
-  }, [activeSong?.videoId, activeSong?.title]);
+  }, [activeSong?.videoId, activeSong?.title, playTrigger]);
+
+  // Pre-fetch next track in background for 0ms instant transition in simple and shuffle modes
+  useEffect(() => {
+    if (currentSongs && currentSongs.length > 1) {
+      let nextIdx = currentIndex + 1;
+      if (shuffle) {
+        nextIdx = (currentIndex + 1) % currentSongs.length;
+      } else if (nextIdx >= currentSongs.length) {
+        nextIdx = 0;
+      }
+      const nextTrack = currentSongs[nextIdx];
+      if (nextTrack) {
+        playerEngine.prefetchTrack(nextTrack);
+      }
+    }
+  }, [currentIndex, currentSongs, shuffle]);
 
   // Sync volume & mute to engine
   useEffect(() => {
