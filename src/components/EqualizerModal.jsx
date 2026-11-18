@@ -94,7 +94,7 @@ const EqualizerModal = () => {
                 </span>
               </div>
               <p className="text-xs theme-text-muted mt-0.5">
-                Customize your bass, singer voice, and sound clarity just like Spotify Premium
+                Customize your bass, vocal presence, and sound clarity with studio master quality
               </p>
             </div>
           </div>
@@ -106,7 +106,7 @@ const EqualizerModal = () => {
           </button>
         </div>
 
-        {/* Bitrate Selector (320kbps Spotify Pro) */}
+        {/* Bitrate Selector (320kbps Studio Master) */}
         <div className="p-4 rounded-2xl bg-slate-500/5 border theme-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
@@ -285,11 +285,11 @@ const EqualizerModal = () => {
           </div>
         </div>
 
-        {/* Apple Music Smart Automix / Crossfade */}
+        {/* Smart Automix / Crossfade */}
         <div className="p-4 rounded-2xl bg-slate-500/5 border theme-border flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold theme-text-main">Apple Music Automix (Crossfade)</span>
+              <span className="text-xs font-bold theme-text-main">Smart Automix (Crossfade)</span>
               <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-500 text-white">
                 SMART BLEND
               </span>
@@ -309,7 +309,7 @@ const EqualizerModal = () => {
             }}
             className="px-3 py-1.5 rounded-xl bg-slate-500/10 border theme-border theme-text-main text-xs font-semibold focus:outline-none focus:border-rose-500"
           >
-            <option value="smart">Smart (4s - Apple Music)</option>
+            <option value="smart">Smart Automix (4s)</option>
             <option value="smooth">Smooth (6s)</option>
             <option value="long">Extended (8s)</option>
             <option value="off">Off (Standard)</option>

@@ -108,7 +108,7 @@ const MainPage = () => {
       {/* Global Add to Playlist Modal */}
       <AddToPlaylistModal />
 
-      {/* Global Spotify Pro Equalizer & Audio DSP Modal */}
+      {/* Global Equalizer & Audio DSP Modal */}
       <EqualizerModal />
 
       {/* First-Time Landing & Auth Modal */}

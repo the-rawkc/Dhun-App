@@ -115,7 +115,7 @@ const SingerDetails = () => {
   const [relatedArtists, setRelatedArtists] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Spotify-style tabs & controls
+  // Artist tabs & controls
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'albums' | 'singles' | 'featured'
   const [showAllPopular, setShowAllPopular] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
@@ -281,7 +281,7 @@ const SingerDetails = () => {
 
   return (
     <div className="flex flex-col gap-8 pb-28 select-none animate-fade-in">
-      {/* ─── Spotify-Style Artist Header ────────────────────────────────────── */}
+      {/* ─── Artist Header ────────────────────────────────────── */}
       <div className="relative rounded-3xl overflow-hidden p-6 sm:p-8 bg-gradient-to-br from-rose-950/40 via-red-950/20 to-dark-900 border border-rose-500/20 shadow-xl flex flex-col sm:flex-row items-center sm:items-end gap-6">
         <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full overflow-hidden bg-dark-950 shadow-2xl border-4 border-rose-500/30 shrink-0">
           <img src={displayImage} alt={displayName} className="w-full h-full object-cover" />
@@ -304,7 +304,7 @@ const SingerDetails = () => {
             </p>
           )}
 
-          {/* Action Row: Big Spotify Play & Follow */}
+          {/* Action Row: Play & Follow */}
           <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-3">
             <button
               onClick={handlePlayAll}
@@ -337,7 +337,7 @@ const SingerDetails = () => {
         </div>
       ) : (
         <>
-          {/* ─── Spotify Section 1: Popular Tracks ───────────────────────────── */}
+          {/* ─── Section 1: Popular Tracks ───────────────────────────── */}
           {topSongs.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -368,7 +368,7 @@ const SingerDetails = () => {
             </div>
           )}
 
-          {/* ─── Spotify Section 2: Discography Tabs ─────────────────────────── */}
+          {/* ─── Section 2: Discography Tabs ─────────────────────────── */}
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl md:text-2xl font-black theme-text-main">Discography</h2>
@@ -588,7 +588,7 @@ const SingerDetails = () => {
             )}
           </div>
 
-          {/* ─── Spotify Section 3: Fans Also Like ──────────────────────────── */}
+          {/* ─── Section 3: Fans Also Like ──────────────────────────── */}
           {relatedArtists.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -610,7 +610,7 @@ const SingerDetails = () => {
             </div>
           )}
 
-          {/* ─── Spotify Section 4: About / Bio ─────────────────────────────── */}
+          {/* ─── Section 4: About / Bio ─────────────────────────────── */}
           {bio && (
             <div className="rounded-2xl p-5 bg-slate-500/5 border theme-border shadow-sm">
               <h3 className="text-base font-bold theme-text-main mb-2">About {displayName}</h3>

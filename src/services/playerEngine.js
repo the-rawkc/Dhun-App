@@ -15,7 +15,7 @@ class PlayerEngine {
     this.isOfflinePlayback = false;
     this.isDirectAudio = false;
 
-    // Dual-deck audio architecture for Apple Music style gapless crossfade & automix
+    // Dual-deck audio architecture for seamless gapless crossfade & automix
     this.deckA = null;
     this.deckB = null;
     this.currentDeck = null;
@@ -29,7 +29,7 @@ class PlayerEngine {
     this.currentVolume = 0.8;
     this.streamCache = new Map();
 
-    // Apple Music Smart Automix transition settings
+    // Smart Automix transition settings
     this.isCrossfading = false;
     this.crossfadeTimer = null;
     this.crossfadeSeconds = 4;
@@ -229,7 +229,7 @@ class PlayerEngine {
           this.listeners.timeUpdate(cur);
           this.updateMediaSessionPosition(cur);
 
-          // Apple Music Smart Automix trigger: starts next track gently during the outro
+          // Smart Automix trigger: starts next track gently during the outro
           const dur = deck.duration;
           if (
             this.crossfadeSeconds > 0 &&
@@ -384,7 +384,7 @@ class PlayerEngine {
                 try {
                   if (typeof this.ytPlayer.unMute === 'function') this.ytPlayer.unMute();
                   if (typeof this.ytPlayer.setVolume === 'function') this.ytPlayer.setVolume(Math.round((this.currentVolume ?? 0.8) * 100));
-                  // Force highest bitrate audio stream (Spotify Pro quality)
+                  // Force highest bitrate audio stream (Studio Pro quality)
                   if (typeof this.ytPlayer.setPlaybackQuality === 'function') {
                     this.ytPlayer.setPlaybackQuality('highres');
                   }
@@ -575,7 +575,7 @@ class PlayerEngine {
     }, 20);
   }
 
-  // Apple Music style seamless smart crossfade / automix
+  // Seamless smart crossfade / automix
   async startSmartCrossfade(remainingSec = 4) {
     if (this.isCrossfading || !this.queue || this.queue.length <= 1) return;
     this.isCrossfading = true;
@@ -682,7 +682,7 @@ class PlayerEngine {
     }
     this.updateMediaSessionPosition(0);
 
-    // Run Apple Music equal-power crossfade curve
+    // Run equal-power crossfade curve
     const durationMs = Math.max(1000, Math.min(this.crossfadeSeconds * 1000, (remainingSec || 4) * 1000));
     const startTime = performance.now();
     const targetVolume = this.currentVolume ?? 0.8;
@@ -789,7 +789,7 @@ class PlayerEngine {
     const isDoubleTap = (now - this.lastPrevClickTime) < 2500;
 
     // 1. If song has played for more than 2.5s and this is the first tap,
-    // RESTART the current song from beginning (Apple Music & Spotify standard)
+    // RESTART the current song from beginning
     if (curTime > 2.5 && !isDoubleTap) {
       this.lastPrevClickTime = now;
       this.seekTo(0);

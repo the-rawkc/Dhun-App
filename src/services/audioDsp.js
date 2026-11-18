@@ -1,6 +1,6 @@
 /**
- * TuneTide Spotify Pro Audio DSP Engine
- * Web Audio API 5-Band Studio Parametric Equalizer, Spotify Volume Normalization,
+ * Dhun Pro Audio DSP Engine
+ * Web Audio API 5-Band Studio Parametric Equalizer, Volume Normalization,
  * Dynamic Range Compression, and Spatial Audio Engine.
  */
 
@@ -119,7 +119,7 @@ class AudioDSPEngine {
         this.filters[i].connect(this.filters[i + 1]);
       }
 
-      // Spotify Pro Dynamics Compressor (Volume Normalizer)
+      // Pro Dynamics Compressor (Volume Normalizer)
       this.compressor = this.audioCtx.createDynamicsCompressor();
       this.compressor.threshold.setValueAtTime(-20, this.audioCtx.currentTime);
       this.compressor.knee.setValueAtTime(24, this.audioCtx.currentTime);

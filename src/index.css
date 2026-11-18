@@ -103,7 +103,7 @@ html.dark {
   scrollbar-width: none;
 }
 
-/* Range input styling for sleek Spotify-style seekbar & volume */
+/* Range input styling for sleek seekbar & volume */
 input[type=range] {
   -webkit-appearance: none;
   background: transparent;

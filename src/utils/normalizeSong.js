@@ -59,7 +59,7 @@ export const cleanSongTitle = (rawTitle, artist = '') => {
   // Clean unicode replacement character artifacts
   clean = clean.replace(/\uFFFD/g, '').replace(/\?{2,}/g, '').trim();
 
-  // Remove common YouTube video descriptors
+  // Remove common video/audio descriptors
   clean = clean.replace(
     /\s*[\(\[](?:Official\s*(?:Music\s*)?Video|Full\s*Video|Official\s*Audio|Lyric\s*Video|Lyrical\s*Video|Lyrical|Audio|Video|4K|8K|HD|HQ|Visualizer|Teaser|Promo|Special\s*Version|Audio\s*Track)[\)\]]/gi,
     ''
@@ -123,7 +123,7 @@ export const getHighResArtwork = (url, videoId) => {
       return clean;
     }
 
-    // If YouTube img / ytimg.com, cleanly replace filename without creating invalid names like mqhqdefault
+    // If ytimg thumbnail, cleanly replace filename without creating invalid names like mqhqdefault
     if (clean.includes('ytimg.com')) {
       clean = clean.replace(/\/(?:default|mqdefault|sddefault)\.jpg/g, '/hqdefault.jpg');
       return clean;

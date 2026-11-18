@@ -207,7 +207,7 @@ const MobilePlayerModal = ({ onOpenQueue }) => {
           <button
             onClick={() => dispatch(setIsEqualizerModalOpen(true))}
             className="p-2 rounded-full text-white/90 hover:text-white bg-black/40 backdrop-blur-md border border-white/15 active:scale-95 transition-all shadow-lg"
-            title="Spotify Pro Equalizer"
+            title="Pro Sound Equalizer"
           >
             <FaSlidersH className="text-sm text-rose-400" />
           </button>

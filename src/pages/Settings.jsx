@@ -226,19 +226,19 @@ const Settings = () => {
               }}
               className="w-full sm:w-auto max-w-full px-3.5 py-2.5 rounded-xl bg-slate-500/10 border theme-border theme-text-main text-xs font-semibold focus:outline-none focus:border-rose-500 truncate"
             >
-              <option value="320">Very High (Best Quality - Like Spotify Pro)</option>
+              <option value="320">Very High (320kbps - Studio Master Quality)</option>
               <option value="256">High Quality (Balanced)</option>
               <option value="128">Normal Quality (Saves Mobile Data)</option>
             </select>
           </div>
 
-          {/* Song Transition Style (Apple Music Automix) Dropdown */}
+          {/* Song Transition Style (Smart Automix) Dropdown */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-3 border-t theme-border min-w-0">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold theme-text-main">Song Transition Style</span>
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-500 text-white shrink-0">
-                  Apple Music Automix
+                  Smart Automix
                 </span>
               </div>
               <p className="text-xs theme-text-muted mt-0.5 leading-relaxed">
@@ -258,7 +258,7 @@ const Settings = () => {
               }}
               className="w-full sm:w-auto max-w-full px-3.5 py-2.5 rounded-xl bg-slate-500/10 border theme-border theme-text-main text-xs font-semibold focus:outline-none focus:border-rose-500 truncate"
             >
-              <option value="smart">Smart Automix (Apple Music Style - 4s)</option>
+              <option value="smart">Smart Automix (Seamless 4s)</option>
               <option value="smooth">Smooth Crossfade (6s)</option>
               <option value="long">Extended Blend (8s)</option>
               <option value="off">Off (Standard Gapless)</option>

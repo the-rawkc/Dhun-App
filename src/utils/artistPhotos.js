@@ -1,6 +1,6 @@
 /**
  * Authentic High-Resolution Artist Images for Indian Artists & Singers
- * Sources: Official JioSaavn CDN & Wikimedia Commons
+ * Sources: Official High-Res CDN & Wikimedia Commons
  */
 
 export const KNOWN_ARTIST_PHOTOS = {
