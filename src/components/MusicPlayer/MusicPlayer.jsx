@@ -87,8 +87,8 @@ const MusicPlayer = () => {
       onDurationChange: (dur) => dispatch(setDuration(dur)),
       onStateChange: (playing) => dispatch(playPause(playing)),
       onEnded: () => {}, // Handled autonomously by playerEngine.playNextTrack
-      onNext: () => dispatch(playNextTrackNow()),
-      onPrev: () => dispatch(playPrevTrackNow()),
+      onNext: () => dispatch(nextSong()),
+      onPrev: () => dispatch(prevSong()),
       onTrackChanged: (track, index) => dispatch(syncCurrentTrack({ track, index })),
     });
   }, [dispatch]);

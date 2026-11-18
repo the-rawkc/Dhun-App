@@ -11,6 +11,7 @@ class PlayerEngine {
     this.timeUpdateTimer = null;
     this.currentTrack = null;
     this.currentVideoId = null;
+    this.currentTrackKey = null;
     this.isOfflinePlayback = false;
     this.isDirectAudio = false;
     this.audioEl = null;
@@ -456,7 +457,6 @@ class PlayerEngine {
     const nextTrack = this.queue[nextIndex];
     if (nextTrack) {
       const vId = nextTrack.videoId || nextTrack.id;
-      this.currentVideoId = typeof vId === 'string' ? vId : '';
       this.currentTrack = nextTrack;
       this.updateMediaMetadata(nextTrack);
       this.updateMediaSessionState('playing');
@@ -503,7 +503,6 @@ class PlayerEngine {
     const prevTrack = this.queue[prevIndex];
     if (prevTrack) {
       const vId = prevTrack.videoId || prevTrack.id;
-      this.currentVideoId = typeof vId === 'string' ? vId : '';
       this.currentTrack = prevTrack;
       this.updateMediaMetadata(prevTrack);
       this.updateMediaSessionState('playing');
@@ -639,7 +638,10 @@ class PlayerEngine {
     const artist = trackMeta?.artist || trackMeta?.artists || trackMeta?.subtitle || '';
     if (!cleanVideoId && !title) return;
 
-    const cacheKey = cleanVideoId || title.toLowerCase().trim();
+    const cacheKey = (cleanVideoId && cleanVideoId.length > 5 && !cleanVideoId.startsWith('tr_'))
+      ? cleanVideoId
+      : (title ? `${title}::${artist}`.toLowerCase().trim() : cleanVideoId);
+
     if (this.streamCache.has(cacheKey)) return;
 
     try {
@@ -650,8 +652,16 @@ class PlayerEngine {
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.streamUrl) {
-          this.streamCache.set(cacheKey, data);
-          if (cleanVideoId) this.streamCache.set(cleanVideoId, data);
+          const dataTitle = (data.title || '').toLowerCase().trim();
+          const reqTitle = title.toLowerCase().trim();
+          const cleanD = dataTitle.replace(/[^a-z0-9]/g, '');
+          const cleanR = reqTitle.replace(/[^a-z0-9]/g, '');
+          const isMatch = !cleanD || !cleanR || cleanD.includes(cleanR) || cleanR.includes(cleanD);
+          if (isMatch) {
+            this.streamCache.set(cacheKey, data);
+            if (cleanVideoId) this.streamCache.set(cleanVideoId, data);
+            if (title) this.streamCache.set(title.toLowerCase().trim(), data);
+          }
         }
       }
     } catch (e) {}
@@ -678,10 +688,13 @@ class PlayerEngine {
 
     if (!cleanVideoId && !title) return;
 
-    const cacheKey = cleanVideoId || title.toLowerCase().trim();
+    const cacheKey = (cleanVideoId && cleanVideoId.length > 5 && !cleanVideoId.startsWith('tr_'))
+      ? cleanVideoId
+      : (title ? `${title}::${artist}`.toLowerCase().trim() : cleanVideoId);
 
-    // GUARD: If this song is ALREADY loading or already loaded with direct audio, avoid duplicate abort/reset
-    if (this.currentVideoId === cleanVideoId && cleanVideoId) {
+    // GUARD: If this song is ALREADY actively playing or already loaded with direct audio, avoid duplicate abort/reset
+    const isSameTrack = this.currentTrackKey && this.currentTrackKey === cacheKey;
+    if (isSameTrack) {
       if (this.activeAbortController) {
         // Fetch is actively in flight for this exact song; keep waiting for it
         if (autoPlay) {
@@ -696,7 +709,6 @@ class PlayerEngine {
           this.shouldBePlaying = true;
           this.isUserPaused = false;
           if (this.audioEl.paused) {
-            this.audioEl.currentTime = 0;
             this.audioEl.play().catch(() => {});
           }
         }
@@ -704,6 +716,7 @@ class PlayerEngine {
       }
     }
 
+    // Changing to a new track: cancel any previous in-flight fetch
     if (this.activeAbortController) {
       try {
         this.activeAbortController.abort();
@@ -711,13 +724,20 @@ class PlayerEngine {
       this.activeAbortController = null;
     }
 
+    this.currentTrackKey = cacheKey;
     this.currentVideoId = cleanVideoId;
     this.currentTrack = trackMeta;
     this.updateMediaMetadata(trackMeta);
 
+    // Pause previous audio immediately so previous song does not bleed into next song
+    if (this.audioEl && !this.audioEl.paused) {
+      try { this.audioEl.pause(); } catch (e) {}
+    }
+
     if (autoPlay) {
       this.shouldBePlaying = true;
       this.isUserPaused = false;
+      this.startBackgroundAudioAnchor(true);
       this.listeners.stateChange(true);
       this.updateMediaSessionState('playing');
       this.requestWakeLock();
@@ -774,7 +794,7 @@ class PlayerEngine {
                 this.audioEl.play().then(() => {
                   this.stopBackgroundAudioAnchor();
                 }).catch(() => {
-                  if (cleanVideoId) this.fallbackToYouTube(cleanVideoId, autoPlay);
+                  if (cleanVideoId) this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
                 });
               }
             };
@@ -785,12 +805,10 @@ class PlayerEngine {
     };
 
     // 2. Check in-memory pre-fetched cache first (INSTANT 0ms playback!)
-    if (this.streamCache.has(cacheKey)) {
-      const cached = this.streamCache.get(cacheKey);
-      if (cached?.streamUrl) {
-        applyDirectStream(cached);
-        return;
-      }
+    const cached = this.streamCache.get(cacheKey) || (cleanVideoId ? this.streamCache.get(cleanVideoId) : null) || (title ? this.streamCache.get(title.toLowerCase().trim()) : null);
+    if (cached?.streamUrl) {
+      applyDirectStream(cached);
+      return;
     }
 
     // 3. Direct native HTML5 320kbps audio stream fetch
@@ -807,11 +825,11 @@ class PlayerEngine {
         );
         clearTimeout(timeoutId);
 
-        if (this.currentVideoId !== cleanVideoId) return;
+        if (this.currentTrackKey !== cacheKey) return;
 
         if (res.ok) {
           const data = await res.json();
-          if (data.success && data.streamUrl && this.currentVideoId === cleanVideoId) {
+          if (data.success && data.streamUrl && this.currentTrackKey === cacheKey) {
             const dataTitle = (data.title || '').toLowerCase().trim();
             const reqTitle = title.toLowerCase().trim();
             const cleanD = dataTitle.replace(/[^a-z0-9]/g, '');
@@ -819,31 +837,32 @@ class PlayerEngine {
             const isMatch = !cleanD || !cleanR || cleanD.includes(cleanR) || cleanR.includes(cleanD);
             if (!isMatch) {
               console.warn('Direct stream title mismatch, falling back to YouTube:', data.title, 'vs', title);
-              if (cleanVideoId) this.fallbackToYouTube(cleanVideoId, autoPlay);
+              if (cleanVideoId) this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
               return;
             }
 
             this.streamCache.set(cacheKey, data);
             if (cleanVideoId) this.streamCache.set(cleanVideoId, data);
+            if (title) this.streamCache.set(title.toLowerCase().trim(), data);
             applyDirectStream(data);
             return;
           }
         }
       } catch (err) {
         clearTimeout(timeoutId);
-        if (this.currentVideoId !== cleanVideoId) return;
+        if (this.currentTrackKey !== cacheKey) return;
         console.warn('Direct stream fetch failed/timed out, falling back to YouTube:', err);
       }
       this.activeAbortController = null;
     }
 
     // 4. Fallback to YouTube embed if direct audio not found
-    if (this.currentVideoId === cleanVideoId && cleanVideoId) {
-      this.fallbackToYouTube(cleanVideoId, autoPlay);
+    if (this.currentTrackKey === cacheKey) {
+      this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
     }
   }
 
-  fallbackToYouTube(cleanVideoId, autoPlay = true) {
+  async fallbackToYouTube(cleanVideoId, autoPlay = true, trackMeta = null) {
     this.isDirectAudio = false;
     this.isOfflinePlayback = false;
     if (this.audioEl) {
@@ -853,12 +872,32 @@ class PlayerEngine {
       } catch (e) {}
     }
 
+    let ytVid = cleanVideoId;
+    if (!isValidVideoId(ytVid) && (trackMeta?.title || this.currentTrack?.title)) {
+      const t = trackMeta?.title || this.currentTrack?.title || '';
+      const a = trackMeta?.artist || this.currentTrack?.artist || '';
+      try {
+        const query = `${t} ${a}`.trim();
+        const searchRes = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}&filter=songs&language=en&hl=en`);
+        const searchData = await searchRes.json();
+        if (searchData?.results?.[0]?.videoId) {
+          ytVid = searchData.results[0].videoId;
+          this.currentVideoId = ytVid;
+        }
+      } catch (e) {}
+    }
+
+    if (!isValidVideoId(ytVid)) {
+      console.warn('Cannot fallback to YouTube: no valid videoId found for track');
+      return;
+    }
+
     if (autoPlay) {
       this.startBackgroundAudioAnchor();
     }
 
     if (!this.isReady || !this.ytPlayer || typeof this.ytPlayer.loadVideoById !== 'function') {
-      this.pendingVideoId = cleanVideoId;
+      this.pendingVideoId = ytVid;
       this.pendingAutoPlay = autoPlay;
       return;
     }
@@ -867,9 +906,9 @@ class PlayerEngine {
       if (typeof this.ytPlayer.unMute === 'function') this.ytPlayer.unMute();
       if (typeof this.ytPlayer.setVolume === 'function') this.ytPlayer.setVolume(Math.round((this.currentVolume ?? 0.8) * 100));
       if (autoPlay) {
-        this.ytPlayer.loadVideoById(cleanVideoId);
+        this.ytPlayer.loadVideoById(ytVid);
       } else {
-        this.ytPlayer.cueVideoById(cleanVideoId);
+        this.ytPlayer.cueVideoById(ytVid);
       }
     } catch (e) {
       console.warn('loadVideo fallback to YouTube error:', e);

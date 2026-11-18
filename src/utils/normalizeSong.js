@@ -229,7 +229,7 @@ export const isValidVideoId = (vid) => {
   const v = vid.trim();
   if (v.length < 6 || v.length > 64) return false;
   if (v === 'undefined' || v === 'null' || v === 'none') return false;
-  if (v.startsWith('UC') || v.startsWith('MPRE') || v.startsWith('VL') || v.startsWith('FEmusic')) return false;
+  if (v.startsWith('tr_') || v.startsWith('0.') || v.startsWith('UC') || v.startsWith('MPRE') || v.startsWith('VL') || v.startsWith('FEmusic')) return false;
   return true;
 };
 
