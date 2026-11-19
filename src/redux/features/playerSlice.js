@@ -183,24 +183,59 @@ const playerSlice = createSlice({
     loadCloudUserData: (state, action) => {
       const { favorites, playlists, favoriteArtists, themeMode } = action.payload || {};
 
-      // 1. Favorites: Cloud is authoritative
+      // 1. Favorites: Smart merge so neither local nor cloud favorites are ever lost
       if (Array.isArray(favorites)) {
-        state.favorites = favorites.filter((f) => f && f.videoId);
+        const favMap = new Map();
+        (state.favorites || []).forEach((f) => {
+          const vid = f && (f.videoId || f.id);
+          if (vid) favMap.set(vid, f);
+        });
+        favorites.forEach((f) => {
+          const vid = f && (f.videoId || f.id);
+          if (vid) favMap.set(vid, f);
+        });
+        state.favorites = Array.from(favMap.values());
         saveItem('tunetide_favorites', state.favorites);
       }
 
-      // 2. Playlists: Cloud is authoritative. Guarantee tracks is always an array.
+      // 2. Playlists: Guarantee tracks is array, ensure defaultPlaylists exist, and merge all playlists
       if (Array.isArray(playlists)) {
-        state.playlists = playlists.map((p) => ({
+        const plMap = new Map();
+        // Load default playlists first
+        defaultPlaylists.forEach((defPl) => plMap.set(defPl.id, defPl));
+        // Merge existing state playlists
+        (state.playlists || []).forEach((p) => {
+          if (p && p.id) plMap.set(p.id, p);
+        });
+        // Merge cloud playlists
+        playlists.forEach((p) => {
+          if (p && p.id) {
+            const existing = plMap.get(p.id);
+            if (existing && Array.isArray(existing.tracks) && existing.tracks.length > 0 && (!p.tracks || p.tracks.length === 0)) {
+              plMap.set(p.id, existing);
+            } else {
+              plMap.set(p.id, p);
+            }
+          }
+        });
+
+        state.playlists = Array.from(plMap.values()).map((p) => ({
           ...p,
           tracks: Array.isArray(p.tracks) ? p.tracks : [],
         }));
         saveItem('tunetide_playlists', state.playlists);
       }
 
-      // 3. Favorite Artists: Cloud is authoritative
+      // 3. Favorite Artists: Smart merge
       if (Array.isArray(favoriteArtists)) {
-        state.favoriteArtists = favoriteArtists;
+        const artMap = new Map();
+        (state.favoriteArtists || []).forEach((a) => {
+          if (a?.name) artMap.set(a.name.toLowerCase(), a);
+        });
+        favoriteArtists.forEach((a) => {
+          if (a?.name) artMap.set(a.name.toLowerCase(), a);
+        });
+        state.favoriteArtists = Array.from(artMap.values());
         saveItem('tunetide_fav_artists', state.favoriteArtists);
       }
 
