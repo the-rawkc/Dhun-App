@@ -376,6 +376,14 @@ class PlayerEngine {
       });
 
       deck.addEventListener('ended', () => {
+        // IGNORE ended event if audio was just silent priming buffer (data:) or empty source
+        if (!deck?.src || deck.src.startsWith('data:') || deck.src === window.location.href) {
+          return;
+        }
+        // IGNORE ended event if engine is currently switching/loading a track
+        if (this.isSwitchingTrack || this.isLoadingTrack) {
+          return;
+        }
         if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
           if (this.crossfadeTimer !== null) {
             // Next deck is already crossfading / playing
@@ -1219,16 +1227,6 @@ class PlayerEngine {
         try {
           deck.volume = this.currentVolume ?? 0.8;
           deck.muted = false;
-          // Prime audio element on user gesture to permanently satisfy autoplay requirements
-          if (!deck.src || deck.src === window.location.href) {
-            deck.src = silentSrc;
-          }
-          if (deck.paused && (!deck.src || deck.src.startsWith('data:'))) {
-            const p = deck.play();
-            if (p && typeof p.catch === 'function') {
-              p.catch(() => {});
-            }
-          }
         } catch (e) {}
       };
 
@@ -1236,6 +1234,7 @@ class PlayerEngine {
       primeDeck(this.deckB);
       if (this.bgAnchorEl) {
         this.bgAnchorEl.src = silentSrc;
+        this.bgAnchorEl.loop = true;
         this.bgAnchorEl.volume = 0.001;
         this.bgAnchorEl.muted = false;
         const ap = this.bgAnchorEl.play();

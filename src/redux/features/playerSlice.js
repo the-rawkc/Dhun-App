@@ -283,10 +283,10 @@ const playerSlice = createSlice({
 
       if (Array.isArray(songs) && songs.length > 0) {
         state.currentSongs = songs.map(normalizeSong).filter(Boolean);
-        const foundIdx = state.currentSongs.findIndex((s) => s.videoId === normalized.videoId);
+        const foundIdx = state.currentSongs.findIndex((s) => isSameSong(s, normalized));
         state.currentIndex = foundIdx >= 0 ? foundIdx : (typeof index === 'number' ? index : 0);
         if (state.currentIndex < 0) state.currentIndex = 0;
-      } else if (!state.currentSongs.some((s) => s.videoId === normalized.videoId)) {
+      } else if (!state.currentSongs.some((s) => isSameSong(s, normalized))) {
         state.currentSongs = [normalized, ...state.currentSongs];
         state.currentIndex = 0;
       }

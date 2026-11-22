@@ -121,7 +121,7 @@ const MusicPlayer = () => {
         (key && playerEngine.currentVideoId && key === playerEngine.currentVideoId)
       );
 
-      if (isAlreadyHandledByEngine || (isEngineAlreadyOnTrack && !playTrigger)) {
+      if (isAlreadyHandledByEngine || isEngineAlreadyOnTrack) {
         // Track was already transitioned and loaded by playerEngine
         lastSyncedTrackRef.current = null;
       } else {
