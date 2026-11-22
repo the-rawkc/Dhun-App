@@ -1,5 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { normalizeSong, isSameSong } from '../../utils/normalizeSong';
+import { normalizeSong, isSameSong, isValidVideoId } from '../../utils/normalizeSong';
 import { syncToCloudDatabase } from '../../services/authService';
 import { playerEngine } from '../../services/playerEngine';
 import {
@@ -768,7 +768,20 @@ export const togglePlayPauseNow = () => (dispatch, getState) => {
   } else {
     try {
       playerEngine.unlockAudio();
-      playerEngine.play();
+
+      const vId = activeSong.videoId || activeSong.id;
+      const isEngineOnSameTrack = playerEngine.currentTrack && (
+        isSameSong(playerEngine.currentTrack, activeSong) ||
+        (vId && isValidVideoId(vId) && playerEngine.currentVideoId === vId)
+      );
+      const hasValidLoadedAudio = playerEngine.audioEl && playerEngine.audioEl.src && !playerEngine.audioEl.src.startsWith('data:');
+
+      if (isEngineOnSameTrack && hasValidLoadedAudio) {
+        playerEngine.play();
+      } else {
+        // Guarantee engine loads and plays the EXACT activeSong shown on screen!
+        playerEngine.loadVideo(vId || activeSong, true, activeSong);
+      }
     } catch (e) {
       console.warn('playerEngine.play error:', e);
     }

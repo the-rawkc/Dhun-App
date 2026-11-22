@@ -116,12 +116,17 @@ const MusicPlayer = () => {
         (key && syncedKey && key === syncedKey)
       );
 
-      if (isAlreadyHandledByEngine) {
+      const isEngineAlreadyOnTrack = playerEngine.currentTrack && (
+        isSameSong(activeSong, playerEngine.currentTrack) ||
+        (key && playerEngine.currentVideoId && key === playerEngine.currentVideoId)
+      );
+
+      if (isAlreadyHandledByEngine || (isEngineAlreadyOnTrack && !playTrigger)) {
         // Track was already transitioned and loaded by playerEngine
         lastSyncedTrackRef.current = null;
       } else {
         lastSyncedTrackRef.current = null;
-        playerEngine.loadVideo(vId || activeSong, true, activeSong);
+        playerEngine.loadVideo(vId || activeSong, isPlaying, activeSong);
       }
 
       if (vId && isValidVideoId(vId)) {

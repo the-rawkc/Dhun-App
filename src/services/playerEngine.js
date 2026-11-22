@@ -168,38 +168,28 @@ class PlayerEngine {
       if (!document.hidden) {
         // Returned to Dhun app foreground (user opened/returned to app)
         if (this.wasInterruptedExternally) {
+          // When earbuds disconnect or incoming call occurs, DO NOT auto-blast music out loud through phone speakers!
+          // Maintain paused state cleanly. User will tap Play when ready.
           this.wasInterruptedExternally = false;
-          this.shouldBePlaying = true;
-          this.isUserPaused = false;
+          this.shouldBePlaying = false;
+          this.isUserPaused = true;
+          this.updateMediaSessionState('paused');
+          this.listeners.stateChange(false);
+          return;
+        }
+
+        // Verify if deck is actually playing before syncing UI state
+        const deck = this.currentDeck || this.deckA;
+        const isDeckActuallyPlaying = deck && !deck.paused && deck.currentTime > 0;
+
+        if (this.shouldBePlaying && !this.isUserPaused && isDeckActuallyPlaying) {
           this.requestWakeLock();
-          if (this.isDirectAudio || this.isOfflinePlayback) {
-            const deck = this.currentDeck || this.deckA;
-            if (deck && deck.paused && deck.src && !deck.src.startsWith('data:')) {
-              deck.play().catch(() => {});
-            }
-          } else if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
-            try {
-              if (typeof this.ytPlayer.unMute === 'function') this.ytPlayer.unMute();
-              this.ytPlayer.playVideo();
-            } catch (e) {}
-          }
           this.updateMediaSessionState('playing');
           this.listeners.stateChange(true);
-        } else if (this.shouldBePlaying && !this.isUserPaused) {
-          this.requestWakeLock();
-          if (this.isDirectAudio || this.isOfflinePlayback) {
-            const deck = this.currentDeck || this.deckA;
-            if (deck && deck.paused && deck.src && !deck.src.startsWith('data:')) {
-              deck.play().catch(() => {});
-            }
-          } else if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
-            try {
-              if (typeof this.ytPlayer.unMute === 'function') this.ytPlayer.unMute();
-              this.ytPlayer.playVideo();
-            } catch (e) {}
-          }
-          this.updateMediaSessionState('playing');
-          this.listeners.stateChange(true);
+        } else if (!isDeckActuallyPlaying) {
+          this.shouldBePlaying = false;
+          this.updateMediaSessionState('paused');
+          this.listeners.stateChange(false);
         }
       } else {
         // Entered background / screen locked:
@@ -214,6 +204,8 @@ class PlayerEngine {
             try {
               this.nextDeck.pause();
               this.nextDeck.currentTime = 0;
+              this.nextDeck.src = '';
+              this.nextDeck.removeAttribute('src');
             } catch (e) {}
           }
         }
@@ -371,10 +363,11 @@ class PlayerEngine {
             return;
           }
 
-          // Otherwise, paused by external interruption (incoming call, other media played throughout phone):
+          // Otherwise, paused by external interruption (incoming call, earbuds disconnected, or other media):
           // Stop music immediately and do NOT auto-resume in the background!
           this.wasInterruptedExternally = true;
           this.shouldBePlaying = false;
+          this.isUserPaused = true;
           this.stopBackgroundAudioAnchor();
           this.listeners.stateChange(false);
           this.updateMediaSessionState('paused');
@@ -724,7 +717,8 @@ class PlayerEngine {
       try {
         deck.pause();
         deck.currentTime = 0;
-        deck.volume = this.currentVolume ?? 0.8;
+        deck.src = '';
+        deck.removeAttribute('src');
       } catch (e) {}
       return;
     }
@@ -746,6 +740,8 @@ class PlayerEngine {
         try {
           deck.pause();
           deck.currentTime = 0;
+          deck.src = '';
+          deck.removeAttribute('src');
           deck.volume = this.currentVolume ?? 0.8;
         } catch (e) {}
       }
@@ -948,6 +944,8 @@ class PlayerEngine {
         try {
           outgoingDeck.pause();
           outgoingDeck.currentTime = 0;
+          outgoingDeck.src = '';
+          outgoingDeck.removeAttribute('src');
           outgoingDeck.volume = targetVolume;
         } catch (e) {}
 
@@ -1444,8 +1442,11 @@ class PlayerEngine {
     // Helper to start playback on active deck
     const applyDirectStream = (data) => {
       this.isDirectAudio = true;
-      if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
-        try { this.ytPlayer.pauseVideo(); } catch (e) {}
+      if (this.ytPlayer) {
+        try {
+          if (typeof this.ytPlayer.pauseVideo === 'function') this.ytPlayer.pauseVideo();
+          if (typeof this.ytPlayer.stopVideo === 'function') this.ytPlayer.stopVideo();
+        } catch (e) {}
       }
 
       const targetVol = this.currentVolume ?? 0.8;
@@ -1453,10 +1454,14 @@ class PlayerEngine {
 
       if (shouldReuse) {
         deckToUse = this.currentDeck || this.deckA;
-        if (this.nextDeck && this.nextDeck !== deckToUse) {
+        const otherDeck = (deckToUse === this.deckA) ? this.deckB : this.deckA;
+        if (otherDeck) {
+          this.clearDeckTimers(otherDeck);
           try {
-            this.nextDeck.pause();
-            this.nextDeck.currentTime = 0;
+            otherDeck.pause();
+            otherDeck.currentTime = 0;
+            otherDeck.src = '';
+            otherDeck.removeAttribute('src');
           } catch (e) {}
         }
       } else {
@@ -1464,14 +1469,13 @@ class PlayerEngine {
         const incomingDeck = (outgoing === this.deckA) ? this.deckB : this.deckA;
 
         if (outgoing && outgoing !== incomingDeck) {
-          if (!outgoing.paused && outgoing.currentTime > 0) {
-            this.fadeAndRetireDeck(outgoing, transitionDuration);
-          } else {
-            try {
-              outgoing.pause();
-              outgoing.currentTime = 0;
-            } catch (e) {}
-          }
+          this.clearDeckTimers(outgoing);
+          try {
+            outgoing.pause();
+            outgoing.currentTime = 0;
+            outgoing.src = '';
+            outgoing.removeAttribute('src');
+          } catch (e) {}
         }
         deckToUse = incomingDeck;
         this.nextDeck = outgoing;
@@ -1675,16 +1679,49 @@ class PlayerEngine {
     this.isUserPaused = false;
     this.wasInterruptedExternally = false;
     this.shouldBePlaying = true;
-    this.updateMediaSessionState('playing');
     this.requestWakeLock();
+
+    // Ensure the other deck is completely stopped and unloaded so 2 musics can NEVER play together
+    const otherDeck = (this.currentDeck === this.deckA) ? this.deckB : this.deckA;
+    if (otherDeck) {
+      this.clearDeckTimers(otherDeck);
+      try {
+        otherDeck.pause();
+        otherDeck.currentTime = 0;
+        otherDeck.src = '';
+        otherDeck.removeAttribute('src');
+      } catch (e) {}
+    }
 
     if (this.isDirectAudio || this.isOfflinePlayback || (this.audioEl && this.audioEl.src && !this.audioEl.src.startsWith('data:'))) {
       this.isDirectAudio = true;
       this.stopBackgroundAudioAnchor();
-      if (this.audioEl) {
+      if (this.ytPlayer) {
+        try {
+          if (typeof this.ytPlayer.pauseVideo === 'function') this.ytPlayer.pauseVideo();
+          if (typeof this.ytPlayer.stopVideo === 'function') this.ytPlayer.stopVideo();
+        } catch (e) {}
+      }
+
+      if (this.audioEl && this.audioEl.src && !this.audioEl.src.startsWith('data:')) {
         this.audioEl.muted = false;
         if (this.audioEl.volume === 0) this.audioEl.volume = this.currentVolume ?? 0.8;
-        this.audioEl.play().catch(() => {});
+        const playPromise = this.audioEl.play();
+        if (playPromise !== undefined && typeof playPromise.then === 'function') {
+          playPromise.then(() => {
+            this.updateMediaSessionState('playing');
+            this.listeners.stateChange(true);
+          }).catch((err) => {
+            console.warn('audioEl.play() rejected:', err);
+            this.shouldBePlaying = false;
+            this.isUserPaused = true;
+            this.updateMediaSessionState('paused');
+            this.listeners.stateChange(false);
+          });
+        }
+      } else if (this.currentTrack) {
+        // If current deck src was empty, reload current track cleanly
+        this.loadVideo(this.currentVideoId || this.currentTrack, true, this.currentTrack);
       }
     } else if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
       this.startBackgroundAudioAnchor();
@@ -1719,16 +1756,17 @@ class PlayerEngine {
       this.isCrossfading = false;
     }
 
-    if (this.isDirectAudio || this.isOfflinePlayback) {
-      if (this.deckA) {
-        try { this.deckA.pause(); } catch (e) {}
-      }
-      if (this.deckB) {
-        try { this.deckB.pause(); } catch (e) {}
-      }
-    } else if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
+    // Unconditionally pause ALL potential audio sources
+    if (this.deckA) {
+      try { this.deckA.pause(); } catch (e) {}
+    }
+    if (this.deckB) {
+      try { this.deckB.pause(); } catch (e) {}
+    }
+    if (this.ytPlayer) {
       try {
-        this.ytPlayer.pauseVideo();
+        if (typeof this.ytPlayer.pauseVideo === 'function') this.ytPlayer.pauseVideo();
+        if (typeof this.ytPlayer.stopVideo === 'function') this.ytPlayer.stopVideo();
       } catch (e) {}
       const iframe = document.getElementById('yt-audio-container')?.querySelector('iframe');
       if (iframe && iframe.contentWindow) {
@@ -1737,6 +1775,7 @@ class PlayerEngine {
         } catch (e) {}
       }
     }
+    this.listeners.stateChange(false);
   }
 
   seekTo(seconds) {
