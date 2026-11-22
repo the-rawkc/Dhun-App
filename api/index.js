@@ -1717,14 +1717,18 @@ async function handleAudioStream(searchParams) {
       return json({ success: false, error: "Decryption failed" }, 500);
     }
 
-    // Upgrade to 320kbps high fidelity audio with 160kbps fallback
+    // 160kbps AAC is universal across the entire CDN, buffers instantly, and never drops or 403s
+    const requestedBitrate = searchParams.get("bitrate");
+    const streamUrl160 = streamUrl.replace("_320.mp4", "_160.mp4").replace("_96.mp4", "_160.mp4");
     const streamUrl320 = streamUrl.replace("_96.mp4", "_320.mp4");
-    const fallbackUrl160 = streamUrl.replace("_320.mp4", "_160.mp4").replace("_96.mp4", "_160.mp4");
+
+    const primaryStream = (requestedBitrate === '320') ? streamUrl320 : streamUrl160;
+    const secondaryStream = (requestedBitrate === '320') ? streamUrl160 : streamUrl320;
 
     return json({
       success: true,
-      streamUrl: streamUrl320,
-      fallbackUrl: fallbackUrl160,
+      streamUrl: primaryStream,
+      fallbackUrl: secondaryStream,
       title: item.song || item.title,
       artist: item.primary_artists || item.singers || artist,
       duration: parseInt(item.duration, 10) || 0,

@@ -26,6 +26,7 @@ class PlayerEngine {
     this.shouldBePlaying = false;
     this.isUserPaused = false;
     this.wasInterruptedExternally = false;
+    this.isBuffering = false;
     this.activeAbortController = null;
     this.currentVolume = 0.8;
     this.streamCache = new Map();
@@ -310,6 +311,7 @@ class PlayerEngine {
         if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
           this.shouldBePlaying = true;
           this.isUserPaused = false;
+          this.isBuffering = false;
           this.isSwitchingTrack = false;
           this.isLoadingTrack = false;
           this.stopBackgroundAudioAnchor();
@@ -323,6 +325,7 @@ class PlayerEngine {
         if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
           this.shouldBePlaying = true;
           this.isUserPaused = false;
+          this.isBuffering = false;
           this.isSwitchingTrack = false;
           this.isLoadingTrack = false;
           this.stopBackgroundAudioAnchor();
@@ -333,7 +336,18 @@ class PlayerEngine {
       });
 
       deck.addEventListener('waiting', () => {
-        // Buffering
+        if (deck === this.currentDeck) {
+          this.isBuffering = true;
+        }
+      });
+
+      deck.addEventListener('canplay', () => {
+        if (deck === this.currentDeck) {
+          this.isBuffering = false;
+          if (this.shouldBePlaying && !this.isUserPaused && deck.paused) {
+            deck.play().catch(() => {});
+          }
+        }
       });
 
       deck.addEventListener('stalled', () => {
@@ -343,7 +357,7 @@ class PlayerEngine {
               if (this.shouldBePlaying && !this.isUserPaused && deck === this.currentDeck && (deck.paused || deck.readyState < 3)) {
                 deck.play().catch(() => {});
               }
-            }, 1200);
+            }, 800);
           }
         }
       });
@@ -352,6 +366,11 @@ class PlayerEngine {
         if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
           // If track ended naturally, or if engine is intentionally switching tracks / loading / crossfading:
           if (deck.ended || this.isSwitchingTrack || this.isLoadingTrack || this.isCrossfading) {
+            return;
+          }
+
+          // If paused due to network buffering underrun or waiting for data, do NOT treat as external call/stop:
+          if (this.isBuffering || deck.readyState < 3) {
             return;
           }
 
@@ -962,6 +981,12 @@ class PlayerEngine {
         // Active decks were already swapped at crossfade start, so just finish crossfade state
         this.isCrossfading = false;
         this.isSwitchingTrack = false;
+        this.isLoadingTrack = false;
+
+        // If incomingDeck paused due to network glitch during crossfade, nudge play
+        if (this.shouldBePlaying && !this.isUserPaused && incomingDeck.paused) {
+          incomingDeck.play().catch(() => {});
+        }
 
         // Compute and prefetch next upcoming track in queue for future seamless transitions
         this.nextUpcomingIndex = this.computeNextUpcomingIndex();
@@ -1886,6 +1911,16 @@ class PlayerEngine {
       const deck = this.currentDeck || this.deckA;
       if (this.isDirectAudio || this.isOfflinePlayback) {
         if (!deck) return;
+
+        // Auto-recover if deck was paused unexpectedly (e.g. browser buffer underrun) while engine state is playing
+        if (deck.paused && !deck.ended && deck.src && !deck.src.startsWith('data:')) {
+          stuckCount++;
+          if (stuckCount >= 2) {
+            stuckCount = 0;
+            deck.play().catch(() => {});
+          }
+          return;
+        }
 
         // Buffer underrun watchdog: check if audio position is frozen in place for ~3-4s while playing
         const cur = deck.currentTime;
