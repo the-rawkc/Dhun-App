@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   playSong,
@@ -25,15 +25,22 @@ import { getOfflineTracks } from '../services/offlineStorage';
 
 const Library = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const { favorites, playlists, favoriteArtists, activeSong } = useSelector((state) => state.player);
 
-  const [activeTab, setActiveTab] = useState('playlists'); // 'playlists' | 'downloads' | 'liked' | 'artists'
+  const [activeTab, setActiveTab] = useState(location?.state?.tab || 'playlists'); // 'playlists' | 'downloads' | 'liked' | 'artists'
   const [offlineSongs, setOfflineSongs] = useState([]);
   const [loadingOffline, setLoadingOffline] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [playlistTitle, setPlaylistTitle] = useState('');
   const [includeActiveSong, setIncludeActiveSong] = useState(true);
+
+  useEffect(() => {
+    if (location?.state?.tab) {
+      setActiveTab(location.state.tab);
+    }
+  }, [location?.state?.tab]);
 
   useEffect(() => {
     // Refresh library from cloud database on opening Library page

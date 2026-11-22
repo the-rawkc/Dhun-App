@@ -43,7 +43,7 @@ import SyncedLyrics from '../SyncedLyrics';
 import QueueDrawer from '../QueueDrawer';
 import MobilePlayerModal from './MobilePlayerModal';
 import { saveTrackOffline, getOfflineTrack, isTrackDownloadedSync } from '../../services/offlineStorage';
-import { isValidVideoId } from '../../utils/normalizeSong';
+import { isValidVideoId, isSameSong } from '../../utils/normalizeSong';
 
 const formatTime = (secs) => {
   if (isNaN(secs) || secs < 0) return '0:00';
@@ -111,8 +111,12 @@ const MusicPlayer = () => {
       const syncedKey = lastSynced
         ? ((lastSynced.videoId && isValidVideoId(lastSynced.videoId)) ? lastSynced.videoId : (lastSynced.title || ''))
         : null;
+      const isAlreadyHandledByEngine = lastSynced && (
+        isSameSong(activeSong, lastSynced) ||
+        (key && syncedKey && key === syncedKey)
+      );
 
-      if (key && syncedKey && key === syncedKey) {
+      if (isAlreadyHandledByEngine) {
         // Track was already transitioned and loaded by playerEngine
         lastSyncedTrackRef.current = null;
       } else {

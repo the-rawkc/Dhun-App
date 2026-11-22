@@ -25,6 +25,7 @@ class PlayerEngine {
     this.wakeLock = null;
     this.shouldBePlaying = false;
     this.isUserPaused = false;
+    this.wasInterruptedExternally = false;
     this.activeAbortController = null;
     this.currentVolume = 0.8;
     this.streamCache = new Map();
@@ -58,6 +59,10 @@ class PlayerEngine {
     this.queueIndex = 0;
     this.isShuffle = false;
     this.repeatMode = 'off';
+    this.nextUpcomingIndex = null;
+    this.shuffleOrder = [];
+    this.shufflePos = 0;
+    this.isLoadingTrack = false;
 
     try {
       const saved = localStorage.getItem('tunetide_volume');
@@ -136,29 +141,22 @@ class PlayerEngine {
     }
   }
 
-  startBackgroundAudioAnchor(force = false) {
-    if (typeof window === 'undefined') return;
+  startBackgroundAudioAnchor() {
+    if (!this.bgAnchorEl) return;
     try {
-      if (!this.bgAnchorEl) {
-        this.bgAnchorEl = new Audio();
-        // 1-second silent WAV base64
-        this.bgAnchorEl.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-        this.bgAnchorEl.loop = true;
-        this.bgAnchorEl.volume = 0.01;
-        this.bgAnchorEl.setAttribute('playsinline', 'true');
-      }
-      const p = this.bgAnchorEl.play();
-      if (p && typeof p.catch === 'function') {
-        p.catch(() => {});
+      this.bgAnchorEl.muted = false;
+      this.bgAnchorEl.volume = 0.001;
+      if (this.bgAnchorEl.paused) {
+        const p = this.bgAnchorEl.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
       }
     } catch (e) {}
   }
 
   stopBackgroundAudioAnchor() {
-    // Keep background audio anchor alive while audio should be playing to prevent mobile OS process suspension
-    if (!this.isUserPaused && this.shouldBePlaying) return;
+    if (!this.bgAnchorEl) return;
     try {
-      if (this.bgAnchorEl && !this.bgAnchorEl.paused) {
+      if (!this.bgAnchorEl.paused) {
         this.bgAnchorEl.pause();
       }
     } catch (e) {}
@@ -168,8 +166,26 @@ class PlayerEngine {
     if (typeof document === 'undefined') return;
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
-        // Returned to tab / PWA foreground
-        if (this.shouldBePlaying && !this.isUserPaused) {
+        // Returned to Dhun app foreground (user opened/returned to app)
+        if (this.wasInterruptedExternally) {
+          this.wasInterruptedExternally = false;
+          this.shouldBePlaying = true;
+          this.isUserPaused = false;
+          this.requestWakeLock();
+          if (this.isDirectAudio || this.isOfflinePlayback) {
+            const deck = this.currentDeck || this.deckA;
+            if (deck && deck.paused && deck.src && !deck.src.startsWith('data:')) {
+              deck.play().catch(() => {});
+            }
+          } else if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
+            try {
+              if (typeof this.ytPlayer.unMute === 'function') this.ytPlayer.unMute();
+              this.ytPlayer.playVideo();
+            } catch (e) {}
+          }
+          this.updateMediaSessionState('playing');
+          this.listeners.stateChange(true);
+        } else if (this.shouldBePlaying && !this.isUserPaused) {
           this.requestWakeLock();
           if (this.isDirectAudio || this.isOfflinePlayback) {
             const deck = this.currentDeck || this.deckA;
@@ -186,9 +202,20 @@ class PlayerEngine {
           this.listeners.stateChange(true);
         }
       } else {
-        // Entered background / screen locked: ensure background anchor is active to retain OS audio focus
-        if (this.shouldBePlaying && !this.isUserPaused) {
-          this.startBackgroundAudioAnchor();
+        // Entered background / screen locked:
+        // If mid-crossfade, immediately finish crossfade to prevent volume stall
+        if (this.isCrossfading && this.crossfadeTimer) {
+          clearInterval(this.crossfadeTimer);
+          this.crossfadeTimer = null;
+          this.isCrossfading = false;
+          this.isSwitchingTrack = false;
+          if (this.currentDeck) this.currentDeck.volume = this.currentVolume ?? 0.8;
+          if (this.nextDeck) {
+            try {
+              this.nextDeck.pause();
+              this.nextDeck.currentTime = 0;
+            } catch (e) {}
+          }
         }
       }
     });
@@ -243,9 +270,17 @@ class PlayerEngine {
           this.listeners.timeUpdate(cur);
           this.updateMediaSessionPosition(cur);
 
-          // Smart Automix trigger: starts next track gently during the outro
           const dur = deck.duration;
+          const isHidden = typeof document !== 'undefined' && document.hidden;
+
+          // Background / lock-screen safety: prefetch upcoming track early if not already cached
+          if (dur && isFinite(dur) && dur > 20 && (dur - cur) <= 35 && (dur - cur) > 2) {
+            this.ensureUpcomingTrackPrefetched();
+          }
+
+          // Smart Automix trigger: starts next track gently during the outro (only in foreground)
           if (
+            !isHidden &&
             this.crossfadeSeconds > 0 &&
             !this.isCrossfading &&
             this.crossfadeAttemptedIndex !== this.queueIndex &&
@@ -283,6 +318,9 @@ class PlayerEngine {
         if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
           this.shouldBePlaying = true;
           this.isUserPaused = false;
+          this.isSwitchingTrack = false;
+          this.isLoadingTrack = false;
+          this.stopBackgroundAudioAnchor();
           this.listeners.stateChange(true);
           this.updateMediaSessionState('playing');
           this.requestWakeLock();
@@ -293,6 +331,9 @@ class PlayerEngine {
         if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
           this.shouldBePlaying = true;
           this.isUserPaused = false;
+          this.isSwitchingTrack = false;
+          this.isLoadingTrack = false;
+          this.stopBackgroundAudioAnchor();
           this.listeners.stateChange(true);
           this.updateMediaSessionState('playing');
           this.requestWakeLock();
@@ -300,17 +341,12 @@ class PlayerEngine {
       });
 
       deck.addEventListener('waiting', () => {
-        if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
-          if (this.shouldBePlaying && !this.isUserPaused) {
-            this.startBackgroundAudioAnchor();
-          }
-        }
+        // Buffering
       });
 
       deck.addEventListener('stalled', () => {
         if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
           if (this.shouldBePlaying && !this.isUserPaused) {
-            this.startBackgroundAudioAnchor();
             setTimeout(() => {
               if (this.shouldBePlaying && !this.isUserPaused && deck === this.currentDeck && (deck.paused || deck.readyState < 3)) {
                 deck.play().catch(() => {});
@@ -322,6 +358,11 @@ class PlayerEngine {
 
       deck.addEventListener('pause', () => {
         if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
+          // If track ended naturally, or if engine is intentionally switching tracks / loading / crossfading:
+          if (deck.ended || this.isSwitchingTrack || this.isLoadingTrack || this.isCrossfading) {
+            return;
+          }
+
           if (this.isUserPaused) {
             this.listeners.stateChange(false);
             this.updateMediaSessionState('paused');
@@ -330,23 +371,14 @@ class PlayerEngine {
             return;
           }
 
-          // If track ended naturally, or if engine is intentionally switching tracks / crossfading:
-          if (deck.ended || this.isSwitchingTrack || this.isCrossfading) {
-            return;
-          }
-
-          // If paused unexpectedly by OS, Chrome, screen lock or audio focus interruption:
-          if (this.shouldBePlaying) {
-            this.startBackgroundAudioAnchor();
-            this.updateMediaSessionState('playing');
-
-            try {
-              const p = deck.play();
-              if (p && typeof p.catch === 'function') {
-                p.catch(() => {});
-              }
-            } catch (e) {}
-          }
+          // Otherwise, paused by external interruption (incoming call, other media played throughout phone):
+          // Stop music immediately and do NOT auto-resume in the background!
+          this.wasInterruptedExternally = true;
+          this.shouldBePlaying = false;
+          this.stopBackgroundAudioAnchor();
+          this.listeners.stateChange(false);
+          this.updateMediaSessionState('paused');
+          this.releaseWakeLock();
         }
       });
 
@@ -357,7 +389,7 @@ class PlayerEngine {
             return;
           }
           this.isCrossfading = false;
-          this.startBackgroundAudioAnchor(true);
+          this.startBackgroundAudioAnchor();
           this.playNextTrack(false);
         }
       });
@@ -369,6 +401,8 @@ class PlayerEngine {
         console.warn('Direct native audio stream error, attempting recovery:', err);
 
         const curTime = deck.currentTime || 0;
+        const isHidden = typeof document !== 'undefined' && document.hidden;
+
         // 1. If 320kbps was playing and failed, retry with 160kbps fallback
         if (deck.src.includes('_320.mp4')) {
           console.log('Switching to 160kbps fallback stream...');
@@ -379,7 +413,7 @@ class PlayerEngine {
             this.shouldBePlaying = true;
             this.isUserPaused = false;
           }).catch(() => {
-            if (this.currentVideoId && !this.isOfflinePlayback) {
+            if (this.currentVideoId && !this.isOfflinePlayback && !isHidden) {
               this.fallbackToYouTube(this.currentVideoId, this.shouldBePlaying, this.currentTrack);
             } else {
               this.playNextTrack(false);
@@ -388,8 +422,8 @@ class PlayerEngine {
           return;
         }
 
-        // 2. If already on 160kbps or other direct stream, try YouTube fallback
-        if (this.currentVideoId && !this.isOfflinePlayback) {
+        // 2. If already on 160kbps or other direct stream, try YouTube fallback if foreground
+        if (this.currentVideoId && !this.isOfflinePlayback && !isHidden) {
           this.fallbackToYouTube(this.currentVideoId, this.shouldBePlaying, this.currentTrack);
         } else {
           setTimeout(() => {
@@ -493,44 +527,16 @@ class PlayerEngine {
                   this.stopTimeTracking();
                   this.listeners.stateChange(false);
                   this.releaseWakeLock();
-                  this.stopBackgroundAudioAnchor();
                   this.updateMediaSessionState('paused');
                   return;
                 }
 
-                // If paused by OS or Chrome during screen-lock / tab switch:
-                if (this.shouldBePlaying) {
-                  // Keep audio anchor alive to hold background audio focus
-                  this.startBackgroundAudioAnchor();
-                  this.updateMediaSessionState('playing');
-
-                  // Attempt immediate resume
-                  try {
-                    if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
-                      this.ytPlayer.playVideo();
-                    }
-                  } catch (e) {}
-                  const iframe = document.getElementById('yt-audio-container')?.querySelector('iframe');
-                  if (iframe && iframe.contentWindow) {
-                    try {
-                      iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-                    } catch (e) {}
-                  }
-
-                  // Schedule a backup resume after 150ms
-                  setTimeout(() => {
-                    if (this.shouldBePlaying && !this.isUserPaused && this.ytPlayer && typeof this.ytPlayer.getPlayerState === 'function') {
-                      if (this.ytPlayer.getPlayerState() !== 1) {
-                        try { this.ytPlayer.playVideo(); } catch (e) {}
-                      }
-                    }
-                  }, 150);
-                  return;
-                }
+                // Paused externally by OS (incoming call, other media played throughout phone):
+                this.wasInterruptedExternally = true;
+                this.shouldBePlaying = false;
                 this.stopTimeTracking();
                 this.listeners.stateChange(false);
                 this.releaseWakeLock();
-                this.stopBackgroundAudioAnchor();
                 this.updateMediaSessionState('paused');
               } else if (event.data === 0) { // Ended
                 this.shouldBePlaying = false;
@@ -593,38 +599,109 @@ class PlayerEngine {
     if (onTrackChanged) this.listeners.onTrackChanged = onTrackChanged;
   }
 
+  buildShuffleOrder(queueLength, currentIndex) {
+    if (queueLength <= 0) return [];
+    if (queueLength === 1) return [0];
+
+    const pool = [];
+    for (let i = 0; i < queueLength; i++) {
+      if (i !== currentIndex) pool.push(i);
+    }
+    // Fisher-Yates deterministic shuffle
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return [currentIndex, ...pool];
+  }
+
   setQueue(songs = [], currentIndex = 0, shuffle = false, repeatMode = 'off') {
     const nextIdx = typeof currentIndex === 'number' ? currentIndex : 0;
     if (this.queueIndex !== nextIdx) {
       this.crossfadeAttemptedIndex = -1;
     }
-    this.queue = Array.isArray(songs) ? songs : [];
+    const newQueue = Array.isArray(songs) ? songs : [];
+    const prevQueueLength = this.queue ? this.queue.length : 0;
+    const prevShuffle = this.isShuffle;
+
+    this.queue = newQueue;
     this.queueIndex = nextIdx;
     this.isShuffle = !!shuffle;
     this.repeatMode = repeatMode || 'off';
+
+    // Build or preserve stable shuffle order
+    if (this.isShuffle && newQueue.length > 0) {
+      const queueChanged = newQueue.length !== prevQueueLength || !prevShuffle;
+      if (queueChanged || !Array.isArray(this.shuffleOrder) || this.shuffleOrder.length !== newQueue.length) {
+        this.shuffleOrder = this.buildShuffleOrder(newQueue.length, nextIdx);
+        this.shufflePos = 0;
+      } else {
+        const foundPos = this.shuffleOrder.indexOf(nextIdx);
+        if (foundPos >= 0) {
+          this.shufflePos = foundPos;
+        } else {
+          this.shuffleOrder = this.buildShuffleOrder(newQueue.length, nextIdx);
+          this.shufflePos = 0;
+        }
+      }
+    } else {
+      this.shuffleOrder = [];
+      this.shufflePos = 0;
+    }
+
+    this.nextUpcomingIndex = this.computeNextUpcomingIndex();
 
     // Pre-fetch next track in background so lock screen handoff is 0ms
     this.prefetchNextInQueue();
   }
 
+  computeNextUpcomingIndex() {
+    if (!this.queue || this.queue.length === 0) return -1;
+    if (this.queue.length === 1) return this.repeatMode === 'one' ? this.queueIndex : 0;
+    if (this.repeatMode === 'one') return this.queueIndex;
+
+    if (this.isShuffle) {
+      if (Array.isArray(this.shuffleOrder) && this.shuffleOrder.length > 0) {
+        const nextPos = (this.shufflePos + 1) % this.shuffleOrder.length;
+        return this.shuffleOrder[nextPos];
+      }
+      return 0;
+    } else {
+      let nextIdx = this.queueIndex + 1;
+      if (nextIdx >= this.queue.length) {
+        nextIdx = 0;
+      }
+      return nextIdx;
+    }
+  }
+
   prefetchNextInQueue() {
     if (!this.queue || this.queue.length <= 1) return;
-    let nextIdx = this.queueIndex + 1;
-    if (this.isShuffle) {
-      if (this.queue.length > 1) {
-        let randomIdx = this.queueIndex;
-        let attempts = 0;
-        while (randomIdx === this.queueIndex && attempts < 20) {
-          randomIdx = Math.floor(Math.random() * this.queue.length);
-          attempts++;
-        }
-        nextIdx = randomIdx;
-      }
-    } else if (nextIdx >= this.queue.length) {
-      nextIdx = 0;
+    if (this.nextUpcomingIndex === null || this.nextUpcomingIndex < 0 || this.nextUpcomingIndex >= this.queue.length) {
+      this.nextUpcomingIndex = this.computeNextUpcomingIndex();
     }
-    const upcomingTrack = this.queue[nextIdx];
+    const upcomingTrack = this.queue[this.nextUpcomingIndex];
     if (upcomingTrack) {
+      this.prefetchTrack(upcomingTrack);
+    }
+  }
+
+  ensureUpcomingTrackPrefetched() {
+    if (!this.queue || this.queue.length <= 1) return;
+    if (this.nextUpcomingIndex === null || this.nextUpcomingIndex < 0 || this.nextUpcomingIndex >= this.queue.length) {
+      this.nextUpcomingIndex = this.computeNextUpcomingIndex();
+    }
+    const upcomingTrack = this.queue[this.nextUpcomingIndex];
+    if (!upcomingTrack) return;
+
+    const cleanVideoId = typeof upcomingTrack === 'object' ? (upcomingTrack?.videoId || upcomingTrack?.id) : String(upcomingTrack || '').trim();
+    const title = upcomingTrack?.title || upcomingTrack?.name || '';
+    const artist = upcomingTrack?.artist || upcomingTrack?.artists || upcomingTrack?.subtitle || '';
+    const cacheKey = (cleanVideoId && cleanVideoId.length > 5 && !cleanVideoId.startsWith('tr_'))
+      ? cleanVideoId
+      : (title ? `${title}::${artist}`.toLowerCase().trim() : cleanVideoId);
+
+    if (cacheKey && !this.streamCache.has(cacheKey)) {
       this.prefetchTrack(upcomingTrack);
     }
   }
@@ -734,28 +811,20 @@ class PlayerEngine {
   // Seamless smart crossfade / automix
   async startSmartCrossfade(remainingSec = 4) {
     if (this.isCrossfading || !this.queue || this.queue.length <= 1) return;
+    const isHidden = typeof document !== 'undefined' && document.hidden;
+    if (isHidden) {
+      // In background / lockscreen, avoid multi-deck volume crossfade because OS throttles
+      // background JS timers. Track will transition seamlessly on active deck on ended.
+      return;
+    }
+
     const startQueueIndex = this.queueIndex;
     this.crossfadeAttemptedIndex = this.queueIndex;
     this.isCrossfading = true;
 
-    let nextIndex = this.queueIndex + 1;
-    if (this.repeatMode === 'one') {
-      nextIndex = this.queueIndex;
-    } else if (this.isShuffle) {
-      if (this.queue.length > 1) {
-        let randomIdx = this.queueIndex;
-        let attempts = 0;
-        while (randomIdx === this.queueIndex && attempts < 20) {
-          randomIdx = Math.floor(Math.random() * this.queue.length);
-          attempts++;
-        }
-        nextIndex = randomIdx;
-      } else {
-        nextIndex = 0;
-      }
-    } else if (nextIndex >= this.queue.length) {
-      nextIndex = 0;
-    }
+    const nextIndex = (this.nextUpcomingIndex !== null && this.nextUpcomingIndex >= 0 && this.nextUpcomingIndex < this.queue.length)
+      ? this.nextUpcomingIndex
+      : this.computeNextUpcomingIndex();
 
     const nextTrack = this.queue[nextIndex];
     if (!nextTrack) {
@@ -815,7 +884,7 @@ class PlayerEngine {
     try {
       await incomingDeck.play();
     } catch (err) {
-      console.warn('Smart crossfade incoming deck play failed:', err);
+      console.warn('Smart crossfade incoming deck play failed, falling back to seamless handoff:', err);
       this.isCrossfading = false;
       this.isSwitchingTrack = false;
       return;
@@ -858,8 +927,9 @@ class PlayerEngine {
     }
 
     this.crossfadeTimer = setInterval(() => {
+      const isNowHidden = typeof document !== 'undefined' && document.hidden;
       const elapsed = performance.now() - startTime;
-      const progress = Math.min(1, elapsed / durationMs);
+      const progress = isNowHidden ? 1 : Math.min(1, elapsed / durationMs);
 
       // Equal-power crossfade curve: cos(t * π/2) and sin(t * π/2)
       // Maintains constant RMS acoustic energy throughout transition with zero drop
@@ -871,7 +941,7 @@ class PlayerEngine {
         incomingDeck.volume = Math.max(0, Math.min(1, inVol));
       } catch (e) {}
 
-      if (progress >= 1) {
+      if (progress >= 1 || isNowHidden) {
         clearInterval(this.crossfadeTimer);
         this.crossfadeTimer = null;
 
@@ -887,7 +957,8 @@ class PlayerEngine {
         this.isCrossfading = false;
         this.isSwitchingTrack = false;
 
-        // Prefetch next track in queue for future seamless transitions
+        // Compute and prefetch next upcoming track in queue for future seamless transitions
+        this.nextUpcomingIndex = this.computeNextUpcomingIndex();
         this.prefetchNextInQueue();
       }
     }, 40);
@@ -907,25 +978,21 @@ class PlayerEngine {
 
     this.crossfadeAttemptedIndex = -1;
     this.isSwitchingTrack = true;
+    this.isLoadingTrack = true;
+    this.startBackgroundAudioAnchor();
     this.pushPlaybackHistory(this.queueIndex);
 
-    let nextIndex = this.queueIndex + 1;
-    if (this.isShuffle) {
-      if (this.queue.length > 1) {
-        let randomIdx = this.queueIndex;
-        let attempts = 0;
-        while (randomIdx === this.queueIndex && attempts < 20) {
-          randomIdx = Math.floor(Math.random() * this.queue.length);
-          attempts++;
-        }
-        nextIndex = randomIdx;
-      } else {
-        nextIndex = 0;
-      }
-    } else if (nextIndex >= this.queue.length) {
-      nextIndex = 0;
+    let nextIndex;
+    if (this.isShuffle && Array.isArray(this.shuffleOrder) && this.shuffleOrder.length > 0) {
+      this.shufflePos = (this.shufflePos + 1) % this.shuffleOrder.length;
+      nextIndex = this.shuffleOrder[this.shufflePos];
+    } else {
+      nextIndex = (this.nextUpcomingIndex !== null && this.nextUpcomingIndex >= 0 && this.nextUpcomingIndex < this.queue.length)
+        ? this.nextUpcomingIndex
+        : this.computeNextUpcomingIndex();
     }
 
+    this.nextUpcomingIndex = null;
     this.queueIndex = nextIndex;
     const nextTrack = this.queue[nextIndex];
     if (nextTrack) {
@@ -934,13 +1001,23 @@ class PlayerEngine {
       this.updateMediaMetadata(nextTrack);
       this.updateMediaSessionState('playing');
 
-      this.smoothSwitchDeck(() => {
-        this.loadVideo(vId || nextTrack, true, nextTrack);
+      const isHidden = typeof document !== 'undefined' && document.hidden;
+      if (isHidden || fromLockScreen) {
+        // Direct seamless handoff on active deck - maintain continuous audio focus on lockscreen
+        this.loadVideo(vId || nextTrack, true, nextTrack, true);
         if (typeof this.listeners.onTrackChanged === 'function') {
           this.listeners.onTrackChanged(nextTrack, nextIndex);
         }
-      });
+      } else {
+        this.smoothSwitchDeck(() => {
+          this.loadVideo(vId || nextTrack, true, nextTrack, false);
+          if (typeof this.listeners.onTrackChanged === 'function') {
+            this.listeners.onTrackChanged(nextTrack, nextIndex);
+          }
+        });
+      }
 
+      this.nextUpcomingIndex = this.computeNextUpcomingIndex();
       this.prefetchNextInQueue();
     }
   }
@@ -984,23 +1061,30 @@ class PlayerEngine {
     this.lastPrevClickTime = 0;
     this.crossfadeAttemptedIndex = -1;
     this.isSwitchingTrack = true;
+    this.isLoadingTrack = true;
+    this.startBackgroundAudioAnchor();
 
     let prevIndex = -1;
-    // Pop from actual playback history first
-    while (this.playbackHistory.length > 0) {
-      const cand = this.playbackHistory.pop();
-      if (cand !== this.queueIndex && cand >= 0 && cand < this.queue.length) {
-        prevIndex = cand;
-        break;
+    if (this.isShuffle && Array.isArray(this.shuffleOrder) && this.shuffleOrder.length > 0) {
+      this.shufflePos = (this.shufflePos - 1 + this.shuffleOrder.length) % this.shuffleOrder.length;
+      prevIndex = this.shuffleOrder[this.shufflePos];
+    } else {
+      // Pop from actual playback history first
+      while (this.playbackHistory.length > 0) {
+        const cand = this.playbackHistory.pop();
+        if (cand !== this.queueIndex && cand >= 0 && cand < this.queue.length) {
+          prevIndex = cand;
+          break;
+        }
       }
-    }
 
-    // If no history, navigate linearly backwards
-    if (prevIndex < 0) {
-      if (this.queueIndex > 0) {
-        prevIndex = this.queueIndex - 1;
-      } else {
-        prevIndex = this.queue.length - 1;
+      // If no history, navigate linearly backwards
+      if (prevIndex < 0) {
+        if (this.queueIndex > 0) {
+          prevIndex = this.queueIndex - 1;
+        } else {
+          prevIndex = this.queue.length - 1;
+        }
       }
     }
 
@@ -1012,13 +1096,22 @@ class PlayerEngine {
       this.updateMediaMetadata(prevTrack);
       this.updateMediaSessionState('playing');
 
-      this.smoothSwitchDeck(() => {
-        this.loadVideo(vId || prevTrack, true, prevTrack);
+      const isHidden = typeof document !== 'undefined' && document.hidden;
+      if (isHidden) {
+        this.loadVideo(vId || prevTrack, true, prevTrack, true);
         if (typeof this.listeners.onTrackChanged === 'function') {
           this.listeners.onTrackChanged(prevTrack, prevIndex);
         }
-      });
+      } else {
+        this.smoothSwitchDeck(() => {
+          this.loadVideo(vId || prevTrack, true, prevTrack, false);
+          if (typeof this.listeners.onTrackChanged === 'function') {
+            this.listeners.onTrackChanged(prevTrack, prevIndex);
+          }
+        });
+      }
 
+      this.nextUpcomingIndex = this.computeNextUpcomingIndex();
       this.prefetchNextInQueue();
     }
   }
@@ -1143,7 +1236,17 @@ class PlayerEngine {
 
       primeDeck(this.deckA);
       primeDeck(this.deckB);
-      primeDeck(this.bgAnchorEl);
+      if (this.bgAnchorEl) {
+        this.bgAnchorEl.src = silentSrc;
+        this.bgAnchorEl.volume = 0.001;
+        this.bgAnchorEl.muted = false;
+        const ap = this.bgAnchorEl.play();
+        if (ap && typeof ap.then === 'function') {
+          ap.then(() => {
+            this.bgAnchorEl.pause();
+          }).catch(() => {});
+        }
+      }
     } catch (e) {}
   }
 
@@ -1176,7 +1279,7 @@ class PlayerEngine {
     } catch (e) {}
   }
 
-  async loadVideo(videoId, autoPlay = true, trackMeta = null) {
+  async loadVideo(videoId, autoPlay = true, trackMeta = null, forceReuseCurrentDeck = false) {
     if (!videoId && !trackMeta) return;
 
     let cleanVideoId = typeof videoId === 'object' ? (videoId?.videoId || videoId?.id) : String(videoId || '').trim();
@@ -1238,18 +1341,25 @@ class PlayerEngine {
       this.crossfadeTimer = null;
     }
     this.isCrossfading = false;
+    this.isSwitchingTrack = true;
+    this.isLoadingTrack = true;
 
     const transitionDuration = this.crossfadeSeconds === 0 ? 200 : (this.crossfadeSeconds >= 6 ? 500 : 350);
-    const outgoingDeck = this.currentDeck || this.deckA;
+    const isHidden = typeof document !== 'undefined' && document.hidden;
+    const shouldReuse = forceReuseCurrentDeck || isHidden;
 
-    // Smoothly fade-out previous audio so it never abruptly pops or cuts off
-    if (outgoingDeck && !outgoingDeck.paused && outgoingDeck.currentTime > 0) {
-      this.fadeAndRetireDeck(outgoingDeck, transitionDuration);
-    } else if (outgoingDeck) {
-      try {
-        outgoingDeck.pause();
-        outgoingDeck.currentTime = 0;
-      } catch (e) {}
+    // Only in foreground dual-deck mode do we fade-out outgoing deck
+    // In background/lockscreen, we reuse currentDeck without stopping it beforehand to prevent OS suspension
+    if (!shouldReuse) {
+      const outgoingDeck = this.currentDeck || this.deckA;
+      if (outgoingDeck && !outgoingDeck.paused && outgoingDeck.currentTime > 0) {
+        this.fadeAndRetireDeck(outgoingDeck, transitionDuration);
+      } else if (outgoingDeck) {
+        try {
+          outgoingDeck.pause();
+          outgoingDeck.currentTime = 0;
+        } catch (e) {}
+      }
     }
 
     if (this.ytPlayer && typeof this.ytPlayer.getPlayerState === 'function' && this.ytPlayer.getPlayerState() === 1) {
@@ -1271,7 +1381,6 @@ class PlayerEngine {
     if (autoPlay) {
       this.shouldBePlaying = true;
       this.isUserPaused = false;
-      this.startBackgroundAudioAnchor(true);
       this.listeners.stateChange(true);
       this.updateMediaSessionState('playing');
       this.requestWakeLock();
@@ -1284,28 +1393,43 @@ class PlayerEngine {
         if (offlineRecord?.audioBlob && offlineRecord.audioBlob.size > 100) {
           this.isOfflinePlayback = true;
           this.isDirectAudio = true;
-          this.stopBackgroundAudioAnchor();
           if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
             try { this.ytPlayer.pauseVideo(); } catch (e) {}
           }
-          const outgoing = this.currentDeck || this.deckA;
-          const incomingDeck = (outgoing === this.deckA) ? this.deckB : this.deckA;
+          const targetVol = this.currentVolume ?? 0.8;
+          let deckToUse;
 
-          if (outgoing && outgoing !== incomingDeck) {
-            this.fadeAndRetireDeck(outgoing, transitionDuration);
+          if (shouldReuse) {
+            deckToUse = this.currentDeck || this.deckA;
+            if (this.nextDeck && this.nextDeck !== deckToUse) {
+              try {
+                this.nextDeck.pause();
+                this.nextDeck.currentTime = 0;
+              } catch (e) {}
+            }
+          } else {
+            const outgoing = this.currentDeck || this.deckA;
+            const incomingDeck = (outgoing === this.deckA) ? this.deckB : this.deckA;
+            if (outgoing && outgoing !== incomingDeck) {
+              this.fadeAndRetireDeck(outgoing, transitionDuration);
+            }
+            deckToUse = incomingDeck;
+            this.nextDeck = outgoing;
           }
 
-          this.currentDeck = incomingDeck;
-          this.nextDeck = outgoing;
-          this.offlineAudioEl = incomingDeck;
+          this.currentDeck = deckToUse;
+          this.offlineAudioEl = deckToUse;
 
           const objUrl = URL.createObjectURL(offlineRecord.audioBlob);
-          incomingDeck.src = objUrl;
-          incomingDeck.volume = 0;
-          incomingDeck.muted = false;
+          deckToUse.src = objUrl;
+          deckToUse.volume = shouldReuse ? targetVol : 0;
+          deckToUse.muted = false;
           if (autoPlay) {
-            incomingDeck.play().then(() => {
-              this.fadeInDeck(incomingDeck, this.currentVolume ?? 0.8, transitionDuration);
+            deckToUse.play().then(() => {
+              this.isSwitchingTrack = false;
+              this.isLoadingTrack = false;
+              this.stopBackgroundAudioAnchor();
+              if (!shouldReuse) this.fadeInDeck(deckToUse, targetVol, transitionDuration);
             }).catch(() => {});
           }
           return;
@@ -1317,85 +1441,128 @@ class PlayerEngine {
 
     this.isOfflinePlayback = false;
 
-    // Helper to start playback on active deck with alternating decks
+    // Helper to start playback on active deck
     const applyDirectStream = (data) => {
       this.isDirectAudio = true;
       if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
         try { this.ytPlayer.pauseVideo(); } catch (e) {}
       }
 
-      // Alternate decks cleanly to prevent any audio element collision
-      const outgoing = this.currentDeck || this.deckA;
-      const incomingDeck = (outgoing === this.deckA) ? this.deckB : this.deckA;
+      const targetVol = this.currentVolume ?? 0.8;
+      let deckToUse;
 
-      if (outgoing && outgoing !== incomingDeck) {
-        if (!outgoing.paused && outgoing.currentTime > 0) {
-          this.fadeAndRetireDeck(outgoing, transitionDuration);
-        } else {
+      if (shouldReuse) {
+        deckToUse = this.currentDeck || this.deckA;
+        if (this.nextDeck && this.nextDeck !== deckToUse) {
           try {
-            outgoing.pause();
-            outgoing.currentTime = 0;
+            this.nextDeck.pause();
+            this.nextDeck.currentTime = 0;
           } catch (e) {}
         }
+      } else {
+        const outgoing = this.currentDeck || this.deckA;
+        const incomingDeck = (outgoing === this.deckA) ? this.deckB : this.deckA;
+
+        if (outgoing && outgoing !== incomingDeck) {
+          if (!outgoing.paused && outgoing.currentTime > 0) {
+            this.fadeAndRetireDeck(outgoing, transitionDuration);
+          } else {
+            try {
+              outgoing.pause();
+              outgoing.currentTime = 0;
+            } catch (e) {}
+          }
+        }
+        deckToUse = incomingDeck;
+        this.nextDeck = outgoing;
       }
 
-      this.currentDeck = incomingDeck;
-      this.nextDeck = outgoing;
-      this.offlineAudioEl = incomingDeck;
+      this.currentDeck = deckToUse;
+      this.offlineAudioEl = deckToUse;
 
-      incomingDeck.src = data.streamUrl;
-      incomingDeck.muted = false;
-      incomingDeck.volume = 0; // Start at 0 volume for smooth equal-power crossfade
+      deckToUse.src = data.streamUrl;
+      deckToUse.muted = false;
       this.activeAbortController = null;
 
       if (autoPlay && this.shouldBePlaying && !this.isUserPaused) {
-        const targetVol = this.currentVolume ?? 0.8;
-
-        const onPlaybackStarted = () => {
-          this.isSwitchingTrack = false;
-          this.stopBackgroundAudioAnchor();
+        if (shouldReuse) {
+          // Lockscreen / background: set full volume immediately and keep active audio session alive
+          deckToUse.volume = targetVol;
           this.listeners.stateChange(true);
           this.updateMediaSessionState('playing');
           this.requestWakeLock();
-          // Silky smooth equal-power fade in
-          this.fadeInDeck(incomingDeck, targetVol, transitionDuration);
-        };
 
-        const playPromise = incomingDeck.play();
-        if (playPromise !== undefined) {
-          playPromise.then(onPlaybackStarted).catch((err) => {
-            console.warn('Direct stream initial play rejected, waiting for buffer:', err);
-            let hasPlayed = false;
-            const tryPlay = () => {
-              if (hasPlayed) return;
-              hasPlayed = true;
-              incomingDeck.removeEventListener('canplay', tryPlay);
-              incomingDeck.removeEventListener('loadeddata', tryPlay);
-              if (this.shouldBePlaying && !this.isUserPaused) {
-                incomingDeck.play().then(onPlaybackStarted).catch((err2) => {
-                  console.warn('Buffered play failed, trying fallback stream:', err2);
-                  if (data.fallbackUrl && incomingDeck.src !== data.fallbackUrl) {
-                    incomingDeck.src = data.fallbackUrl;
-                    incomingDeck.play().then(onPlaybackStarted).catch(() => {
-                      if (cleanVideoId) this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
-                      else this.playNextTrack(false);
-                    });
-                  } else if (cleanVideoId) {
-                    this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
-                  } else {
-                    this.playNextTrack(false);
-                  }
-                });
-              }
-            };
+          const onDeckPlaybackStarted = () => {
+            this.isSwitchingTrack = false;
+            this.isLoadingTrack = false;
+            this.stopBackgroundAudioAnchor();
+          };
 
-            incomingDeck.addEventListener('canplay', tryPlay, { once: true });
-            incomingDeck.addEventListener('loadeddata', tryPlay, { once: true });
-            setTimeout(tryPlay, 500);
-          });
+          const playPromise = deckToUse.play();
+          if (playPromise !== undefined) {
+            playPromise.then(onDeckPlaybackStarted).catch((err) => {
+              console.warn('Direct stream immediate play rejected on lockscreen, awaiting readyState:', err);
+              const tryPlay = () => {
+                deckToUse.removeEventListener('canplay', tryPlay);
+                deckToUse.removeEventListener('loadeddata', tryPlay);
+                if (this.shouldBePlaying && !this.isUserPaused) {
+                  deckToUse.play().then(onDeckPlaybackStarted).catch(() => {});
+                }
+              };
+              deckToUse.addEventListener('canplay', tryPlay, { once: true });
+              deckToUse.addEventListener('loadeddata', tryPlay, { once: true });
+            });
+          }
+        } else {
+          // Foreground smooth fade-in
+          deckToUse.volume = 0;
+          const onPlaybackStarted = () => {
+            this.isSwitchingTrack = false;
+            this.isLoadingTrack = false;
+            this.stopBackgroundAudioAnchor();
+            this.listeners.stateChange(true);
+            this.updateMediaSessionState('playing');
+            this.requestWakeLock();
+            this.fadeInDeck(deckToUse, targetVol, transitionDuration);
+          };
+
+          const playPromise = deckToUse.play();
+          if (playPromise !== undefined) {
+            playPromise.then(onPlaybackStarted).catch((err) => {
+              console.warn('Direct stream initial play rejected, waiting for buffer:', err);
+              let hasPlayed = false;
+              const tryPlay = () => {
+                if (hasPlayed) return;
+                hasPlayed = true;
+                deckToUse.removeEventListener('canplay', tryPlay);
+                deckToUse.removeEventListener('loadeddata', tryPlay);
+                if (this.shouldBePlaying && !this.isUserPaused) {
+                  deckToUse.play().then(onPlaybackStarted).catch((err2) => {
+                    console.warn('Buffered play failed, trying fallback stream:', err2);
+                    if (data.fallbackUrl && deckToUse.src !== data.fallbackUrl) {
+                      deckToUse.src = data.fallbackUrl;
+                      deckToUse.play().then(onPlaybackStarted).catch(() => {
+                        if (cleanVideoId && !isHidden) this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
+                        else this.playNextTrack(false);
+                      });
+                    } else if (cleanVideoId && !isHidden) {
+                      this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
+                    } else {
+                      this.playNextTrack(false);
+                    }
+                  });
+                }
+              };
+
+              deckToUse.addEventListener('canplay', tryPlay, { once: true });
+              deckToUse.addEventListener('loadeddata', tryPlay, { once: true });
+              setTimeout(tryPlay, 500);
+            });
+          }
         }
       } else {
         this.isSwitchingTrack = false;
+        this.isLoadingTrack = false;
       }
     };
 
@@ -1442,7 +1609,12 @@ class PlayerEngine {
 
     // 4. Fallback to YouTube embed if direct audio not found
     if (this.currentTrackKey === cacheKey) {
-      this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
+      if (!isHidden) {
+        this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
+      } else {
+        // On lockscreen, advance to next track so playback never terminates
+        this.playNextTrack(false);
+      }
     }
   }
 
@@ -1501,6 +1673,7 @@ class PlayerEngine {
 
   play() {
     this.isUserPaused = false;
+    this.wasInterruptedExternally = false;
     this.shouldBePlaying = true;
     this.updateMediaSessionState('playing');
     this.requestWakeLock();
@@ -1531,6 +1704,7 @@ class PlayerEngine {
 
   pause() {
     this.isUserPaused = true;
+    this.wasInterruptedExternally = false;
     this.shouldBePlaying = false;
     this.stopBackgroundAudioAnchor();
     this.updateMediaSessionState('paused');
@@ -1665,7 +1839,7 @@ class PlayerEngine {
     let stuckCount = 0;
 
     this.playbackWatchdogTimer = setInterval(() => {
-      if (!this.shouldBePlaying || this.isUserPaused || this.isCrossfading || this.isSwitchingTrack) {
+      if (!this.shouldBePlaying || this.isUserPaused || this.wasInterruptedExternally || this.isCrossfading || this.isSwitchingTrack || this.isLoadingTrack) {
         lastTime = -1;
         stuckCount = 0;
         return;
@@ -1675,21 +1849,13 @@ class PlayerEngine {
       if (this.isDirectAudio || this.isOfflinePlayback) {
         if (!deck) return;
 
-        // 1. If unexpectedly paused by OS / browser during playback
-        if (deck.paused && !deck.ended && deck.src && !deck.src.startsWith('data:')) {
-          this.startBackgroundAudioAnchor();
-          deck.play().catch(() => {});
-          return;
-        }
-
-        // 2. Buffer underrun watchdog: check if audio position is frozen in place for ~3-4s
+        // Buffer underrun watchdog: check if audio position is frozen in place for ~3-4s while playing
         const cur = deck.currentTime;
         if (!deck.paused && !deck.ended && deck.duration && isFinite(deck.duration) && deck.duration > 0 && cur > 0 && cur < deck.duration - 1) {
           if (Math.abs(cur - lastTime) < 0.05) {
             stuckCount++;
             if (stuckCount >= 3) {
               stuckCount = 0;
-              this.startBackgroundAudioAnchor();
               deck.play().catch(() => {});
             }
           } else {
@@ -1699,12 +1865,6 @@ class PlayerEngine {
         } else {
           lastTime = cur;
           stuckCount = 0;
-        }
-      } else if (this.ytPlayer && typeof this.ytPlayer.getPlayerState === 'function') {
-        const state = this.ytPlayer.getPlayerState();
-        if (state === 2) { // Paused unexpectedly
-          this.startBackgroundAudioAnchor();
-          try { this.ytPlayer.playVideo(); } catch (e) {}
         }
       }
     }, 1200);

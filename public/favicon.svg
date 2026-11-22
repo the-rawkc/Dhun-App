@@ -7,22 +7,22 @@
     </linearGradient>
   </defs>
 
-  <!-- Premium Deep Black Background -->
+  <!-- Premium Deep Black Background (Spotify Style) -->
   <rect width="512" height="512" fill="#000000"/>
 
-  <!-- Centered Vibrant Crimson Circle -->
-  <circle cx="256" cy="256" r="206" fill="url(#dhunRed)"/>
+  <!-- Centered Vibrant Crimson Circle (Spotify proportional size) -->
+  <circle cx="256" cy="256" r="170" fill="url(#dhunRed)"/>
 
   <!-- Crisp White Dhun Soundwave Emblem -->
   <g fill="#ffffff">
-    <circle cx="114.6" cy="256" r="10.8" />
-    <rect x="140.4" y="219.4" width="21.5" height="73.1" rx="10.75" />
-    <rect x="176.9" y="187.2" width="21.5" height="137.6" rx="10.75" />
-    <rect x="211.9" y="120.6" width="22.6" height="270.9" rx="11.3" />
-    <rect x="247.9" y="154.9" width="21.5" height="202.1" rx="10.75" />
-    <rect x="282.4" y="185.1" width="21.5" height="141.9" rx="10.75" />
-    <rect x="318.4" y="209.8" width="20.4" height="92.5" rx="10.2" />
-    <rect x="352.8" y="230.2" width="20.4" height="51.6" rx="10.2" />
-    <circle cx="397.4" cy="256" r="10.2" />
+    <circle cx="139.3" cy="256.0" r="8.9" />
+    <rect x="160.6" y="225.8" width="17.7" height="60.3" rx="8.9" />
+    <rect x="190.7" y="199.2" width="17.7" height="113.6" rx="8.9" />
+    <rect x="219.6" y="144.3" width="18.7" height="223.6" rx="9.3" />
+    <rect x="249.3" y="172.6" width="17.7" height="166.8" rx="8.9" />
+    <rect x="277.8" y="197.5" width="17.7" height="117.1" rx="8.9" />
+    <rect x="307.5" y="217.9" width="16.8" height="76.3" rx="8.4" />
+    <rect x="335.9" y="234.7" width="16.8" height="42.6" rx="8.4" />
+    <circle cx="372.7" cy="256.0" r="8.4" />
   </g>
 </svg>

@@ -2,9 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
-  playTrackNow,
-  shufflePlayTracks,
-  createPlaylist,
   loadCloudUserData,
   resetUserLibrary,
 } from '../redux/features/playerSlice';
@@ -18,8 +15,6 @@ import {
   fetchCloudProfile,
 } from '../services/authService';
 import { PRESET_AVATARS } from '../utils/avatars';
-import SongRow from '../components/SongRow';
-import ArtistCard from '../components/ArtistCard';
 import {
   FaUser,
   FaPhoneAlt,
@@ -38,12 +33,8 @@ import {
   FaCamera,
   FaTimes,
   FaPen,
-  FaPlay,
-  FaRandom,
-  FaFolderPlus,
   FaSyncAlt,
-  FaSearch,
-  FaCompass,
+  FaChevronRight,
 } from 'react-icons/fa';
 
 const Profile = () => {
@@ -52,8 +43,6 @@ const Profile = () => {
   const { favorites, playlists, favoriteArtists } = useSelector((state) => state.player);
 
   const [currentUser, setCurrentUser] = useState(getActiveSession());
-  const [activeTab, setActiveTab] = useState('favorites'); // 'favorites' | 'playlists' | 'artists' | 'account'
-  const [favoriteSearch, setFavoriteSearch] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedTime, setLastSyncedTime] = useState(null);
 
@@ -74,10 +63,6 @@ const Profile = () => {
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [customAvatarUrl, setCustomAvatarUrl] = useState('');
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
-
-  // Create Playlist Modal
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
 
   // Active sync on mount and auto-refresh library
   const refreshFromCloud = async () => {
@@ -197,42 +182,8 @@ const Profile = () => {
     reader.readAsText(file);
   };
 
-  // Liked Songs Playback
-  const handlePlayFavorites = () => {
-    if (favorites.length > 0) {
-      dispatch(playTrackNow({ song: favorites[0], songs: favorites, index: 0 }));
-    }
-  };
-
-  const handleShuffleFavorites = () => {
-    if (favorites.length > 0) {
-      dispatch(shufflePlayTracks({ tracks: favorites }));
-    }
-  };
-
-  // Create Playlist
-  const handleCreatePlaylist = (e) => {
-    e.preventDefault();
-    if (!newPlaylistTitle.trim()) return;
-    const newId = `pl-${Date.now()}`;
-    dispatch(createPlaylist({ id: newId, title: newPlaylistTitle.trim() }));
-    setNewPlaylistTitle('');
-    setShowCreateModal(false);
-    navigate(`/playlist/${newId}`);
-  };
-
-  // Filtered Favorites
-  const filteredFavorites = favorites.filter((s) => {
-    if (!favoriteSearch.trim()) return true;
-    const term = favoriteSearch.toLowerCase().trim();
-    return (
-      (s.title || s.name || '').toLowerCase().includes(term) ||
-      (s.artist || s.author || '').toLowerCase().includes(term)
-    );
-  });
-
   return (
-    <div className="flex flex-col gap-6 pb-28 select-none animate-fade-in max-w-5xl mx-auto">
+    <div className="flex flex-col gap-6 pb-28 select-none animate-fade-in max-w-4xl mx-auto">
       {/* ─── Page Top Bar: Title & Settings ─────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
@@ -240,7 +191,7 @@ const Profile = () => {
             Your <span className="text-rose-500">Profile</span>
           </h1>
           <p className="text-xs theme-text-muted mt-0.5">
-            Manage your music collection, liked songs, and synced playlists
+            Account settings, cloud sync, and library overview
           </p>
         </div>
 
@@ -304,7 +255,7 @@ const Profile = () => {
 
             <div
               className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-emerald-500 border-2 theme-border flex items-center justify-center text-white text-[9px]"
-              title="Profile Active"
+              title={currentUser ? 'Cloud Active' : 'Guest'}
             >
               <FaCheck />
             </div>
@@ -387,7 +338,7 @@ const Profile = () => {
             <p className="text-xs theme-text-muted mt-2 max-w-xl">
               {currentUser
                 ? 'Your playlists and liked songs are linked to this phone profile and saved in the cloud database.'
-                : 'Log in with your 10-digit phone number & 4-digit PIN to sync your playlists and liked songs.'}
+                : 'Log in with your 10-digit phone number & 4-digit PIN to sync your playlists and liked songs across devices.'}
             </p>
           </div>
 
@@ -401,568 +352,263 @@ const Profile = () => {
             </button>
           )}
         </div>
+      </div>
 
-        {/* ─── Interactive Profile Stat Pills ────────────────────────── */}
-        <div className="grid grid-cols-4 gap-2 sm:gap-3 mt-6 pt-5 border-t theme-border">
-          <div
-            onClick={() => setActiveTab('favorites')}
-            className={`p-2.5 sm:p-3 rounded-xl transition-all cursor-pointer flex flex-col items-center justify-center text-center group border ${
-              activeTab === 'favorites'
-                ? 'bg-rose-500/15 border-rose-500/40 text-rose-500'
-                : 'bg-slate-500/5 hover:bg-slate-500/10 border-transparent theme-text-main'
-            }`}
+      {/* ─── Library Summary Overview (Navigates to Library) ────────── */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-sm font-bold uppercase tracking-wider theme-text-muted">
+            Library Overview
+          </h2>
+          <button
+            onClick={() => navigate('/library')}
+            className="text-xs font-semibold text-rose-500 hover:text-rose-400 flex items-center gap-1"
           >
-            <FaHeart className="text-base sm:text-lg mb-0.5 text-rose-500 group-hover:scale-110 transition-transform" />
-            <span className="text-base sm:text-lg font-black">{favorites.length}</span>
-            <span className="text-[10px] sm:text-[11px] font-medium opacity-80">Liked Songs</span>
+            <span>Go to Library</span>
+            <FaChevronRight className="text-[10px]" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Liked Songs Shortcut */}
+          <div
+            onClick={() => navigate('/library', { state: { tab: 'liked' } })}
+            className="p-4 rounded-2xl theme-bg-card border theme-border hover:border-rose-500/40 hover:bg-slate-500/5 cursor-pointer transition-all shadow-sm group flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center text-lg group-hover:scale-110 group-hover:bg-rose-500 group-hover:text-white transition-all shadow-sm">
+                <FaHeart />
+              </div>
+              <div>
+                <span className="text-lg font-black theme-text-main block leading-none">
+                  {favorites.length}
+                </span>
+                <span className="text-xs font-medium theme-text-muted">
+                  Liked Songs
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-semibold text-rose-500 opacity-80 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">
+              <span>View</span>
+              <FaChevronRight className="text-[10px]" />
+            </div>
           </div>
 
+          {/* Playlists Shortcut */}
           <div
-            onClick={() => setActiveTab('playlists')}
-            className={`p-2.5 sm:p-3 rounded-xl transition-all cursor-pointer flex flex-col items-center justify-center text-center group border ${
-              activeTab === 'playlists'
-                ? 'bg-rose-500/15 border-rose-500/40 text-rose-500'
-                : 'bg-slate-500/5 hover:bg-slate-500/10 border-transparent theme-text-main'
-            }`}
+            onClick={() => navigate('/library', { state: { tab: 'playlists' } })}
+            className="p-4 rounded-2xl theme-bg-card border theme-border hover:border-rose-500/40 hover:bg-slate-500/5 cursor-pointer transition-all shadow-sm group flex items-center justify-between"
           >
-            <FaMusic className="text-base sm:text-lg mb-0.5 text-rose-500 group-hover:scale-110 transition-transform" />
-            <span className="text-base sm:text-lg font-black">{playlists.length}</span>
-            <span className="text-[10px] sm:text-[11px] font-medium opacity-80">Playlists</span>
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center text-lg group-hover:scale-110 group-hover:bg-rose-500 group-hover:text-white transition-all shadow-sm">
+                <FaMusic />
+              </div>
+              <div>
+                <span className="text-lg font-black theme-text-main block leading-none">
+                  {playlists.length}
+                </span>
+                <span className="text-xs font-medium theme-text-muted">
+                  Playlists
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-semibold text-rose-500 opacity-80 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">
+              <span>View</span>
+              <FaChevronRight className="text-[10px]" />
+            </div>
           </div>
 
+          {/* Artists Shortcut */}
           <div
-            onClick={() => setActiveTab('artists')}
-            className={`p-2.5 sm:p-3 rounded-xl transition-all cursor-pointer flex flex-col items-center justify-center text-center group border ${
-              activeTab === 'artists'
-                ? 'bg-rose-500/15 border-rose-500/40 text-rose-500'
-                : 'bg-slate-500/5 hover:bg-slate-500/10 border-transparent theme-text-main'
-            }`}
+            onClick={() => navigate('/library', { state: { tab: 'artists' } })}
+            className="p-4 rounded-2xl theme-bg-card border theme-border hover:border-rose-500/40 hover:bg-slate-500/5 cursor-pointer transition-all shadow-sm group flex items-center justify-between"
           >
-            <FaUserFriends className="text-base sm:text-lg mb-0.5 text-rose-500 group-hover:scale-110 transition-transform" />
-            <span className="text-base sm:text-lg font-black">{favoriteArtists.length}</span>
-            <span className="text-[10px] sm:text-[11px] font-medium opacity-80">Followed</span>
-          </div>
-
-          <div
-            onClick={() => setActiveTab('account')}
-            className={`p-2.5 sm:p-3 rounded-xl transition-all cursor-pointer flex flex-col items-center justify-center text-center group border ${
-              activeTab === 'account'
-                ? 'bg-rose-500/15 border-rose-500/40 text-rose-500'
-                : 'bg-slate-500/5 hover:bg-slate-500/10 border-transparent theme-text-main'
-            }`}
-          >
-            <FaShieldAlt className="text-base sm:text-lg mb-0.5 text-emerald-500 group-hover:scale-110 transition-transform" />
-            <span className="text-base sm:text-lg font-black">
-              {currentUser ? 'Active' : 'Guest'}
-            </span>
-            <span className="text-[10px] sm:text-[11px] font-medium opacity-80">Cloud Sync</span>
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center text-lg group-hover:scale-110 group-hover:bg-rose-500 group-hover:text-white transition-all shadow-sm">
+                <FaUserFriends />
+              </div>
+              <div>
+                <span className="text-lg font-black theme-text-main block leading-none">
+                  {favoriteArtists.length}
+                </span>
+                <span className="text-xs font-medium theme-text-muted">
+                  Followed Artists
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-semibold text-rose-500 opacity-80 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">
+              <span>View</span>
+              <FaChevronRight className="text-[10px]" />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ─── Profile Navigation Tabs Bar ────────────────────────────── */}
-      <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
-        <button
-          onClick={() => setActiveTab('favorites')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-            activeTab === 'favorites'
-              ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-600/30'
-              : 'bg-slate-500/10 hover:bg-slate-500/20 theme-text-main'
-          }`}
-        >
-          <FaHeart className="text-xs" />
-          <span>Liked Songs ({favorites.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('playlists')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-            activeTab === 'playlists'
-              ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-600/30'
-              : 'bg-slate-500/10 hover:bg-slate-500/20 theme-text-main'
-          }`}
-        >
-          <FaMusic className="text-xs" />
-          <span>My Playlists ({playlists.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('artists')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-            activeTab === 'artists'
-              ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-600/30'
-              : 'bg-slate-500/10 hover:bg-slate-500/20 theme-text-main'
-          }`}
-        >
-          <FaUserFriends className="text-xs" />
-          <span>Followed Artists ({favoriteArtists.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('account')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-            activeTab === 'account'
-              ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-600/30'
-              : 'bg-slate-500/10 hover:bg-slate-500/20 theme-text-main'
-          }`}
-        >
-          <FaShieldAlt className="text-xs" />
-          <span>Account & Cloud Sync</span>
-        </button>
-      </div>
-
-      {/* ─── TAB 1: LIKED SONGS (Directly Interactive on Profile) ───── */}
-      {activeTab === 'favorites' && (
-        <div className="flex flex-col gap-4 animate-fade-in">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-rose-900/30 via-pink-950/20 to-transparent border border-rose-500/20 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-rose-600 to-pink-600 flex items-center justify-center text-white shadow-md shadow-rose-600/30 shrink-0">
-                <FaHeart className="text-xl" />
+      {/* ─── Account & Cloud Sync Section ───────────────────────────── */}
+      <div className="flex flex-col gap-6">
+        {!currentUser ? (
+          <div className="p-5 sm:p-6 rounded-2xl theme-bg-card border theme-border shadow-md">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/15 flex items-center justify-center text-rose-500">
+                <FaMobileAlt className="text-base" />
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-black theme-text-main">Your Liked Songs</h2>
+                <h3 className="text-base sm:text-lg font-bold theme-text-main">
+                  Log In with Phone & 4-Digit PIN
+                </h3>
                 <p className="text-xs theme-text-muted">
-                  {favorites.length} {favorites.length === 1 ? 'song' : 'songs'} saved on your profile
+                  Access your music library and liked songs seamlessly across devices
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button
-                onClick={handlePlayFavorites}
-                disabled={favorites.length === 0}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
-              >
-                <FaPlay className="text-[10px]" />
-                <span>Play All</span>
-              </button>
-
-              <button
-                onClick={handleShuffleFavorites}
-                disabled={favorites.length === 0}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-slate-500/15 hover:bg-slate-500/25 theme-text-main font-bold text-xs border theme-border hover:scale-105 active:scale-95 transition-all disabled:opacity-40"
-              >
-                <FaRandom className="text-[10px] text-rose-500" />
-                <span>Shuffle</span>
-              </button>
-            </div>
-          </div>
-
-          {favorites.length > 5 && (
-            <div className="relative">
-              <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
-              <input
-                type="text"
-                placeholder="Search in your liked songs..."
-                value={favoriteSearch}
-                onChange={(e) => setFavoriteSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-500/10 border theme-border theme-text-main placeholder-slate-400 text-xs focus:outline-none focus:border-rose-500 transition-colors"
-              />
-            </div>
-          )}
-
-          {favorites.length > 0 ? (
-            <div className="space-y-1">
-              {filteredFavorites.map((song, i) => (
-                <SongRow
-                  key={song.videoId || i}
-                  song={song}
-                  index={i}
-                  songs={favorites}
-                  isHighlightedLiked={true}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-16 px-4 rounded-2xl theme-bg-card border theme-border text-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-500 text-2xl">
-                <FaHeart />
+            {authError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-semibold">
+                {authError}
               </div>
-              <h3 className="text-base font-bold theme-text-main">No liked songs on this profile yet</h3>
-              <p className="text-xs theme-text-muted max-w-sm">
-                Tap the heart button on any track while streaming to add it to your profile.
-              </p>
-              <button
-                onClick={() => navigate('/charts')}
-                className="mt-2 flex items-center gap-2 px-5 py-2.5 rounded-full bg-rose-600 text-white font-bold text-xs shadow-md shadow-rose-600/30 hover:scale-105 transition-all"
-              >
-                <FaCompass />
-                <span>Explore Top Indian Hits</span>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+            )}
 
-      {/* ─── TAB 2: PLAYLISTS (Directly Interactive on Profile) ──────── */}
-      {activeTab === 'playlists' && (
-        <div className="flex flex-col gap-4 animate-fade-in">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base sm:text-lg font-black theme-text-main">Profile Playlists</h2>
-              <p className="text-xs theme-text-muted">
-                {playlists.length} playlists saved on this profile
-              </p>
-            </div>
-
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/30 hover:scale-105 transition-all"
-            >
-              <FaFolderPlus />
-              <span>New Playlist</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
-            {/* Auto Liked Songs Playlist Box */}
-            <div
-              onClick={() => setActiveTab('favorites')}
-              className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border border-rose-500/30 shadow-sm"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-12 h-12 rounded-xl shrink-0 bg-gradient-to-br from-rose-600 via-pink-600 to-rose-900 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-                  <FaHeart className="text-white text-lg drop-shadow" />
+            <form onSubmit={handleLogin} className="space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-bold theme-text-muted mb-1 uppercase tracking-wider">
+                  Your Name (For new accounts)
+                </label>
+                <div className="relative">
+                  <FaUser className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
+                  <input
+                    type="text"
+                    placeholder="e.g. Rahul Sharma"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-500/10 border theme-border text-xs theme-text-main focus:outline-none focus:border-rose-500 transition-colors"
+                  />
                 </div>
-                <div className="min-w-0">
-                  <span className="text-[8px] font-black uppercase tracking-wider text-rose-500">AUTO SYNC</span>
-                  <h3 className="font-bold text-xs sm:text-sm theme-text-main group-hover:text-rose-500 truncate transition-colors">
-                    Liked Songs
-                  </h3>
-                  <p className="text-[11px] theme-text-muted truncate">
-                    {favorites.length} {favorites.length === 1 ? 'song' : 'songs'}
-                  </p>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold theme-text-muted mb-1 uppercase tracking-wider">
+                  10-Digit Mobile Number
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs">
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    required
+                    maxLength={10}
+                    placeholder="9876543210"
+                    value={phoneInput}
+                    onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ''))}
+                    className="w-full pl-12 pr-4 py-2 rounded-xl bg-slate-500/10 border theme-border text-xs font-mono theme-text-main focus:outline-none focus:border-rose-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold theme-text-muted mb-1 uppercase tracking-wider">
+                  4-Digit Secret PIN
+                </label>
+                <div className="relative">
+                  <FaLock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
+                  <input
+                    type="password"
+                    required
+                    maxLength={4}
+                    placeholder="••••"
+                    value={pinInput}
+                    onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
+                    className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-500/10 border theme-border text-xs font-mono tracking-widest theme-text-main focus:outline-none focus:border-rose-500 transition-colors"
+                  />
                 </div>
               </div>
 
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePlayFavorites();
-                }}
-                disabled={favorites.length === 0}
-                className="p-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-md hover:scale-110 active:scale-95 transition-all disabled:opacity-30 shrink-0"
-                title="Play Liked Songs"
+                type="submit"
+                disabled={isLoggingIn || phoneInput.length < 10 || pinInput.length < 4}
+                className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white font-bold text-xs shadow-md shadow-rose-600/30 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2"
               >
-                <FaPlay className="text-[9px]" />
+                {isLoggingIn ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Syncing Cloud Profile...</span>
+                  </>
+                ) : (
+                  <>
+                    <FaCloudUploadAlt className="text-sm" />
+                    <span>Log In & Load My Music</span>
+                  </>
+                )}
               </button>
-            </div>
-
-            {/* Custom & Regional Playlists */}
-            {playlists.map((pl) => {
-              const trks = Array.isArray(pl.tracks) ? pl.tracks : [];
-              const firstTrack = trks.length > 0 ? trks[0] : null;
-              const plCover =
-                firstTrack?.thumbnail ||
-                firstTrack?.cover ||
-                firstTrack?.image ||
-                pl.cover ||
-                'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80';
-
-              return (
-                <div
-                  key={pl.id}
-                  onClick={() => navigate(`/playlist/${pl.id}`)}
-                  className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl glass-card hover:bg-slate-500/10 cursor-pointer group transition-all border theme-border shadow-sm"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-dark-800 shrink-0 shadow-md">
-                      <img
-                        src={plCover}
-                        alt={pl.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="text-[8px] font-black uppercase tracking-wider text-slate-400">PLAYLIST</span>
-                      <h3 className="font-bold text-xs sm:text-sm theme-text-main group-hover:text-rose-500 truncate transition-colors">
-                        {pl.title}
-                      </h3>
-                      <p className="text-[11px] theme-text-muted truncate">
-                        {trks.length} {trks.length === 1 ? 'song' : 'songs'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (trks.length > 0) {
-                        dispatch(playTrackNow({ song: trks[0], songs: trks, index: 0 }));
-                      } else {
-                        navigate(`/playlist/${pl.id}`);
-                      }
-                    }}
-                    className="p-2.5 rounded-full bg-slate-500/15 hover:bg-rose-600 hover:text-white theme-text-main shadow-md hover:scale-110 active:scale-95 transition-all shrink-0"
-                    title={`Play ${pl.title}`}
-                  >
-                    <FaPlay className="text-[9px]" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ─── TAB 3: FOLLOWED ARTISTS ────────────────────────────────── */}
-      {activeTab === 'artists' && (
-        <div className="flex flex-col gap-4 animate-fade-in">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base sm:text-lg font-black theme-text-main">Followed Artists</h2>
-              <p className="text-xs theme-text-muted">
-                {favoriteArtists.length} singers and composers followed on this profile
-              </p>
-            </div>
-
-            <button
-              onClick={() => navigate('/artists')}
-              className="text-xs font-bold text-rose-500 hover:text-rose-400"
-            >
-              Browse All Artists →
-            </button>
-          </div>
-
-          {favoriteArtists.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {favoriteArtists.map((artist, i) => (
-                <ArtistCard key={artist.name || i} artist={artist} />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-16 px-4 rounded-2xl theme-bg-card border theme-border text-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-500 text-2xl">
-                <FaUserFriends />
-              </div>
-              <h3 className="text-base font-bold theme-text-main">No followed artists yet</h3>
-              <p className="text-xs theme-text-muted max-w-sm">
-                Follow your favorite Indian singers (Arijit Singh, Diljit Dosanjh, Renuka Panwar) to see them here.
-              </p>
-              <button
-                onClick={() => navigate('/artists')}
-                className="mt-2 px-5 py-2.5 rounded-full bg-rose-600 text-white font-bold text-xs shadow-md shadow-rose-600/30 hover:scale-105 transition-all"
-              >
-                Browse Indian Artists
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ─── TAB 4: ACCOUNT, LOGIN & CLOUD SYNC ──────────────────────── */}
-      {activeTab === 'account' && (
-        <div className="flex flex-col gap-6 animate-fade-in">
-          {!currentUser ? (
-            <div className="p-5 sm:p-6 rounded-2xl theme-bg-card border theme-border shadow-md">
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 rounded-2xl bg-rose-500/15 flex items-center justify-center text-rose-500">
-                  <FaMobileAlt className="text-base" />
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold theme-text-main">
-                    Log In with Phone & 4-Digit PIN
-                  </h3>
-                  <p className="text-xs theme-text-muted">
-                    Access your playlists and liked songs on any phone, tablet, or PC
-                  </p>
-                </div>
-              </div>
-
-              {authError && (
-                <div className="mb-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-semibold">
-                  {authError}
-                </div>
-              )}
-
-              <form onSubmit={handleLogin} className="space-y-3.5">
-                <div>
-                  <label className="block text-[11px] font-bold theme-text-muted mb-1 uppercase tracking-wider">
-                    Your Name (For new accounts)
-                  </label>
-                  <div className="relative">
-                    <FaUser className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
-                    <input
-                      type="text"
-                      placeholder="e.g. Rahul Sharma"
-                      value={nameInput}
-                      onChange={(e) => setNameInput(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-500/10 border theme-border text-xs theme-text-main focus:outline-none focus:border-rose-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold theme-text-muted mb-1 uppercase tracking-wider">
-                    10-Digit Mobile Number
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs">
-                      +91
-                    </span>
-                    <input
-                      type="tel"
-                      required
-                      maxLength={10}
-                      placeholder="9876543210"
-                      value={phoneInput}
-                      onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ''))}
-                      className="w-full pl-12 pr-4 py-2 rounded-xl bg-slate-500/10 border theme-border text-xs font-mono theme-text-main focus:outline-none focus:border-rose-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold theme-text-muted mb-1 uppercase tracking-wider">
-                    4-Digit Secret PIN
-                  </label>
-                  <div className="relative">
-                    <FaLock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
-                    <input
-                      type="password"
-                      required
-                      maxLength={4}
-                      placeholder="••••"
-                      value={pinInput}
-                      onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
-                      className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-500/10 border theme-border text-xs font-mono tracking-widest theme-text-main focus:outline-none focus:border-rose-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoggingIn || phoneInput.length < 10 || pinInput.length < 4}
-                  className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white font-bold text-xs shadow-md shadow-rose-600/30 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2"
-                >
-                  {isLoggingIn ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Syncing Cloud Profile...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FaCloudUploadAlt className="text-sm" />
-                      <span>Log In & Load My Music</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            </div>
-          ) : (
-            <div className="p-5 sm:p-6 rounded-2xl theme-bg-card border theme-border shadow-md">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 flex items-center justify-center text-emerald-500">
-                  <FaCheck className="text-base" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold theme-text-main">
-                    Cloud Database Synchronized
-                  </h3>
-                  <p className="text-xs theme-text-muted">
-                    Linked to +91 {currentUser.phone}
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-slate-500/10 border theme-border flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <FaPhoneAlt className="text-rose-500 text-xs" />
-                  <div>
-                    <p className="text-xs font-bold theme-text-main">+91 {currentUser.phone}</p>
-                    <p className="text-[10px] theme-text-muted">PIN: •••• (Protected)</p>
-                  </div>
-                </div>
-                <button
-                  onClick={refreshFromCloud}
-                  disabled={isSyncing}
-                  className="px-3 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 border border-rose-500/30 transition-all flex items-center gap-1.5"
-                >
-                  <FaSyncAlt className={`text-[10px] ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{isSyncing ? 'Refreshing...' : 'Refresh Data'}</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Library Backup & Transfer Section */}
-          <div className="p-5 sm:p-6 rounded-2xl theme-bg-card border theme-border shadow-md">
-            <h3 className="text-base font-bold theme-text-main mb-1">
-              Manual JSON Backup & Transfer
-            </h3>
-            <p className="text-xs theme-text-muted mb-4">
-              Download your complete library as a JSON file or restore it anytime on any device.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                onClick={exportUserDataJSON}
-                className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-500/10 hover:bg-slate-500/20 theme-text-main text-xs font-bold transition-all border theme-border"
-              >
-                <FaFileExport className="text-rose-500 text-sm" />
-                <span>Export Backup File</span>
-              </button>
-
-              <label className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-500/10 hover:bg-slate-500/20 theme-text-main text-xs font-bold transition-all border theme-border cursor-pointer">
-                <FaFileImport className="text-rose-500 text-sm" />
-                <span>Restore Backup File</span>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleFileImport}
-                  className="hidden"
-                />
-              </label>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Create Playlist Modal ──────────────────────────────────── */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-sm rounded-2xl theme-bg-card border theme-border shadow-2xl p-5 text-left">
-            <div className="flex items-center justify-between pb-3 border-b theme-border mb-3">
-              <h3 className="text-sm font-bold theme-text-main">Create New Playlist</h3>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="p-1 rounded-full theme-text-muted hover:theme-text-main"
-              >
-                <FaTimes className="text-xs" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreatePlaylist} className="space-y-3">
-              <input
-                type="text"
-                autoFocus
-                required
-                placeholder="Playlist name..."
-                value={newPlaylistTitle}
-                onChange={(e) => setNewPlaylistTitle(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-500/10 border theme-border text-xs theme-text-main focus:outline-none focus:border-rose-500"
-              />
-
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-3.5 py-1.5 rounded-xl bg-slate-500/10 text-xs font-semibold theme-text-muted hover:theme-text-main"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!newPlaylistTitle.trim()}
-                  className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md disabled:opacity-40"
-                >
-                  Create
-                </button>
-              </div>
             </form>
           </div>
+        ) : (
+          <div className="p-5 sm:p-6 rounded-2xl theme-bg-card border theme-border shadow-md">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 flex items-center justify-center text-emerald-500">
+                <FaCheck className="text-base" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold theme-text-main">
+                  Cloud Database Synchronized
+                </h3>
+                <p className="text-xs theme-text-muted">
+                  Linked to +91 {currentUser.phone}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-500/10 border theme-border flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <FaPhoneAlt className="text-rose-500 text-xs" />
+                <div>
+                  <p className="text-xs font-bold theme-text-main">+91 {currentUser.phone}</p>
+                  <p className="text-[10px] theme-text-muted">PIN: •••• (Protected)</p>
+                </div>
+              </div>
+              <button
+                onClick={refreshFromCloud}
+                disabled={isSyncing}
+                className="px-3 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 border border-rose-500/30 transition-all flex items-center gap-1.5"
+              >
+                <FaSyncAlt className={`text-[10px] ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Refreshing...' : 'Refresh Data'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Library Backup & Transfer Section */}
+        <div className="p-5 sm:p-6 rounded-2xl theme-bg-card border theme-border shadow-md">
+          <h3 className="text-base font-bold theme-text-main mb-1">
+            Manual JSON Backup & Transfer
+          </h3>
+          <p className="text-xs theme-text-muted mb-4">
+            Download your complete library as a JSON file or restore it anytime on any device.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              onClick={exportUserDataJSON}
+              className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-500/10 hover:bg-slate-500/20 theme-text-main text-xs font-bold transition-all border theme-border"
+            >
+              <FaFileExport className="text-rose-500 text-sm" />
+              <span>Export Backup File</span>
+            </button>
+
+            <label className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-500/10 hover:bg-slate-500/20 theme-text-main text-xs font-bold transition-all border theme-border cursor-pointer">
+              <FaFileImport className="text-rose-500 text-sm" />
+              <span>Restore Backup File</span>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleFileImport}
+                className="hidden"
+              />
+            </label>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* ─── Choose Avatar Modal ────────────────────────────────────── */}
       {isAvatarModalOpen && (
