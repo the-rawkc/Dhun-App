@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dhun-cache-v13';
+const CACHE_NAME = 'dhun-cache-v14';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

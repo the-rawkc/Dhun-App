@@ -244,33 +244,31 @@ export const isValidSongId = (id) => {
 
 export const isSameSong = (songA, songB) => {
   if (!songA || !songB) return false;
+  if (songA === songB) return true;
 
-  const v1 = (songA.videoId || '').trim();
-  const v2 = (songB.videoId || '').trim();
-  if (isValidVideoId(v1) && isValidVideoId(v2)) {
-    return v1 === v2;
-  }
-
-  const id1 = (songA.id || '').trim();
-  const id2 = (songB.id || '').trim();
-  if (isValidSongId(id1) && isValidSongId(id2) && id1 === id2) {
+  const v1 = (songA.videoId || songA.id || '').trim();
+  const v2 = (songB.videoId || songB.id || '').trim();
+  if (v1 && v2 && v1 === v2) {
     return true;
   }
 
-  if (isValidVideoId(v1) && isValidSongId(id2) && v1 === id2) return true;
-  if (isValidSongId(id1) && isValidVideoId(v2) && id1 === v2) return true;
+  const id1 = (songA.id || songA.videoId || '').trim();
+  const id2 = (songB.id || songB.videoId || '').trim();
+  if (id1 && id2 && id1 === id2) {
+    return true;
+  }
 
   const t1 = (songA.title || songA.name || '').trim().toLowerCase();
   const t2 = (songB.title || songB.name || '').trim().toLowerCase();
-  const a1 = (songA.artist || '').trim().toLowerCase();
-  const a2 = (songB.artist || '').trim().toLowerCase();
+  const a1 = (songA.artist || songA.artists || songA.subtitle || '').trim().toLowerCase();
+  const a2 = (songB.artist || songB.artists || songB.subtitle || '').trim().toLowerCase();
 
   const isGenericA = !a1 || a1 === 'indian artist' || a1 === 'unknown artist' || a1 === 'various artists';
   const isGenericB = !a2 || a2 === 'indian artist' || a2 === 'unknown artist' || a2 === 'various artists';
   const isGenericT = (t) => !t || t.length < 3 || t === 'unknown title' || t === 'untitled' || t.startsWith('track ');
 
   if (!isGenericT(t1) && !isGenericT(t2) && t1 === t2) {
-    if (!isGenericA && !isGenericB && a1 === a2) {
+    if (isGenericA || isGenericB || a1 === a2 || a1.includes(a2) || a2.includes(a1)) {
       return true;
     }
   }

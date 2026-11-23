@@ -118,8 +118,16 @@ const MusicPlayer = () => {
 
       const isEngineAlreadyOnTrack = playerEngine.currentTrack && (
         isSameSong(activeSong, playerEngine.currentTrack) ||
+        (activeSong.title && playerEngine.currentTrack.title && activeSong.title.trim().toLowerCase() === playerEngine.currentTrack.title.trim().toLowerCase()) ||
         (key && playerEngine.currentVideoId && key === playerEngine.currentVideoId)
       );
+
+      const isHidden = typeof document !== 'undefined' && document.hidden;
+      if (isHidden && (isAlreadyHandledByEngine || isEngineAlreadyOnTrack || playerEngine.shouldBePlaying)) {
+        // In background or on lockscreen, playerEngine handles playback autonomously. Never interrupt it!
+        lastSyncedTrackRef.current = null;
+        return;
+      }
 
       if (isAlreadyHandledByEngine || isEngineAlreadyOnTrack) {
         // Track was already transitioned and loaded by playerEngine

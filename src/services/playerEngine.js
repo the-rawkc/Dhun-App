@@ -267,8 +267,27 @@ class PlayerEngine {
           const isHidden = typeof document !== 'undefined' && document.hidden;
 
           // Background / lock-screen safety: prefetch upcoming track early if not already cached
-          if (dur && isFinite(dur) && dur > 20 && (dur - cur) <= 35 && (dur - cur) > 2) {
+          if (dur && isFinite(dur) && dur > 10 && (dur - cur) <= 45 && (dur - cur) > 2) {
             this.ensureUpcomingTrackPrefetched();
+          }
+
+          // Lock-screen seamless handoff: trigger next track 0.8s before silence so audio focus is never dropped
+          if (
+            isHidden &&
+            dur &&
+            !isNaN(dur) &&
+            isFinite(dur) &&
+            dur > 10 &&
+            cur > 5 &&
+            (dur - cur) <= 0.8 &&
+            (dur - cur) > 0 &&
+            !this.isSwitchingTrack &&
+            !this.isLoadingTrack &&
+            this.shouldBePlaying &&
+            !this.isUserPaused
+          ) {
+            this.playNextTrack(true);
+            return;
           }
 
           // Smart Automix trigger: starts next track gently during the outro (only in foreground)
@@ -399,18 +418,13 @@ class PlayerEngine {
         if (!deck?.src || deck.src.startsWith('data:') || deck.src === window.location.href) {
           return;
         }
-        // IGNORE ended event if engine is currently switching/loading a track
-        if (this.isSwitchingTrack || this.isLoadingTrack) {
-          return;
-        }
         if (deck === this.currentDeck && (this.isDirectAudio || this.isOfflinePlayback)) {
           if (this.crossfadeTimer !== null) {
             // Next deck is already crossfading / playing
             return;
           }
           this.isCrossfading = false;
-          this.startBackgroundAudioAnchor();
-          this.playNextTrack(false);
+          this.playNextTrack(true);
         }
       });
 
@@ -681,7 +695,11 @@ class PlayerEngine {
     if (this.repeatMode === 'one') return this.queueIndex;
 
     if (this.isShuffle) {
-      if (Array.isArray(this.shuffleOrder) && this.shuffleOrder.length > 0) {
+      if (!Array.isArray(this.shuffleOrder) || this.shuffleOrder.length !== this.queue.length) {
+        this.shuffleOrder = this.buildShuffleOrder(this.queue.length, this.queueIndex);
+        this.shufflePos = 0;
+      }
+      if (this.shuffleOrder.length > 0) {
         const nextPos = (this.shufflePos + 1) % this.shuffleOrder.length;
         return this.shuffleOrder[nextPos];
       }
@@ -1014,8 +1032,17 @@ class PlayerEngine {
     this.pushPlaybackHistory(this.queueIndex);
 
     let nextIndex;
-    if (this.isShuffle && Array.isArray(this.shuffleOrder) && this.shuffleOrder.length > 0) {
-      this.shufflePos = (this.shufflePos + 1) % this.shuffleOrder.length;
+    if (this.isShuffle) {
+      if (!Array.isArray(this.shuffleOrder) || this.shuffleOrder.length !== this.queue.length) {
+        this.shuffleOrder = this.buildShuffleOrder(this.queue.length, this.queueIndex);
+        this.shufflePos = 0;
+      }
+      this.shufflePos++;
+      if (this.shufflePos >= this.shuffleOrder.length) {
+        // Full shuffle loop finished: re-shuffle and seamlessly continue
+        this.shuffleOrder = this.buildShuffleOrder(this.queue.length, this.queueIndex);
+        this.shufflePos = (this.shuffleOrder.length > 1) ? 1 : 0;
+      }
       nextIndex = this.shuffleOrder[this.shufflePos];
     } else {
       nextIndex = (this.nextUpcomingIndex !== null && this.nextUpcomingIndex >= 0 && this.nextUpcomingIndex < this.queue.length)
@@ -1308,18 +1335,6 @@ class PlayerEngine {
     const title = trackMeta?.title || trackMeta?.name || '';
     const artist = trackMeta?.artist || trackMeta?.artists || trackMeta?.subtitle || '';
 
-    // If cleanVideoId is missing or invalid, automatically resolve it via search
-    if (!isValidVideoId(cleanVideoId) && title) {
-      try {
-        const query = `${title} ${artist}`.trim();
-        const searchRes = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}&filter=songs&language=en&hl=en`);
-        const searchData = await searchRes.json();
-        if (searchData?.results?.[0]?.videoId) {
-          cleanVideoId = searchData.results[0].videoId;
-        }
-      } catch (e) {}
-    }
-
     if (!cleanVideoId && !title) return;
 
     const cacheKey = (cleanVideoId && cleanVideoId.length > 5 && !cleanVideoId.startsWith('tr_'))
@@ -1524,6 +1539,7 @@ class PlayerEngine {
             this.isSwitchingTrack = false;
             this.isLoadingTrack = false;
             this.stopBackgroundAudioAnchor();
+            this.ensureUpcomingTrackPrefetched();
           };
 
           const playPromise = deckToUse.play();
@@ -1552,6 +1568,7 @@ class PlayerEngine {
             this.updateMediaSessionState('playing');
             this.requestWakeLock();
             this.fadeInDeck(deckToUse, targetVol, transitionDuration);
+            this.ensureUpcomingTrackPrefetched();
           };
 
           const playPromise = deckToUse.play();
@@ -1911,6 +1928,16 @@ class PlayerEngine {
       const deck = this.currentDeck || this.deckA;
       if (this.isDirectAudio || this.isOfflinePlayback) {
         if (!deck) return;
+
+        // Auto-recover if deck ended and engine should be playing but next track hasn't started
+        if (deck.ended && this.shouldBePlaying && !this.isUserPaused) {
+          stuckCount++;
+          if (stuckCount >= 2) {
+            stuckCount = 0;
+            this.playNextTrack(true);
+          }
+          return;
+        }
 
         // Auto-recover if deck was paused unexpectedly (e.g. browser buffer underrun) while engine state is playing
         if (deck.paused && !deck.ended && deck.src && !deck.src.startsWith('data:')) {
