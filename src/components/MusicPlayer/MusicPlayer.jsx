@@ -88,8 +88,8 @@ const MusicPlayer = () => {
       onDurationChange: (dur) => dispatch(setDuration(dur)),
       onStateChange: (playing) => dispatch(playPause(playing)),
       onEnded: () => {}, // Handled autonomously by playerEngine.playNextTrack
-      onNext: () => dispatch(nextSong()),
-      onPrev: () => dispatch(prevSong()),
+      onNext: () => dispatch(playNextTrackNow()),
+      onPrev: () => dispatch(playPrevTrackNow()),
       onTrackChanged: (track, index) => {
         lastSyncedTrackRef.current = track;
         dispatch(syncCurrentTrack({ track, index }));
@@ -458,7 +458,7 @@ const MusicPlayer = () => {
           <button
             onClick={() => {
               playerEngine.unlockAudio();
-              dispatch(prevSong());
+              dispatch(playPrevTrackNow());
             }}
             className="p-2 theme-text-main hover:text-rose-600 active:scale-90 transition-transform"
             title="Previous"
@@ -483,7 +483,7 @@ const MusicPlayer = () => {
           <button
             onClick={() => {
               playerEngine.unlockAudio();
-              dispatch(nextSong());
+              dispatch(playNextTrackNow());
             }}
             className="p-2 theme-text-main hover:text-rose-600 active:scale-90 transition-transform"
             title="Next"

@@ -752,85 +752,29 @@ class PlayerEngine {
     }
   }
 
-  // Smoothly ramps down and retires a playing deck with an equal-power cosine curve
-  fadeAndRetireDeck(deck, durationMs = 350) {
+  // Immediately stops and retires a deck with zero lingering playback
+  fadeAndRetireDeck(deck) {
     if (!deck) return;
     this.clearDeckTimers(deck);
-
-    const isHidden = typeof document !== 'undefined' && document.hidden;
-    if (deck.paused || deck.ended || deck.volume <= 0 || isHidden) {
-      try {
-        deck.pause();
-        deck.currentTime = 0;
-        deck.src = '';
-        deck.removeAttribute('src');
-      } catch (e) {}
-      return;
-    }
-
-    const startVol = deck.volume;
-    const startTime = performance.now();
-
-    deck._fadeTimer = setInterval(() => {
-      const elapsed = performance.now() - startTime;
-      const progress = Math.min(1, elapsed / durationMs);
-
-      // Equal-power fade-out curve: cos(progress * π/2)
-      try {
-        deck.volume = Math.max(0, startVol * Math.cos(progress * 0.5 * Math.PI));
-      } catch (e) {}
-
-      if (progress >= 1) {
-        this.clearDeckTimers(deck);
-        try {
-          deck.pause();
-          deck.currentTime = 0;
-          deck.src = '';
-          deck.removeAttribute('src');
-          deck.volume = this.currentVolume ?? 0.8;
-        } catch (e) {}
-      }
-    }, 20);
-  }
-
-  // Smoothly fades in a deck with an equal-power sine curve
-  fadeInDeck(deck, targetVolume = 0.8, durationMs = 350) {
-    if (!deck) return;
-    this.clearDeckTimers(deck);
-
-    const isHidden = typeof document !== 'undefined' && document.hidden;
-    if (isHidden) {
-      try {
-        deck.volume = targetVolume;
-      } catch (e) {}
-      return;
-    }
-
-    const startTime = performance.now();
     try {
-      deck.volume = 0;
+      deck.pause();
+      deck.currentTime = 0;
+      deck.src = '';
+      deck.removeAttribute('src');
+      deck.volume = this.currentVolume ?? 0.8;
     } catch (e) {}
-
-    deck._fadeTimer = setInterval(() => {
-      const elapsed = performance.now() - startTime;
-      const progress = Math.min(1, elapsed / durationMs);
-
-      // Equal-power fade-in curve: sin(progress * π/2)
-      const currentVol = Math.sin(progress * 0.5 * Math.PI) * targetVolume;
-      try {
-        deck.volume = Math.max(0, Math.min(1, currentVol));
-      } catch (e) {}
-
-      if (progress >= 1) {
-        this.clearDeckTimers(deck);
-        try {
-          deck.volume = targetVolume;
-        } catch (e) {}
-      }
-    }, 20);
   }
 
-  // Smoothly ramps down the current deck volume before switching tracks
+  // Sets deck to target volume immediately without delay
+  fadeInDeck(deck, targetVolume = 0.8) {
+    if (!deck) return;
+    this.clearDeckTimers(deck);
+    try {
+      deck.volume = targetVolume;
+    } catch (e) {}
+  }
+
+  // Immediately stops previous deck audio before executing switch
   smoothSwitchDeck(onSwitch) {
     if (this.crossfadeTimer) {
       clearInterval(this.crossfadeTimer);
@@ -840,10 +784,8 @@ class PlayerEngine {
     this.isSwitchingTrack = true;
 
     const deck = this.currentDeck;
-    const transitionDuration = this.crossfadeSeconds === 0 ? 200 : (this.crossfadeSeconds >= 6 ? 500 : 350);
-
-    if (deck && !deck.paused && deck.currentTime > 0) {
-      this.fadeAndRetireDeck(deck, transitionDuration);
+    if (deck) {
+      this.fadeAndRetireDeck(deck);
     }
 
     if (onSwitch) onSwitch();
@@ -1059,21 +1001,10 @@ class PlayerEngine {
       this.updateMediaMetadata(nextTrack);
       this.updateMediaSessionState('playing');
 
-      const isHidden = typeof document !== 'undefined' && document.hidden;
-      if (isHidden || fromLockScreen) {
-        // Direct seamless handoff on active deck - maintain continuous audio focus on lockscreen
-        this.loadVideo(vId || nextTrack, true, nextTrack, true);
-        if (typeof this.listeners.onTrackChanged === 'function') {
-          this.listeners.onTrackChanged(nextTrack, nextIndex);
-        }
-      } else {
-        this.smoothSwitchDeck(() => {
-          this.loadVideo(vId || nextTrack, true, nextTrack, false);
-          if (typeof this.listeners.onTrackChanged === 'function') {
-            this.listeners.onTrackChanged(nextTrack, nextIndex);
-          }
-        });
+      if (typeof this.listeners.onTrackChanged === 'function') {
+        this.listeners.onTrackChanged(nextTrack, nextIndex);
       }
+      this.loadVideo(vId || nextTrack, true, nextTrack, true);
 
       this.nextUpcomingIndex = this.computeNextUpcomingIndex();
       this.prefetchNextInQueue();
@@ -1154,20 +1085,10 @@ class PlayerEngine {
       this.updateMediaMetadata(prevTrack);
       this.updateMediaSessionState('playing');
 
-      const isHidden = typeof document !== 'undefined' && document.hidden;
-      if (isHidden) {
-        this.loadVideo(vId || prevTrack, true, prevTrack, true);
-        if (typeof this.listeners.onTrackChanged === 'function') {
-          this.listeners.onTrackChanged(prevTrack, prevIndex);
-        }
-      } else {
-        this.smoothSwitchDeck(() => {
-          this.loadVideo(vId || prevTrack, true, prevTrack, false);
-          if (typeof this.listeners.onTrackChanged === 'function') {
-            this.listeners.onTrackChanged(prevTrack, prevIndex);
-          }
-        });
+      if (typeof this.listeners.onTrackChanged === 'function') {
+        this.listeners.onTrackChanged(prevTrack, prevIndex);
       }
+      this.loadVideo(vId || prevTrack, true, prevTrack, true);
 
       this.nextUpcomingIndex = this.computeNextUpcomingIndex();
       this.prefetchNextInQueue();
@@ -1381,25 +1302,20 @@ class PlayerEngine {
     this.isSwitchingTrack = true;
     this.isLoadingTrack = true;
 
-    const transitionDuration = this.crossfadeSeconds === 0 ? 200 : (this.crossfadeSeconds >= 6 ? 500 : 350);
     const isHidden = typeof document !== 'undefined' && document.hidden;
-    const shouldReuse = forceReuseCurrentDeck || isHidden;
 
-    // Only in foreground dual-deck mode do we fade-out outgoing deck
-    // In background/lockscreen, we reuse currentDeck without stopping it beforehand to prevent OS suspension
-    if (!shouldReuse) {
-      const outgoingDeck = this.currentDeck || this.deckA;
-      if (outgoingDeck && !outgoingDeck.paused && outgoingDeck.currentTime > 0) {
-        this.fadeAndRetireDeck(outgoingDeck, transitionDuration);
-      } else if (outgoingDeck) {
+    // Immediately stop outgoing audio on ALL decks so previous song NEVER lingers
+    [this.deckA, this.deckB].forEach(d => {
+      if (d) {
+        this.clearDeckTimers(d);
         try {
-          outgoingDeck.pause();
-          outgoingDeck.currentTime = 0;
+          d.pause();
+          d.currentTime = 0;
         } catch (e) {}
       }
-    }
+    });
 
-    if (this.ytPlayer && typeof this.ytPlayer.getPlayerState === 'function' && this.ytPlayer.getPlayerState() === 1) {
+    if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
       try { this.ytPlayer.pauseVideo(); } catch (e) {}
     }
 
@@ -1434,24 +1350,16 @@ class PlayerEngine {
             try { this.ytPlayer.pauseVideo(); } catch (e) {}
           }
           const targetVol = this.currentVolume ?? 0.8;
-          let deckToUse;
-
-          if (shouldReuse) {
-            deckToUse = this.currentDeck || this.deckA;
-            if (this.nextDeck && this.nextDeck !== deckToUse) {
-              try {
-                this.nextDeck.pause();
-                this.nextDeck.currentTime = 0;
-              } catch (e) {}
-            }
-          } else {
-            const outgoing = this.currentDeck || this.deckA;
-            const incomingDeck = (outgoing === this.deckA) ? this.deckB : this.deckA;
-            if (outgoing && outgoing !== incomingDeck) {
-              this.fadeAndRetireDeck(outgoing, transitionDuration);
-            }
-            deckToUse = incomingDeck;
-            this.nextDeck = outgoing;
+          const deckToUse = this.currentDeck || this.deckA;
+          const otherDeck = (deckToUse === this.deckA) ? this.deckB : this.deckA;
+          if (otherDeck) {
+            this.clearDeckTimers(otherDeck);
+            try {
+              otherDeck.pause();
+              otherDeck.currentTime = 0;
+              otherDeck.src = '';
+              otherDeck.removeAttribute('src');
+            } catch (e) {}
           }
 
           this.currentDeck = deckToUse;
@@ -1459,14 +1367,13 @@ class PlayerEngine {
 
           const objUrl = URL.createObjectURL(offlineRecord.audioBlob);
           deckToUse.src = objUrl;
-          deckToUse.volume = shouldReuse ? targetVol : 0;
+          deckToUse.volume = targetVol;
           deckToUse.muted = false;
           if (autoPlay) {
             deckToUse.play().then(() => {
               this.isSwitchingTrack = false;
               this.isLoadingTrack = false;
               this.stopBackgroundAudioAnchor();
-              if (!shouldReuse) this.fadeInDeck(deckToUse, targetVol, transitionDuration);
             }).catch(() => {});
           }
           return;
@@ -1489,121 +1396,70 @@ class PlayerEngine {
       }
 
       const targetVol = this.currentVolume ?? 0.8;
-      let deckToUse;
-
-      if (shouldReuse) {
-        deckToUse = this.currentDeck || this.deckA;
-        const otherDeck = (deckToUse === this.deckA) ? this.deckB : this.deckA;
-        if (otherDeck) {
-          this.clearDeckTimers(otherDeck);
-          try {
-            otherDeck.pause();
-            otherDeck.currentTime = 0;
-            otherDeck.src = '';
-            otherDeck.removeAttribute('src');
-          } catch (e) {}
-        }
-      } else {
-        const outgoing = this.currentDeck || this.deckA;
-        const incomingDeck = (outgoing === this.deckA) ? this.deckB : this.deckA;
-
-        if (outgoing && outgoing !== incomingDeck) {
-          this.clearDeckTimers(outgoing);
-          try {
-            outgoing.pause();
-            outgoing.currentTime = 0;
-            outgoing.src = '';
-            outgoing.removeAttribute('src');
-          } catch (e) {}
-        }
-        deckToUse = incomingDeck;
-        this.nextDeck = outgoing;
+      const deckToUse = this.currentDeck || this.deckA;
+      const otherDeck = (deckToUse === this.deckA) ? this.deckB : this.deckA;
+      if (otherDeck) {
+        this.clearDeckTimers(otherDeck);
+        try {
+          otherDeck.pause();
+          otherDeck.currentTime = 0;
+          otherDeck.src = '';
+          otherDeck.removeAttribute('src');
+        } catch (e) {}
       }
 
       this.currentDeck = deckToUse;
       this.offlineAudioEl = deckToUse;
 
       deckToUse.src = data.streamUrl;
+      deckToUse.volume = targetVol;
       deckToUse.muted = false;
       this.activeAbortController = null;
 
       if (autoPlay && this.shouldBePlaying && !this.isUserPaused) {
-        if (shouldReuse) {
-          // Lockscreen / background: set full volume immediately and keep active audio session alive
-          deckToUse.volume = targetVol;
-          this.listeners.stateChange(true);
-          this.updateMediaSessionState('playing');
-          this.requestWakeLock();
+        this.listeners.stateChange(true);
+        this.updateMediaSessionState('playing');
+        this.requestWakeLock();
 
-          const onDeckPlaybackStarted = () => {
-            this.isSwitchingTrack = false;
-            this.isLoadingTrack = false;
-            this.stopBackgroundAudioAnchor();
-            this.ensureUpcomingTrackPrefetched();
-          };
+        const onDeckPlaybackStarted = () => {
+          this.isSwitchingTrack = false;
+          this.isLoadingTrack = false;
+          this.stopBackgroundAudioAnchor();
+          this.ensureUpcomingTrackPrefetched();
+        };
 
-          const playPromise = deckToUse.play();
-          if (playPromise !== undefined) {
-            playPromise.then(onDeckPlaybackStarted).catch((err) => {
-              console.warn('Direct stream immediate play rejected on lockscreen, awaiting readyState:', err);
-              const tryPlay = () => {
-                deckToUse.removeEventListener('canplay', tryPlay);
-                deckToUse.removeEventListener('loadeddata', tryPlay);
-                if (this.shouldBePlaying && !this.isUserPaused) {
-                  deckToUse.play().then(onDeckPlaybackStarted).catch(() => {});
-                }
-              };
-              deckToUse.addEventListener('canplay', tryPlay, { once: true });
-              deckToUse.addEventListener('loadeddata', tryPlay, { once: true });
-            });
-          }
-        } else {
-          // Foreground smooth fade-in
-          deckToUse.volume = 0;
-          const onPlaybackStarted = () => {
-            this.isSwitchingTrack = false;
-            this.isLoadingTrack = false;
-            this.stopBackgroundAudioAnchor();
-            this.listeners.stateChange(true);
-            this.updateMediaSessionState('playing');
-            this.requestWakeLock();
-            this.fadeInDeck(deckToUse, targetVol, transitionDuration);
-            this.ensureUpcomingTrackPrefetched();
-          };
+        const playPromise = deckToUse.play();
+        if (playPromise !== undefined) {
+          playPromise.then(onDeckPlaybackStarted).catch((err) => {
+            console.warn('Direct stream immediate play rejected, awaiting readyState:', err);
+            let hasPlayed = false;
+            const tryPlay = () => {
+              if (hasPlayed) return;
+              hasPlayed = true;
+              deckToUse.removeEventListener('canplay', tryPlay);
+              deckToUse.removeEventListener('loadeddata', tryPlay);
+              if (this.shouldBePlaying && !this.isUserPaused) {
+                deckToUse.play().then(onDeckPlaybackStarted).catch((err2) => {
+                  console.warn('Buffered play failed, trying fallback stream:', err2);
+                  if (data.fallbackUrl && deckToUse.src !== data.fallbackUrl) {
+                    deckToUse.src = data.fallbackUrl;
+                    deckToUse.play().then(onDeckPlaybackStarted).catch(() => {
+                      if (cleanVideoId && !isHidden) this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
+                      else this.playNextTrack(false);
+                    });
+                  } else if (cleanVideoId && !isHidden) {
+                    this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
+                  } else {
+                    this.playNextTrack(false);
+                  }
+                });
+              }
+            };
 
-          const playPromise = deckToUse.play();
-          if (playPromise !== undefined) {
-            playPromise.then(onPlaybackStarted).catch((err) => {
-              console.warn('Direct stream initial play rejected, waiting for buffer:', err);
-              let hasPlayed = false;
-              const tryPlay = () => {
-                if (hasPlayed) return;
-                hasPlayed = true;
-                deckToUse.removeEventListener('canplay', tryPlay);
-                deckToUse.removeEventListener('loadeddata', tryPlay);
-                if (this.shouldBePlaying && !this.isUserPaused) {
-                  deckToUse.play().then(onPlaybackStarted).catch((err2) => {
-                    console.warn('Buffered play failed, trying fallback stream:', err2);
-                    if (data.fallbackUrl && deckToUse.src !== data.fallbackUrl) {
-                      deckToUse.src = data.fallbackUrl;
-                      deckToUse.play().then(onPlaybackStarted).catch(() => {
-                        if (cleanVideoId && !isHidden) this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
-                        else this.playNextTrack(false);
-                      });
-                    } else if (cleanVideoId && !isHidden) {
-                      this.fallbackToYouTube(cleanVideoId, autoPlay, trackMeta);
-                    } else {
-                      this.playNextTrack(false);
-                    }
-                  });
-                }
-              };
-
-              deckToUse.addEventListener('canplay', tryPlay, { once: true });
-              deckToUse.addEventListener('loadeddata', tryPlay, { once: true });
-              setTimeout(tryPlay, 500);
-            });
-          }
+            deckToUse.addEventListener('canplay', tryPlay, { once: true });
+            deckToUse.addEventListener('loadeddata', tryPlay, { once: true });
+            setTimeout(tryPlay, 400);
+          });
         }
       } else {
         this.isSwitchingTrack = false;
